@@ -8,6 +8,8 @@ set -euo pipefail
 SING_BOX_VERSION="${SING_BOX_VERSION:-v1.13.21}"
 GOMOBILE_VERSION="v0.1.12"
 BUILD_TAGS="with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api,badlinkname,tfogo_checklinkname0"
+# NaiveProxy (Chromium cronet) — как в официальном клиенте sing-box. NAIVE=0 — собрать без него
+NAIVE="${NAIVE:-1}"
 TARGETS="${TARGETS:-android/arm64,android/arm}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -35,17 +37,32 @@ cd "$WORK"
 echo "==> тесты парсера подписки"
 APEX_RULES_DIR="$ROOT/app/src/main/assets/rules" go test -tags "$BUILD_TAGS" -ldflags "-checklinkname=0" ./experimental/apexcore/
 
-echo "==> gomobile bind ($TARGETS)"
-gomobile bind -v \
-  -target "$TARGETS" \
-  -androidapi 21 \
-  -javapkg=io.nekohasekai \
-  -libname=box \
-  -trimpath -buildvcs=false \
-  -ldflags "-X github.com/sagernet/sing-box/constant.Version=${SING_BOX_VERSION#v} -X internal/godebug.defaultGODEBUG=multipathtcp=0 -s -w -buildid= -checklinkname=0" \
-  -tags "$BUILD_TAGS" \
-  -o libbox.aar \
-  ./experimental/libbox ./experimental/apexcore
+bind() {
+  gomobile bind -v \
+    -target "$TARGETS" \
+    -androidapi 23 \
+    -javapkg=io.nekohasekai \
+    -libname=box \
+    -trimpath -buildvcs=false \
+    -ldflags "-X github.com/sagernet/sing-box/constant.Version=${SING_BOX_VERSION#v} -X internal/godebug.defaultGODEBUG=multipathtcp=0 -s -w -buildid= -checklinkname=0" \
+    -tags "$1" \
+    -o libbox.aar \
+    ./experimental/libbox ./experimental/apexcore
+}
+
+if [[ "$NAIVE" == "1" ]]; then
+  echo "==> проверка конфига NaiveProxy"
+  APEX_RULES_DIR="$ROOT/app/src/main/assets/rules" go test -tags "$BUILD_TAGS,with_naive_outbound" -ldflags "-checklinkname=0" -run Naive ./experimental/apexcore/ \
+    || echo "::warning title=NaiveProxy::тест конфига NaiveProxy не прошёл на сборочной машине"
+  echo "==> gomobile bind ($TARGETS) с NaiveProxy"
+  if ! bind "$BUILD_TAGS,with_naive_outbound"; then
+    echo "::warning title=NaiveProxy::ядро с NaiveProxy не собралось — собираю без него"
+    bind "$BUILD_TAGS"
+  fi
+else
+  echo "==> gomobile bind ($TARGETS)"
+  bind "$BUILD_TAGS"
+fi
 
 mkdir -p "$(dirname "$OUT")"
 cp libbox.aar "$OUT"

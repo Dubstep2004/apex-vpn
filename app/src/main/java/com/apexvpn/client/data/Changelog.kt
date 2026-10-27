@@ -6,6 +6,18 @@ data class Release(val version: String, val code: Int, val date: String, val cha
 object Changelog {
     val releases = listOf(
         Release(
+            "1.3.0", 6, "28 октября 2026",
+            listOf(
+                "Категории протоколов в выборе сервера: VLESS, VMess, Trojan, Shadowsocks, Hysteria и другие",
+                "Автопилот выбирает сервер только среди выбранного протокола",
+                "У каждого сервера видно, как он подключается: Reality, TLS, WS, gRPC, QUIC…",
+                "Новые протоколы: Hysteria (v1), AnyTLS, NaiveProxy, ShadowTLS, SOCKS, HTTP(S), SSH",
+                "Shadowsocks с плагинами obfs-local и v2ray-plugin",
+                "Исправлены ссылки Hysteria 2 со сменой портов",
+                "Цепочки серверов (detour) из JSON-подписок",
+            ),
+        ),
+        Release(
             "1.2.2", 5, "28 октября 2026",
             listOf(
                 "Свой User-Agent для подписки: Настройки → Подписка → User-Agent (и на первом экране)",

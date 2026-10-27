@@ -21,7 +21,28 @@ data class Node(
     val type: String,
     val server: String,
     val port: Int,
+    /** Категория протокола: VLESS, Hysteria 2, ShadowTLS… */
+    val category: String = Protocols.category(type),
+    /** Описание подключения: «Reality · Vision · TCP» */
+    val detail: String = "",
+    /** Протокол поверх UDP/QUIC — пинг по TCP не измерить */
+    val udp: Boolean = type in Protocols.udpTypes,
 )
+
+/** Категории протоколов (то же, что в core/apexcore/protocols.go). */
+object Protocols {
+    private val names = mapOf(
+        "vless" to "VLESS", "vmess" to "VMess", "trojan" to "Trojan", "shadowsocks" to "Shadowsocks",
+        "hysteria2" to "Hysteria 2", "hysteria" to "Hysteria", "tuic" to "TUIC", "wireguard" to "WireGuard",
+        "anytls" to "AnyTLS", "naive" to "NaiveProxy", "socks" to "SOCKS", "http" to "HTTP", "ssh" to "SSH",
+        "shadowtls" to "ShadowTLS",
+    )
+    private val short = mapOf("Shadowsocks" to "SS", "Hysteria 2" to "Hy2", "Hysteria" to "Hy", "WireGuard" to "WG", "NaiveProxy" to "Naive")
+    val udpTypes = setOf("hysteria2", "hysteria", "tuic", "wireguard")
+
+    fun category(type: String) = names[type] ?: type.uppercase()
+    fun shortName(category: String) = short[category] ?: category
+}
 
 data class SubscriptionState(
     val url: String = "",
@@ -242,12 +263,16 @@ object Subscription {
         val arr = JSONArray(json)
         List(arr.length()) { i ->
             val o = arr.getJSONObject(i)
+            val type = o.optString("type")
             Node(
                 tag = o.getString("tag"),
                 name = o.optString("name"),
-                type = o.optString("type"),
+                type = type,
                 server = o.optString("server"),
                 port = o.optInt("port"),
+                category = o.optString("category").ifEmpty { Protocols.category(type) },
+                detail = o.optString("detail"),
+                udp = o.optBoolean("udp", type in Protocols.udpTypes),
             )
         }
     }.getOrDefault(emptyList())

@@ -37,6 +37,7 @@ data class Settings(
     val sharePass: String = "",
     // Серверы
     val favorites: Set<String> = emptySet(),          // по названию сервера
+    val protocol: String = "",                        // категория протокола в списке и для автопилота; "" — все
     // Уведомления и фон
     val speedInNotification: Boolean = true,
     val expiryAlerts: Boolean = true,
@@ -102,6 +103,7 @@ object AppSettings {
         put("adBlock", s.adBlock)
         put("ipv6", s.ipv6)
         put("profile", s.profile.id)
+        put("autoProtocols", JSONArray(if (s.protocol.isEmpty()) emptyList() else listOf(s.protocol)))
         put(
             "share",
             JSONObject().put("enabled", s.share).put("port", s.sharePort)
@@ -138,7 +140,7 @@ object AppSettings {
         put("ipv6", s.ipv6); put("profile", s.profile.id); put("failover", s.failover)
         put("wifiRules", s.wifiRules); put("trustedWifi", list(s.trustedWifi))
         put("share", s.share); put("sharePort", s.sharePort); put("shareUser", s.shareUser); put("sharePass", s.sharePass)
-        put("favorites", list(s.favorites))
+        put("favorites", list(s.favorites)); put("protocol", s.protocol)
         put("speedNotif", s.speedInNotification); put("expiryAlerts", s.expiryAlerts)
         put("autoUpdates", s.autoCheckUpdates); put("crashReports", s.crashReports); put("refreshHours", s.refreshHours)
         put("theme", s.theme.id); put("accent", s.accent.id)
@@ -169,6 +171,7 @@ object AppSettings {
             shareUser = o.optString("shareUser", d.shareUser),
             sharePass = o.optString("sharePass", d.sharePass),
             favorites = arr("favorites", d.favorites).toSet(),
+            protocol = o.optString("protocol", d.protocol),
             speedInNotification = o.optBoolean("speedNotif", d.speedInNotification),
             expiryAlerts = o.optBoolean("expiryAlerts", d.expiryAlerts),
             autoCheckUpdates = o.optBoolean("autoUpdates", d.autoCheckUpdates),

@@ -48,6 +48,8 @@ type routeOptions struct {
 	IPv6          bool         `json:"ipv6"`
 	Profile       string       `json:"profile"`       // normal | gaming | calls | battery
 	Share         shareOptions `json:"share"`         // раздача на компьютер
+	// Протоколы, среди которых автопилот выбирает сервер (категории Node.Category). Пусто — все.
+	AutoProtocols []string `json:"autoProtocols"`
 }
 
 // профиль подключения: как часто проверять серверы и рвать ли соединения при смене
@@ -119,13 +121,24 @@ func BuildConfig(nodesJSON string, selectedTag string, optionsJSON string) (stri
 
 	tags := make([]string, 0, len(nodes))
 	found := selectedTag == AutoTag
+	allowed := map[string]bool{}
+	for _, c := range opts.AutoProtocols {
+		allowed[c] = true
+	}
+	var autoTags []string
 	var proxyOutbounds, endpoints []any
-	for _, n := range nodes {
+	for i := range nodes {
+		n := &nodes[i]
 		if n.Outbound == nil || n.Tag == "" {
 			continue
 		}
 		n.Outbound["tag"] = n.Tag
+		linkChain(n)
+		fillMeta(n)
 		tags = append(tags, n.Tag)
+		if len(allowed) == 0 || allowed[n.Category] {
+			autoTags = append(autoTags, n.Tag)
+		}
 		if n.Tag == selectedTag {
 			found = true
 		}
@@ -134,9 +147,15 @@ func BuildConfig(nodesJSON string, selectedTag string, optionsJSON string) (stri
 		} else {
 			proxyOutbounds = append(proxyOutbounds, n.Outbound)
 		}
+		for _, e := range n.Extra {
+			proxyOutbounds = append(proxyOutbounds, e)
+		}
 	}
 	if len(tags) == 0 {
 		return "", errors.New("нет серверов")
+	}
+	if len(autoTags) == 0 {
+		autoTags = tags // выбранных протоколов в подписке нет — берём все
 	}
 	if !found {
 		selectedTag = AutoTag
@@ -151,7 +170,7 @@ func BuildConfig(nodesJSON string, selectedTag string, optionsJSON string) (stri
 		},
 		map[string]any{
 			"type": "urltest", "tag": AutoTag,
-			"outbounds":                   tags,
+			"outbounds":                   autoTags,
 			"url":                         "https://www.gstatic.com/generate_204",
 			"interval":                    prof.interval,
 			"tolerance":                   prof.tolerance,

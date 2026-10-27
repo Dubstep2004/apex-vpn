@@ -2,6 +2,7 @@ package com.apexvpn.client.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,6 +50,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.apexvpn.client.data.AUTO_TAG
 import com.apexvpn.client.data.Node
 import com.apexvpn.client.data.Pinger
+import com.apexvpn.client.data.Protocols
 import com.apexvpn.client.data.ServerInfo
 import com.apexvpn.client.ui.theme.Apex
 
@@ -59,10 +61,6 @@ private const val COLLAPSED = 4
 /** Серверы с одинаковым названием (разные протоколы) показываем одной строкой. */
 private data class ServerGroup(val title: String, val flag: String?, val nodes: List<Node>)
 
-private val typeNames = mapOf(
-    "vless" to "VLESS", "vmess" to "VMess", "trojan" to "Trojan", "shadowsocks" to "SS",
-    "hysteria2" to "Hy2", "tuic" to "TUIC", "wireguard" to "WG", "anytls" to "AnyTLS", "hysteria" to "Hy",
-)
 
 /** Шторка выбора сервера: автопилот, избранное, сортировка по пингу, протоколы. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -83,7 +81,13 @@ fun ServerSheet(viewModel: MainViewModel, onDismiss: () -> Unit) {
     fun key(n: Node) = ping(n)?.takeIf { it >= 0 } ?: Int.MAX_VALUE
     fun groupKey(g: ServerGroup) = g.nodes.minOf { key(it) }
 
-    val groups = sub.nodes
+    // Категории протоколов: сколько серверов каждого вида в подписке
+    val categories = sub.nodes.groupingBy { it.category }.eachCount().entries
+        .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
+    val activeProtocol = settings.protocol.takeIf { p -> categories.any { it.key == p } } ?: ""
+    val visible = if (activeProtocol.isEmpty()) sub.nodes else sub.nodes.filter { it.category == activeProtocol }
+
+    val groups = visible
         .groupBy { ServerInfo.flag(it.name) to ServerInfo.title(it.name) }
         .map { (k, list) -> ServerGroup(k.second, k.first, list.sortedBy { key(it) }) }
     val favorites = groups.filter { g -> g.nodes.any { it.name in settings.favorites } || g.title in settings.favorites }
@@ -138,6 +142,33 @@ fun ServerSheet(viewModel: MainViewModel, onDismiss: () -> Unit) {
             Spacer(Modifier.height(14.dp))
 
             Segmented(ServerTab.entries.map { it.title }, ServerTab.entries.indexOf(tab)) { tab = ServerTab.entries[it] }
+
+            // Категории протоколов
+            if (categories.size > 1) {
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    ProtocolChip("Все протоколы", sub.nodes.size, activeProtocol.isEmpty()) {
+                        viewModel.change { copy(protocol = "") }
+                    }
+                    categories.forEach { (name, count) ->
+                        ProtocolChip(name, count, activeProtocol == name) {
+                            val next = if (activeProtocol == name) "" else name
+                            viewModel.change { copy(protocol = next) }
+                        }
+                    }
+                }
+                if (activeProtocol.isNotEmpty()) {
+                    Text(
+                        "Показаны только $activeProtocol. Автопилот тоже выбирает среди них.",
+                        color = Apex.TextDim,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(start = 4.dp, top = 8.dp),
+                    )
+                }
+            }
 
             val pick: (Node) -> Unit = { viewModel.select(it.tag); onDismiss() }
             val row: @Composable (ServerGroup, Boolean) -> Unit = { g, isFastest ->
@@ -280,16 +311,29 @@ private fun GroupRow(
                 )
             }
         }
+        // Протокол и способ подключения: «VLESS · Reality · Vision · TCP»
+        val shownNode = selectedNode ?: best
+        val info = listOf(shownNode.category, shownNode.detail).filter { it.isNotBlank() }.joinToString(" · ")
+        if (info.isNotEmpty()) {
+            Text(
+                info,
+                color = Apex.TextDim,
+                fontSize = 13.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = 54.dp, top = 2.dp),
+            )
+        }
         // 23. Выбор протокола, если у сервера несколько подключений
         if (group.nodes.size > 1) {
             Spacer(Modifier.height(8.dp))
-            Row(Modifier.padding(start = 54.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.padding(start = 54.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 val counts = mutableMapOf<String, Int>()
                 group.nodes.forEach { n ->
-                    val base = typeNames[n.type] ?: n.type.uppercase()
+                    val base = Protocols.shortName(n.category)
                     val idx = (counts[base] ?: 0) + 1
                     counts[base] = idx
-                    val label = if (group.nodes.count { (typeNames[it.type] ?: it.type.uppercase()) == base } > 1) "$base $idx" else base
+                    val label = if (group.nodes.count { Protocols.shortName(it.category) == base } > 1) "$base $idx" else base
                     val on = n.tag == selectedTag
                     Text(
                         label,
@@ -305,6 +349,31 @@ private fun GroupRow(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ProtocolChip(title: String, count: Int, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (selected) Apex.Accent else Apex.Surface)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            title,
+            color = if (selected) androidx.compose.ui.graphics.Color.White else Apex.Text,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            count.toString(),
+            color = if (selected) androidx.compose.ui.graphics.Color.White.copy(alpha = 0.75f) else Apex.TextDim,
+            fontSize = 13.sp,
+        )
     }
 }
 

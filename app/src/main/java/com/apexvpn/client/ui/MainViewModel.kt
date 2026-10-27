@@ -63,7 +63,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         viewModelScope.launch {
-            if (Subscription.needsRefresh()) refresh(silent = true)
+            // После обновления до 1.3 у сохранённых серверов нет описаний протоколов — обновим один раз
+            val oldFormat = Subscription.state.value.nodes.let { n -> n.isNotEmpty() && n.all { it.detail.isEmpty() } }
+            if (Subscription.needsRefresh() || oldFormat) refresh(silent = true)
         }
         if (AppSettings.value.autoCheckUpdates) {
             viewModelScope.launch { UpdateManager.check(silent = true) }

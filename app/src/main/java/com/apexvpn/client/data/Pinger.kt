@@ -15,14 +15,14 @@ object Pinger {
     private const val TIMEOUT_MS = 3000
 
     const val UNREACHABLE = -1
-    const val NOT_APPLICABLE = -2 // UDP-протоколы (Hysteria2, TUIC) по TCP не измерить
+    const val NOT_APPLICABLE = -2 // UDP-протоколы (Hysteria, TUIC, WireGuard) по TCP не измерить
 
     /** tag → задержка в мс, UNREACHABLE или NOT_APPLICABLE */
     suspend fun pingAll(nodes: List<Node>): Map<String, Int> = withContext(Dispatchers.IO) {
         val limit = Semaphore(8)
         nodes.map { node ->
             async {
-                if (node.type == "hysteria2" || node.type == "tuic") {
+                if (node.udp) {
                     node.tag to NOT_APPLICABLE
                 } else {
                     limit.withPermit { node.tag to ping(node.server, node.port) }

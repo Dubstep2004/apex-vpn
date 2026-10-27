@@ -25,6 +25,14 @@ type Node struct {
 	Outbound map[string]any `json:"outbound"`
 	// Endpoint — узел уровня endpoints в sing-box (WireGuard), а не outbounds
 	Endpoint bool `json:"endpoint,omitempty"`
+	// Категория протокола для экрана выбора: VLESS, Hysteria 2, ShadowTLS…
+	Category string `json:"category,omitempty"`
+	// Описание подключения: «Reality · Vision · TCP»
+	Detail string `json:"detail,omitempty"`
+	// UDP — протокол поверх UDP/QUIC (задержку не измерить по TCP)
+	UDP bool `json:"udp,omitempty"`
+	// Extra — промежуточные outbounds цепочки (detour): ShadowTLS и т. п.
+	Extra []map[string]any `json:"extra,omitempty"`
 }
 
 type parseResult struct {
@@ -95,6 +103,8 @@ func parse(content string) (*parseResult, error) {
 		n := &res.Nodes[i]
 		n.Tag = fmt.Sprintf("node-%d", i+1)
 		n.Outbound["tag"] = n.Tag
+		linkChain(n)
+		fillMeta(n)
 		if strings.TrimSpace(n.Name) == "" {
 			n.Name = fmt.Sprintf("%s:%d", n.Server, n.Port)
 		}
@@ -119,7 +129,10 @@ func decodeBase64(s string) (string, bool) {
 var proxyTypes = map[string]bool{
 	"vless": true, "vmess": true, "trojan": true, "shadowsocks": true,
 	"hysteria2": true, "tuic": true, "hysteria": true, "anytls": true,
+	"naive": true, "socks": true, "http": true, "ssh": true, "shadowtls": true,
 }
+
+const maxChain = 3
 
 func parseSingBoxJSON(content string, res *parseResult) error {
 	var cfg struct {
@@ -129,19 +142,34 @@ func parseSingBoxJSON(content string, res *parseResult) error {
 	if err := json.Unmarshal([]byte(content), &cfg); err != nil {
 		return fmt.Errorf("неверный JSON подписки: %w", err)
 	}
+	byTag := map[string]map[string]any{}
+	for _, ob := range cfg.Outbounds {
+		if tag, _ := ob["tag"].(string); tag != "" {
+			byTag[tag] = ob
+		}
+	}
 	for _, ob := range cfg.Outbounds {
 		typ, _ := ob["type"].(string)
 		if !proxyTypes[typ] {
 			continue
 		}
 		name, _ := ob["tag"].(string)
-		server, _ := ob["server"].(string)
+		// ShadowTLS сам по себе не прокси — он нужен как ступень цепочки
+		if typ == "shadowtls" {
+			continue
+		}
+		extra, err := resolveChain(ob, byTag)
+		if err != nil {
+			res.Skipped = append(res.Skipped, fmt.Sprintf("%s: %v", name, err))
+			continue
+		}
+		main := copyMap(ob)
+		server, _ := main["server"].(string)
 		port := 0
-		if p, ok := ob["server_port"].(float64); ok {
+		if p, ok := main["server_port"].(float64); ok {
 			port = int(p)
 		}
-		delete(ob, "detour")
-		res.Nodes = append(res.Nodes, Node{Name: name, Type: typ, Server: server, Port: port, Outbound: ob})
+		res.Nodes = append(res.Nodes, Node{Name: name, Type: typ, Server: server, Port: port, Outbound: main, Extra: extra})
 	}
 	for _, ep := range cfg.Endpoints {
 		if typ, _ := ep["type"].(string); typ != "wireguard" {
@@ -164,6 +192,52 @@ func parseSingBoxJSON(content string, res *parseResult) error {
 	return nil
 }
 
+func copyMap(m map[string]any) map[string]any {
+	c := make(map[string]any, len(m))
+	for k, v := range m {
+		c[k] = v
+	}
+	return c
+}
+
+// resolveChain собирает цепочку detour (например, Shadowsocks → ShadowTLS).
+// Ссылки на direct/неизвестные теги отбрасываются — узел подключается напрямую.
+func resolveChain(ob map[string]any, byTag map[string]map[string]any) ([]map[string]any, error) {
+	var chain []map[string]any
+	seen := map[string]bool{}
+	cur := ob
+	for {
+		detour, _ := cur["detour"].(string)
+		if detour == "" {
+			break
+		}
+		next, ok := byTag[detour]
+		typ, _ := next["type"].(string)
+		if !ok || !proxyTypes[typ] {
+			break // direct, selector и т. п. — просто идём напрямую
+		}
+		if seen[detour] || len(chain) >= maxChain {
+			return nil, errors.New("слишком длинная или зацикленная цепочка")
+		}
+		seen[detour] = true
+		chain = append(chain, copyMap(next))
+		cur = next
+	}
+	return chain, nil
+}
+
+// linkChain даёт ступеням цепочки уникальные теги и связывает их через detour.
+func linkChain(n *Node) {
+	prev := n.Outbound
+	for j, e := range n.Extra {
+		tag := fmt.Sprintf("%s-via%d", n.Tag, j+1)
+		e["tag"] = tag
+		prev["detour"] = tag
+		prev = e
+	}
+	delete(prev, "detour")
+}
+
 func parseLink(link string) (*Node, error) {
 	scheme, _, ok := strings.Cut(link, "://")
 	if !ok {
@@ -184,6 +258,22 @@ func parseLink(link string) (*Node, error) {
 		return parseTUIC(link)
 	case "wireguard", "wg":
 		return parseWireGuard(link)
+	case "hysteria", "hy":
+		return parseHysteria(link)
+	case "socks", "socks5", "socks5h", "socks4", "socks4a":
+		return parseSOCKS(link)
+	case "http", "https":
+		return parseHTTPProxy(link)
+	case "ssh":
+		return parseSSH(link)
+	case "anytls":
+		return parseAnyTLS(link)
+	case "naive+https", "naive+quic", "naive":
+		return parseNaive(link)
+	case "ssr":
+		return parseSSR(link)
+	case "xhttp", "splithttp":
+		return nil, errors.New("XHTTP не поддерживается ядром sing-box")
 	case "awg", "amneziawg":
 		return nil, errors.New("AmneziaWG не поддерживается ядром sing-box")
 	default:
@@ -505,15 +595,22 @@ func parseShadowsocks(link string) (*Node, error) {
 	if err != nil || perr != nil || port <= 0 {
 		return nil, fmt.Errorf("ss %s: неверный адрес", name)
 	}
-	if q, _ := url.ParseQuery(query); q.Get("plugin") != "" {
-		return nil, fmt.Errorf("ss %s: плагины не поддерживаются", name)
-	}
 	ob := map[string]any{
 		"type":        "shadowsocks",
 		"server":      host,
 		"server_port": port,
 		"method":      method,
 		"password":    password,
+	}
+	if q, _ := url.ParseQuery(query); q.Get("plugin") != "" {
+		plugin, opts, err := ssPlugin(q.Get("plugin"))
+		if err != nil {
+			return nil, fmt.Errorf("ss %s: %w", name, err)
+		}
+		ob["plugin"] = plugin
+		if opts != "" {
+			ob["plugin_opts"] = opts
+		}
 	}
 	return &Node{Name: strings.TrimSpace(name), Type: "shadowsocks", Server: host, Port: port, Outbound: ob}, nil
 }
@@ -522,6 +619,7 @@ func parseHysteria2(link string) (*Node, error) {
 	if strings.HasPrefix(strings.ToLower(link), "hy2://") {
 		link = "hysteria2://" + link[len("hy2://"):]
 	}
+	link, portSpec := splitMultiPort(link)
 	u, err := url.Parse(link)
 	if err != nil {
 		return nil, fmt.Errorf("hysteria2: %w", err)
@@ -529,24 +627,15 @@ func parseHysteria2(link string) (*Node, error) {
 	q := u.Query()
 	name := fragmentName(u)
 	server := u.Hostname()
-	portStr := u.Port()
-	ob := map[string]any{"type": "hysteria2", "server": server}
-	// Port hopping: "443,20000-30000"
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		var ports []string
-		for _, p := range splitList(portStr) {
-			ports = append(ports, strings.ReplaceAll(p, "-", ":"))
-		}
-		if len(ports) == 0 {
-			return nil, fmt.Errorf("hysteria2 %s: неверный порт", name)
-		}
-		ob["server_ports"] = ports
-		first := strings.SplitN(ports[0], ":", 2)[0]
-		port, _ = strconv.Atoi(first)
-	} else {
-		ob["server_port"] = port
+	port, err := strconv.Atoi(u.Port())
+	if err != nil || port <= 0 {
+		return nil, fmt.Errorf("hysteria2 %s: неверный порт", name)
 	}
+	ob := map[string]any{"type": "hysteria2", "server": server}
+	if portSpec == "" {
+		portSpec = q.Get("mport")
+	}
+	applyPorts(ob, port, portSpec)
 	if server == "" {
 		return nil, fmt.Errorf("hysteria2 %s: нет адреса", name)
 	}
