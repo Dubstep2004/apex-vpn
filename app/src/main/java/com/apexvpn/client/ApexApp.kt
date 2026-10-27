@@ -1,0 +1,91 @@
+package com.apexvpn.client
+
+import android.app.Application
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.net.ConnectivityManager
+import android.os.Build
+import androidx.core.content.getSystemService
+import com.apexvpn.client.data.AppSettings
+import com.apexvpn.client.data.BackgroundWork
+import com.apexvpn.client.data.CrashReporter
+import com.apexvpn.client.data.News
+import com.apexvpn.client.data.Prefs
+import com.apexvpn.client.data.Subscription
+import com.apexvpn.client.vpn.ApexTileService
+import com.apexvpn.client.vpn.ApexWidget
+import com.apexvpn.client.vpn.VpnState
+import io.nekohasekai.libbox.Libbox
+import io.nekohasekai.libbox.SetupOptions
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
+import java.io.File
+
+class ApexApp : Application() {
+
+    /** Область для фоновых дел всего приложения. */
+    val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    override fun onCreate() {
+        super.onCreate()
+        instance = this
+        CrashReporter.install(this)
+        Prefs.init(this)
+        AppSettings.init(this)
+        News.init(this)
+
+        val workingDir = File(filesDir, "work").apply { mkdirs() }
+        val tempDir = File(cacheDir, "box").apply { mkdirs() }
+        Libbox.setup(
+            SetupOptions().also {
+                it.basePath = filesDir.path
+                it.workingPath = workingDir.path
+                it.tempPath = tempDir.path
+                // Обход бага Go на Android: https://github.com/golang/go/issues/68760
+                it.fixAndroidStack = BuildConfig.DEBUG ||
+                    Build.VERSION.SDK_INT in Build.VERSION_CODES.N..Build.VERSION_CODES.N_MR1 ||
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+                it.logMaxLines = 300
+                it.debug = BuildConfig.DEBUG
+            },
+        )
+        runCatching { Libbox.redirectStderr(File(workingDir, "stderr.log").path) }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val nm = getSystemService<NotificationManager>()!!
+            nm.createNotificationChannel(
+                NotificationChannel(CHANNEL_VPN, getString(R.string.notification_channel), NotificationManager.IMPORTANCE_LOW)
+                    .apply { setShowBadge(false) },
+            )
+            nm.createNotificationChannel(
+                NotificationChannel(CHANNEL_ALERTS, getString(R.string.notification_channel_alerts), NotificationManager.IMPORTANCE_DEFAULT),
+            )
+        }
+
+        // Виджет и плитка следят за состоянием VPN и выбранным сервером
+        appScope.launch {
+            combine(VpnState.status, Subscription.state) { s, sub -> s to sub.selectedTag }
+                .distinctUntilChanged()
+                .collect {
+                    ApexWidget.refresh(this@ApexApp)
+                    ApexTileService.refresh(this@ApexApp)
+                }
+        }
+
+        BackgroundWork.schedule(this)
+    }
+
+    companion object {
+        const val CHANNEL_VPN = "vpn_status"
+        const val CHANNEL_ALERTS = "alerts"
+        lateinit var instance: ApexApp
+            private set
+
+        val connectivity: ConnectivityManager
+            get() = instance.getSystemService()!!
+    }
+}

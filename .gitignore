@@ -1,0 +1,18 @@
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+.DS_Store
+captures/
+.cxx/
+.kotlin/
+
+# Ядро собирается скриптом core/build-core.sh
+app/libs/*.aar
+core/.build/
+
+# Ключи подписи — никогда не коммитить
+*.jks
+*.keystore
+keystore.properties
