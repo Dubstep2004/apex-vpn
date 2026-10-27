@@ -132,7 +132,7 @@ private fun ChoiceRow(title: String, subtitle: String?, selected: Boolean, onCli
 @Composable
 private fun AppsPage(viewModel: MainViewModel, onBack: () -> Unit) {
     val s by viewModel.settings.collectAsStateWithLifecycle()
-    val apps by viewModel.apps.collectAsStateWithLifecycle()
+    val appList by viewModel.apps.collectAsStateWithLifecycle()
     var query by rememberSaveable { mutableStateOf("") }
     LaunchedEffect(Unit) { viewModel.loadApps() }
 
@@ -147,7 +147,7 @@ private fun AppsPage(viewModel: MainViewModel, onBack: () -> Unit) {
             Spacer(Modifier.height(12.dp))
             SearchField(query, "Поиск приложения") { query = it }
             Spacer(Modifier.height(10.dp))
-            val list = apps
+            val list = appList
             if (list == null) {
                 Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = Apex.Accent)
