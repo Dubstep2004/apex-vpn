@@ -82,7 +82,16 @@ fun SetupScreen(viewModel: MainViewModel, onScanQr: () -> Unit) {
             Spacer(Modifier.width(10.dp))
             Text("Сканировать QR-код", color = Apex.Text, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
         }
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.height(8.dp))
+        var editingUa by remember { mutableStateOf(false) }
+        var uaSummary by remember { mutableStateOf(userAgentSummary()) }
+        androidx.compose.material3.TextButton(onClick = { editingUa = true }) {
+            Text("User-Agent: $uaSummary", color = Apex.TextDim, fontSize = 13.sp, textAlign = TextAlign.Center)
+        }
+        if (editingUa) {
+            UserAgentDialog(onDismiss = { editingUa = false; uaSummary = userAgentSummary() })
+        }
+        Spacer(Modifier.height(24.dp))
         Text("Версия ${BuildConfig.VERSION_NAME}", color = Apex.TextDim, fontSize = 13.sp)
         Spacer(Modifier.height(16.dp))
     }

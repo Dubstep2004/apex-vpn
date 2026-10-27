@@ -22,6 +22,7 @@ import androidx.compose.material.icons.rounded.Computer
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material.icons.rounded.Lock
@@ -74,6 +75,8 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
     val rulesUpdating by viewModel.rulesUpdating.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf(false) }
     var confirmRemove by remember { mutableStateOf(false) }
+    var editingUa by remember { mutableStateOf(false) }
+    var uaSummary by remember { mutableStateOf(userAgentSummary()) }
     val context = LocalContext.current
 
     Column(
@@ -99,6 +102,8 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
             ) { if (refreshing) Spinner() }
             GroupDivider()
             ListRow("Изменить ссылку", leading = { tile(Icons.Rounded.Edit) }, onClick = { editing = true }) { Chevron() }
+            GroupDivider()
+            ListRow("User-Agent", uaSummary, leading = { tile(Icons.Rounded.Fingerprint) }, onClick = { editingUa = true }) { Chevron() }
             GroupDivider()
             ListRow("Сканировать QR-код", "Добавить подписку с экрана другого устройства", leading = { tile(Icons.Rounded.QrCodeScanner) }, onClick = onScanQr) { Chevron() }
             GroupDivider()
@@ -291,6 +296,12 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
             confirmButton = {},
             dismissButton = { TextButton(onClick = { editing = false }) { Text("Отмена", color = Apex.TextDim) } },
         )
+    }
+
+    if (editingUa) {
+        UserAgentDialog(onDismiss = { editingUa = false; uaSummary = userAgentSummary() }, onSaved = {
+            if (sub.url.isNotEmpty() && !refreshing) viewModel.refresh()
+        })
     }
 
     if (confirmRemove) {

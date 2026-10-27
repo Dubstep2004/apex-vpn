@@ -6,6 +6,14 @@ data class Release(val version: String, val code: Int, val date: String, val cha
 object Changelog {
     val releases = listOf(
         Release(
+            "1.2.2", 5, "28 октября 2026",
+            listOf(
+                "Свой User-Agent для подписки: Настройки → Подписка → User-Agent (и на первом экране)",
+                "Приложение запоминает, с каким User-Agent подписка загрузилась, и пробует его первым",
+                "Добавлен вариант Hiddify",
+            ),
+        ),
+        Release(
             "1.2.1", 4, "28 октября 2026",
             listOf(
                 "Подписка загружается надёжнее: несколько способов запроса к серверу",

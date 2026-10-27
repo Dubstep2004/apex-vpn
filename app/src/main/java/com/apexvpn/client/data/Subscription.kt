@@ -122,19 +122,27 @@ object Subscription {
      * Панели подписок (Remnawave, Marzban, 3x-ui) по-разному отвечают разным клиентам.
      * Пробуем несколько вариантов User-Agent, пока один не вернёт серверы.
      */
-    private val userAgents = listOf(
+    val builtInUserAgents = listOf(
         "v2rayNG/1.10.23",
         "Happ/3.7.0",
         "v2rayN/7.13.8",
+        "Hiddify/2.5.7",
         "sing-box 1.13.21",
         "APEX VPN/${BuildConfig.VERSION_NAME}",
     )
 
+    /** Порядок попыток: свой User-Agent → последний сработавший → встроенные. */
+    private fun userAgents(): List<String> =
+        (listOf(Prefs.customUserAgent.trim(), Prefs.workingUserAgent) + builtInUserAgents)
+            .filter { it.isNotBlank() }
+            .distinct()
+
     private suspend fun fetch(url: String) = withContext(Dispatchers.IO) {
         var lastError: Exception? = null
-        for (ua in userAgents) {
+        for (ua in userAgents()) {
             try {
                 fetchWith(url, ua)
+                Prefs.workingUserAgent = ua
                 return@withContext
             } catch (e: NotFound) {
                 throw e // ссылка неверная — другие варианты не помогут

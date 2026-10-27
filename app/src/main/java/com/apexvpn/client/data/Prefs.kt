@@ -61,6 +61,16 @@ object Prefs {
         get() = sp.getInt("seen_version", 0)
         set(v) = sp.edit { putInt("seen_version", v) }
 
+    /** Свой User-Agent для запроса подписки (пусто — встроенные варианты) */
+    var customUserAgent: String
+        get() = sp.getString("custom_ua", "") ?: ""
+        set(v) = sp.edit { putString("custom_ua", v) }
+
+    /** User-Agent, с которым подписка загрузилась в последний раз */
+    var workingUserAgent: String
+        get() = sp.getString("working_ua", "") ?: ""
+        set(v) = sp.edit { putString("working_ua", v) }
+
     /** Постоянный анонимный идентификатор устройства для панелей подписок (HWID) */
     val deviceId: String
         get() = sp.getString("device_id", null) ?: java.util.UUID.randomUUID().toString().replace("-", "").also {
