@@ -61,6 +61,12 @@ object Prefs {
         get() = sp.getInt("seen_version", 0)
         set(v) = sp.edit { putInt("seen_version", v) }
 
+    /** Постоянный анонимный идентификатор устройства для панелей подписок (HWID) */
+    val deviceId: String
+        get() = sp.getString("device_id", null) ?: java.util.UUID.randomUUID().toString().replace("-", "").also {
+            sp.edit { putString("device_id", it) }
+        }
+
     fun clearSubscription() = sp.edit {
         remove("sub_url"); remove("nodes"); remove("selected"); remove("title")
         remove("used"); remove("total"); remove("expire"); remove("updated")

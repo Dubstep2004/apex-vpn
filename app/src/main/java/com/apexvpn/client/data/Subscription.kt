@@ -38,8 +38,6 @@ const val AUTO_TAG = "auto"
 
 /** Загрузка и хранение подписки. Разрешена только ссылка на sub.knownhosts.ru. */
 object Subscription {
-    private const val USER_AGENT = "v2rayNG/1.10.23 (APEX VPN ${BuildConfig.VERSION_NAME})"
-
     private val _state = MutableStateFlow(load())
     val state: StateFlow<SubscriptionState> = _state.asStateFlow()
 
@@ -120,23 +118,62 @@ object Subscription {
         return re.find(decoded)?.value?.trimEnd('.', ',', ')', ']')
     }
 
+    /**
+     * Панели подписок (Remnawave, Marzban, 3x-ui) по-разному отвечают разным клиентам.
+     * Пробуем несколько вариантов User-Agent, пока один не вернёт серверы.
+     */
+    private val userAgents = listOf(
+        "v2rayNG/1.10.23",
+        "Happ/3.7.0",
+        "v2rayN/7.13.8",
+        "sing-box 1.13.21",
+        "APEX VPN/${BuildConfig.VERSION_NAME}",
+    )
+
     private suspend fun fetch(url: String) = withContext(Dispatchers.IO) {
+        var lastError: Exception? = null
+        for (ua in userAgents) {
+            try {
+                fetchWith(url, ua)
+                return@withContext
+            } catch (e: NotFound) {
+                throw e // ссылка неверная — другие варианты не помогут
+            } catch (e: Exception) {
+                lastError = e
+            }
+        }
+        throw lastError ?: IllegalStateException("Не удалось загрузить подписку")
+    }
+
+    private class NotFound(message: String) : Exception(message)
+
+    private fun fetchWith(url: String, userAgent: String) {
         val conn = (URL(url).openConnection() as HttpURLConnection).apply {
             connectTimeout = 15_000
             readTimeout = 20_000
             instanceFollowRedirects = true
-            setRequestProperty("User-Agent", USER_AGENT)
+            setRequestProperty("User-Agent", userAgent)
             setRequestProperty("Accept", "*/*")
+            // Заголовки устройства: их ждут панели с ограничением числа устройств (HWID)
+            setRequestProperty("x-hwid", Prefs.deviceId)
+            setRequestProperty("x-device-os", "Android")
+            setRequestProperty("x-ver-os", android.os.Build.VERSION.RELEASE ?: "")
+            setRequestProperty("x-device-model", android.os.Build.MODEL ?: "")
         }
         try {
             val code = conn.responseCode
             if (code != HttpURLConnection.HTTP_OK) {
-                error(
-                    when (code) {
-                        403, 404 -> "Подписка не найдена или отключена (код $code)"
-                        else -> "Сервер подписки ответил кодом $code"
-                    },
-                )
+                val detail = runCatching {
+                    conn.errorStream?.bufferedReader()?.use { it.readText() }
+                        ?.replace(Regex("<[^>]*>"), " ")?.replace(Regex("\\s+"), " ")?.trim()?.take(120)
+                }.getOrNull().orEmpty()
+                val suffix = if (detail.isNotEmpty() && detail.length < 120) ": $detail" else ""
+                when (code) {
+                    404 -> throw NotFound("Подписка не найдена — проверьте ссылку (код 404)")
+                    401, 403 -> error("Подписка отключена или превышен лимит устройств (код $code)$suffix")
+                    in 500..599 -> error("Сервер подписки временно недоступен (код $code). Попробуйте позже$suffix")
+                    else -> error("Сервер подписки ответил кодом $code$suffix")
+                }
             }
             // Защита от редиректа на чужой домен
             require(conn.url.host.equals(BuildConfig.SUBSCRIPTION_HOST, ignoreCase = true)) {
