@@ -67,7 +67,17 @@ jobs:
           APEX_KEYSTORE_PASSWORD: ${{ secrets.APEX_KEYSTORE_PASSWORD }}
           APEX_KEY_ALIAS: ${{ secrets.APEX_KEY_ALIAS }}
           APEX_KEY_PASSWORD: ${{ secrets.APEX_KEY_PASSWORD }}
-        run: ./gradlew --no-daemon assembleRelease
+        run: |
+          set -o pipefail
+          if ! ./gradlew --no-daemon assembleRelease 2>&1 | tee gradle.log; then
+            # Ошибки сборки — в аннотации, чтобы их было видно без полного лога
+            grep -E "^e: |error:|What went wrong|Could not|> " gradle.log | sed 's/%/%25/g' | head -200 > errors.txt || true
+            split -l 20 errors.txt err_ || true
+            for f in err_*; do
+              [ -s "$f" ] && echo "::error title=Gradle::$(sed ':a;N;$!ba;s/\n/%0A/g' "$f")"
+            done
+            exit 1
+          fi
 
       - name: Collect APK and update.json
         run: |
