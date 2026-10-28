@@ -138,4 +138,6 @@ dependencies {
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     // 11. Связь с часами Wear OS
     implementation("com.google.android.gms:play-services-wearable:19.0.0")
+    // Google Play Services тянет старый Fragment 1.0 — поднимаем (иначе ломаются запросы разрешений)
+    implementation("androidx.fragment:fragment-ktx:1.8.5")
 }
