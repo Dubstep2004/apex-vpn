@@ -6,12 +6,10 @@
 """
 import json, sys, datetime, html
 
-releases = []
 raw = sys.stdin.read().strip()
-# --paginate склеивает массивы подряд: ][
-for chunk in raw.replace("][", "]\n[").split("\n"):
-    if chunk.strip():
-        releases += json.loads(chunk)
+# gh api --paginate --slurp → массив страниц; без --slurp — одна страница
+data = json.loads(raw) if raw else []
+releases = [r for page in data for r in page] if data and isinstance(data[0], list) else data
 
 def apk_count(rel, wear=False):
     return sum(a.get("download_count", 0) for a in rel.get("assets", [])

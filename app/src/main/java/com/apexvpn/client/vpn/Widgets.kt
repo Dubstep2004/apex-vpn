@@ -10,6 +10,7 @@ import android.widget.RemoteViews
 import com.apexvpn.client.R
 import com.apexvpn.client.data.AUTO_TAG
 import com.apexvpn.client.data.ServerInfo
+import com.apexvpn.client.data.isFavorite
 import com.apexvpn.client.data.Subscription
 
 /** 10. Круглый виджет 1×1: кнопка цвета состояния и пинг. */
@@ -61,7 +62,8 @@ object NewWidgets {
     private fun widgetServers(): List<Pair<String, String>> {
         val sub = Subscription.state.value
         val fav = com.apexvpn.client.data.AppSettings.value.favorites
-        val pool = sub.nodes.filter { it.name in fav }.ifEmpty { sub.nodes.filter { !it.ads } }
+        val pool = sub.nodes.filter { it.isFavorite(fav) }.distinctBy { ServerInfo.title(it.name) }
+            .ifEmpty { sub.nodes.filter { !it.ads }.distinctBy { ServerInfo.title(it.name) } }
         return listOf(AUTO_TAG to "⚡ Автопилот") + pool.take(3).map { n ->
             n.tag to listOfNotNull(ServerInfo.flag(n.name), ServerInfo.title(n.name)).joinToString(" ")
         }

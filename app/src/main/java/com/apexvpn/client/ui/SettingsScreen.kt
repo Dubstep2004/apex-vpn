@@ -123,7 +123,8 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
                 "Ссылка-приглашение",
                 "Для своего второго телефона или семьи: установка и подписка в одно касание",
                 leading = { tile(Icons.Rounded.Share) },
-                onClick = {
+                onClick = inviteClick@{
+                    if (sub.url.isBlank()) { viewModel.showMessage("Сначала добавьте подписку"); return@inviteClick }
                     val invite = com.apexvpn.client.data.Invite.link(sub.url)
                     val send = android.content.Intent(android.content.Intent.ACTION_SEND)
                         .setType("text/plain")

@@ -20,7 +20,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh api "repos/${{ github.repository }}/releases" --paginate | python3 scripts/download-stats.py > docs/stats.svg
+          gh api "repos/${{ github.repository }}/releases" --paginate --slurp | python3 scripts/download-stats.py > docs/stats.svg
       - name: Commit if changed
         run: |
           git config user.name "github-actions[bot]"

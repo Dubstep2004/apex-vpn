@@ -7,7 +7,7 @@
 <p>
 <a href="https://github.com/Dubstep2004/apex-vpn/releases/latest"><b>⬇️ Скачать APK</b></a>
 &nbsp;&nbsp;·&nbsp;&nbsp;
-<a href="#-что-нового"><b>🆕 Что нового в 1.9.1</b></a>
+<a href="#-что-нового"><b>🆕 Что нового в 1.9.2</b></a>
 &nbsp;&nbsp;·&nbsp;&nbsp;
 <a href="#setup"><b>🚀 Как установить</b></a>
 </p>
@@ -383,6 +383,9 @@ core/apexcore/          Go: разбор подписки → конфиги sin
 </details>
 
 ## 📝 Что нового
+
+**1.9.2**
+- Исправлено: избранное больше не стирается при обновлении подписки; свайп и виджет видят избранные серверы
 
 **1.9.1**
 - 15 новых сервисов «Через VPN» (Netflix, Spotify, Reddit, Signal, Viber, Notion, Figma и другие)

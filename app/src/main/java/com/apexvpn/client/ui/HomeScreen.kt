@@ -75,6 +75,7 @@ import com.apexvpn.client.BuildConfig
 import com.apexvpn.client.data.AUTO_TAG
 import com.apexvpn.client.data.ExpiryAlerts
 import com.apexvpn.client.data.ServerInfo
+import com.apexvpn.client.data.isFavorite
 import com.apexvpn.client.ui.theme.Apex
 import com.apexvpn.client.vpn.VpnState
 import com.apexvpn.client.vpn.VpnStatus
@@ -147,7 +148,8 @@ fun HomeScreen(
         val auto = sub.selectedTag == AUTO_TAG || selected == null
         // 12. Свайп по щиту: избранные серверы (если их 2+), иначе все без рекламы
         val cycle = remember(sub.nodes, settings.favorites) {
-            val fav = sub.nodes.filter { it.name in settings.favorites }
+            // Из каждой избранной группы — лучший по порядку сервер; иначе все без рекламы
+            val fav = sub.nodes.filter { it.isFavorite(settings.favorites) }.distinctBy { ServerInfo.title(it.name) }
             listOf(AUTO_TAG) + (if (fav.size >= 2) fav else sub.nodes.filter { !it.ads }).map { it.tag }
         }
         val onSwipe: (Int) -> Unit = { dir ->

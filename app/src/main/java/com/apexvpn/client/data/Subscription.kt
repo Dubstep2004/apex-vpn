@@ -125,8 +125,9 @@ object Subscription {
         fetch(validate(url))
         _state.value = load()
         // 195. Серверов, которых больше нет в подписке, в избранном не держим
-        val names = _state.value.nodes.map { it.name }.toSet()
-        if (names.isNotEmpty()) {
+        // В избранном хранится название группы (ServerInfo.title), у старых версий — полное имя сервера
+        val names = _state.value.nodes.flatMap { listOf(it.name, ServerInfo.title(it.name)) }.toSet()
+        if (_state.value.nodes.isNotEmpty()) {
             val fav = AppSettings.value.favorites
             if (fav.any { it !in names }) AppSettings.update { copy(favorites = fav.intersect(names)) }
         }
@@ -320,3 +321,6 @@ object Subscription {
         }
     }.getOrDefault(emptyList())
 }
+
+/** Сервер в избранном: по названию группы (как в списке серверов) или по полному имени (старые версии). */
+fun Node.isFavorite(favorites: Set<String>): Boolean = name in favorites || ServerInfo.title(name) in favorites
