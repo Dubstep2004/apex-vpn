@@ -20,7 +20,10 @@ android {
         applicationId = "com.apexvpn.client"
         minSdk = 30
         targetSdk = 34
-        versionCode = appVersionCode
+        // На 1 меньше, чем у телефона: часы и телефон обязаны иметь один applicationId (иначе не увидят
+        // друг друга), и если по ошибке открыть apex-watch на телефоне, Android откажется «понижать»
+        // APEX VPN до приложения для часов — вместо того чтобы заменить им приложение на телефоне.
+        versionCode = appVersionCode - 1
         versionName = appVersionName
     }
 

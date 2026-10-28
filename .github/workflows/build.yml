@@ -153,6 +153,14 @@ jobs:
           # Что нового — из data/Changelog.kt (первая запись) с метками: 🟢 Новое, 🟣 Улучшено/Изменено, 🔵 Исправлено, 🔴 Удалено
           python3 scripts/changelog.py notes "$VERSION_NAME" > dist/changelog.txt
           cat dist/changelog.txt
+          # Описание релиза: что нового + какой файл куда ставить
+          {
+            cat dist/changelog.txt
+            echo
+            echo "---"
+            echo "📱 **apex-vpn-${VERSION_NAME}.apk** — для телефона"
+            echo "⌚ **apex-watch-${VERSION_NAME}.apk** — только для часов Wear OS. На телефон не устанавливайте."
+          } > dist/release.md
           # Описание версии для команды «apex publish» на сервере
           jq -n --argjson code "$VERSION_CODE" --arg name "$VERSION_NAME" --rawfile notes dist/changelog.txt \
             '{versionCode:$code, versionName:$name, changelog:$notes}' > "dist/apex-vpn-${VERSION_NAME}.json"
@@ -174,7 +182,7 @@ jobs:
         with:
           tag_name: v${{ steps.apk.outputs.name }}
           name: APEX VPN ${{ steps.apk.outputs.name }}
-          body_path: dist/changelog.txt
+          body_path: dist/release.md
           files: |
             ${{ steps.apk.outputs.apk }}
             dist/apex-vpn-${{ steps.apk.outputs.name }}.json

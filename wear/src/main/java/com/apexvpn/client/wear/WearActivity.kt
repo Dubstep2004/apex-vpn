@@ -65,6 +65,35 @@ class WearActivity : ComponentActivity(), DataClient.OnDataChangedListener {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Защита: APEX Watch — только для часов. Если его как-то поставили на телефон — объясняем, что делать
+        if (!packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_WATCH)) {
+            setContent {
+                MaterialTheme {
+                    Column(
+                        Modifier.fillMaxSize().background(Color(0xFF0A0A0D)).padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Text("APEX Watch — приложение для часов", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                        Spacer(Modifier.height(10.dp))
+                        Text(
+                            "На телефон нужно установить apex-vpn-<версия>.apk со страницы github.com/Dubstep2004/apex-vpn/releases",
+                            color = Color(0xFF8E8E9A), fontSize = 14.sp, textAlign = TextAlign.Center,
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        Button(
+                            onClick = {
+                                runCatching {
+                                    startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/Dubstep2004/apex-vpn/releases/latest")))
+                                }
+                            },
+                            modifier = Modifier.size(width = 200.dp, height = 48.dp),
+                        ) { Text("Скачать APEX VPN") }
+                    }
+                }
+            }
+            return
+        }
         setContent {
             MaterialTheme {
                 WearScreen(state, linked, onToggle = { send("/apex/toggle") }, onOpenLink = { openOnPhone(it) })

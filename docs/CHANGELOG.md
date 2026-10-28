@@ -2,6 +2,17 @@
 
 <img src="img/tags/new.svg" height="22"> <img src="img/tags/improved.svg" height="22"> <img src="img/tags/changed.svg" height="22"> <img src="img/tags/fixed.svg" height="22"> <img src="img/tags/removed.svg" height="22">
 
+## 2.2.3 · 28 октября 2026
+
+<img src="img/tags/improved.svg" alt="Улучшено" height="22">
+
+- Если APEX Watch всё же открыли на телефоне — он подскажет, какой файл нужен для телефона
+- На странице версии подписано, какой файл для телефона, а какой — только для часов
+
+<img src="img/tags/fixed.svg" alt="Исправлено" height="22">
+
+- APEX Watch больше нельзя по ошибке установить на телефон поверх APEX VPN: Android откажет в установке
+
 ## 2.2.2 · 28 октября 2026
 
 <img src="img/tags/new.svg" alt="Новое" height="22">
