@@ -276,8 +276,12 @@ class MainActivity : ComponentActivity() {
             intent.removeExtra(EXTRA_INSTALL_UPDATE)
             lifecycleScope.launch {
                 com.apexvpn.client.update.UpdateManager.check(silent = true)
-                com.apexvpn.client.update.UpdateManager.readyFile()?.let {
-                    com.apexvpn.client.update.UpdateManager.launchInstaller(this@MainActivity, it)
+                val s = com.apexvpn.client.update.UpdateManager.state.value
+                runCatching {
+                    com.apexvpn.client.update.UpdateManager.openPage(
+                        this@MainActivity,
+                        (s as? com.apexvpn.client.update.UpdateState.Available)?.info,
+                    )
                 }
             }
         }

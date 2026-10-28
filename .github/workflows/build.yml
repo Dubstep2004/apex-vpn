@@ -8,12 +8,26 @@ on:
     paths-ignore: ["**.md", "docs/**", "server/**"]
   pull_request:
   workflow_dispatch:
+  # Раз в неделю «трогаем» ключ подписи в кэше, чтобы GitHub его не удалил
+  schedule:
+    - cron: "17 3 * * 1"
 
 permissions:
   contents: write
 
 jobs:
+  keep-signing-key:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Keep build signing key alive
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: apex-debug-keystore-v1
+
   build:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 75
     env:

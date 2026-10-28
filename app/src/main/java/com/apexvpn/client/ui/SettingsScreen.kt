@@ -255,15 +255,8 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
         SectionLabel("Обновления приложения")
         Group {
             ListRow(
-                "Скачивать заранее по Wi-Fi",
-                "Новая версия скачается в фоне — останется нажать «Установить»",
-                leading = { tile(Icons.Rounded.Download) },
-                onClick = { viewModel.change(reload = false) { copy(autoDownloadUpdates = !autoDownloadUpdates) } },
-            ) { ApexSwitch(s.autoDownloadUpdates, { v -> viewModel.change(reload = false) { copy(autoDownloadUpdates = v) } }) }
-            GroupDivider()
-            ListRow(
                 "Проверять автоматически",
-                "При каждом запуске",
+                "При запуске и раз в 3 часа — с GitHub Releases",
                 leading = { tile(Icons.Rounded.Update) },
                 onClick = { viewModel.change(reload = false) { copy(autoCheckUpdates = !autoCheckUpdates) } },
             ) { ApexSwitch(s.autoCheckUpdates, { v -> viewModel.change(reload = false) { copy(autoCheckUpdates = v) } }) }
@@ -271,13 +264,15 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
             val (subtitle, busy) = when (val u = update) {
                 UpdateState.Checking -> "Проверяем…" to true
                 UpdateState.UpToDate -> "У вас последняя версия" to false
-                is UpdateState.Available -> "Доступна версия ${u.info.versionName}" to false
-                is UpdateState.Downloading -> "Загрузка ${(u.progress * 100).toInt()}%" to true
-                is UpdateState.ReadyToInstall -> "Версия ${u.info.versionName} готова к установке" to false
+                is UpdateState.Available -> "Доступна версия ${u.info.versionName} — нажмите, откроется GitHub" to false
                 is UpdateState.Failed -> u.message to false
                 UpdateState.Idle -> "Версия ${BuildConfig.VERSION_NAME}" to false
             }
-            ListRow("Проверить сейчас", subtitle, leading = { tile(Icons.Rounded.SystemUpdate) }, onClick = { if (!busy) viewModel.checkUpdate() }) {
+            ListRow("Проверить сейчас", subtitle, leading = { tile(Icons.Rounded.SystemUpdate) }, onClick = {
+                val u = update
+                if (u is UpdateState.Available) com.apexvpn.client.update.UpdateManager.openPage(context, u.info)
+                else if (!busy) viewModel.checkUpdate()
+            }) {
                 if (busy) Spinner()
             }
             GroupDivider()

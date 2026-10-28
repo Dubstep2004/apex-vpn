@@ -39,30 +39,32 @@ class BackgroundWork(context: Context, params: WorkerParameters) : CoroutineWork
         News.refresh()
         if (RulesUpdater.update(ctx)) ApexVpnService.reload(ctx)
         CrashReporter.uploadPending(ctx)
-        // 1. Обновление заранее по Wi-Fi: потом установка в одно касание
-        if (AppSettings.value.autoDownloadUpdates) {
-            runCatching { com.apexvpn.client.update.UpdateManager.prefetch(ctx) }.getOrNull()?.let { notifyUpdateReady(ctx, it.versionName) }
+        // Новая версия на GitHub — уведомление; нажатие открывает страницу версии
+        if (AppSettings.value.autoCheckUpdates) {
+            runCatching { com.apexvpn.client.update.UpdateManager.check(silent = true) }
+            (com.apexvpn.client.update.UpdateManager.state.value as? com.apexvpn.client.update.UpdateState.Available)
+                ?.let { notifyUpdate(ctx, it.info) }
         }
         return Result.success()
     }
 
-    private fun notifyUpdateReady(context: Context, version: String) {
+    private fun notifyUpdate(context: Context, info: com.apexvpn.client.update.UpdateInfo) {
+        val version = info.versionName
         val sp = context.getSharedPreferences("alerts", Context.MODE_PRIVATE)
         if (sp.getString("update_ready", "") == version) return // уже говорили про эту версию
         sp.edit { putString("update_ready", version) }
         val nm = context.getSystemService<NotificationManager>() ?: return
         val pi = PendingIntent.getActivity(
             context, 12,
-            Intent(context, MainActivity::class.java).putExtra(MainActivity.EXTRA_INSTALL_UPDATE, true)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            Intent(Intent.ACTION_VIEW, android.net.Uri.parse(info.pageUrl)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         nm.notify(
             5,
             NotificationCompat.Builder(context, ApexApp.CHANNEL_ALERTS)
                 .setSmallIcon(R.drawable.ic_stat_apex)
-                .setContentTitle("APEX VPN $version готов к установке")
-                .setContentText("Нажмите, чтобы установить обновление")
+                .setContentTitle("Доступна версия APEX VPN $version")
+                .setContentText("Нажмите — откроется страница версии на GitHub")
                 .setContentIntent(pi)
                 .setAutoCancel(true)
                 .build(),
