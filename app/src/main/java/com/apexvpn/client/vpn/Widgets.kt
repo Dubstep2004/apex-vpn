@@ -14,7 +14,9 @@ import com.apexvpn.client.data.Subscription
 
 /** 10. Круглый виджет 1×1: кнопка цвета состояния и пинг. */
 class ApexWidgetRound : AppWidgetProvider() {
-    override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) = NewWidgets.update(context)
+    override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
+        NewWidgets.update(context)
+    }
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == NewWidgets.ACTION_TOGGLE) VpnToggle.toggle(context.applicationContext) else super.onReceive(context, intent)
     }
@@ -22,7 +24,9 @@ class ApexWidgetRound : AppWidgetProvider() {
 
 /** 10. Информационный виджет: состояние, сервер, скорость ↓↑ и пинг. */
 class ApexWidgetInfo : AppWidgetProvider() {
-    override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) = NewWidgets.update(context)
+    override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
+        NewWidgets.update(context)
+    }
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == NewWidgets.ACTION_TOGGLE) VpnToggle.toggle(context.applicationContext) else super.onReceive(context, intent)
     }
