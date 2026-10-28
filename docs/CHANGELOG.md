@@ -2,6 +2,13 @@
 
 <img src="img/tags/new.svg" height="22"> <img src="img/tags/improved.svg" height="22"> <img src="img/tags/changed.svg" height="22"> <img src="img/tags/fixed.svg" height="22"> <img src="img/tags/removed.svg" height="22">
 
+## 1.9.6 · 28 октября 2026
+
+<img src="img/tags/new.svg" alt="Новое" height="22">
+
+- Готовые шаблоны своих списков: Игры, Нейросети, Работа, Разработка, Учёба, Кино, Музыка, Соцсети, Покупки
+- Несколько шаблонов можно добавить разом, а любой — сначала открыть и изменить
+
 ## 1.9.5 · 28 октября 2026
 
 <img src="img/tags/improved.svg" alt="Улучшено" height="22">

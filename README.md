@@ -7,7 +7,7 @@
 <p>
 <a href="https://github.com/Dubstep2004/apex-vpn/releases/latest"><b>⬇️ Скачать APK</b></a>
 &nbsp;&nbsp;·&nbsp;&nbsp;
-<a href="#-что-нового"><b>🆕 Что нового в 1.9.5</b></a>
+<a href="#-что-нового"><b>🆕 Что нового в 1.9.6</b></a>
 &nbsp;&nbsp;·&nbsp;&nbsp;
 <a href="#setup"><b>🚀 Как установить</b></a>
 </p>
@@ -113,8 +113,16 @@
 Свои наборы сайтов, которые идут **через VPN**: например «Работа» или «Игры».
 
 1. Вкладка **Режим** → раздел **Свои списки** → **«Новый список»**.
-2. Введите **название**.
-3. Впишите **сайты — по одному на строку**:
+2. Выберите **готовый шаблон** или **«Пустой список»**:
+   - 🎮 **Игры** — Steam, Epic, Riot, Battle.net, EA, Ubisoft, PlayStation, Xbox, Nintendo, Roblox, Minecraft…
+   - 🤖 **Нейросети** — Midjourney, Hugging Face, Mistral, Character.AI, Poe, Suno, ElevenLabs, Cursor…
+   - 💼 **Работа** — Slack, Zoom, Atlassian, Microsoft 365, Asana, Miro, Canva, Dropbox…
+   - 💻 **Разработка** — GitHub, GitLab, Docker, npm, PyPI, Stack Overflow, JetBrains…
+   - 🎓 **Учёба**, 🎬 **Кино и сериалы**, 🎧 **Музыка**, 💬 **Соцсети**, 🛍️ **Покупки**
+
+   Отметьте галочками несколько шаблонов и нажмите **«Добавить»** — они появятся сразу. Нажатие на шаблон открывает его для правки перед сохранением.
+3. Проверьте **название** и **сайты** — добавьте своё или уберите лишнее.
+   Сайты пишутся **по одному на строку**:
    - `example.com` — сайт со всеми поддоменами;
    - `full:mail.example.com` — только этот адрес;
    - `keyword:corp` — все сайты, где есть слово;
@@ -283,7 +291,7 @@
 
 ### 🧭 Маршрутизация
 - **Умный режим**: российские сайты и IP идут напрямую
-- **Сервисы через VPN**: 26 готовых (YouTube, Instagram, Telegram, ChatGPT, Netflix, Spotify…) и **свои списки** сайтов
+- **Сервисы через VPN**: 26 готовых (YouTube, Instagram, Telegram, ChatGPT, Netflix, Spotify…) и **свои списки** сайтов с готовыми шаблонами (Игры, Нейросети, Работа…)
 - **Для опытных**: свои правила, FakeDNS, стратегия доменов, DoH / DoT / DoQ
 - **Банки не увидят VPN**, выбор приложений
 
@@ -434,6 +442,13 @@ core/apexcore/          Go: разбор подписки → конфиги sin
 
 <img src="docs/img/tags/new.svg" alt="Новое" height="22"> <img src="docs/img/tags/improved.svg" alt="Улучшено" height="22"> <img src="docs/img/tags/changed.svg" alt="Изменено" height="22"> <img src="docs/img/tags/fixed.svg" alt="Исправлено" height="22"> <img src="docs/img/tags/removed.svg" alt="Удалено" height="22">
 
+### 1.9.6 · 28 октября 2026
+
+<img src="docs/img/tags/new.svg" alt="Новое" height="22">
+
+- Готовые шаблоны своих списков: Игры, Нейросети, Работа, Разработка, Учёба, Кино, Музыка, Соцсети, Покупки
+- Несколько шаблонов можно добавить разом, а любой — сначала открыть и изменить
+
 ### 1.9.5 · 28 октября 2026
 
 <img src="docs/img/tags/improved.svg" alt="Улучшено" height="22">
@@ -456,22 +471,6 @@ core/apexcore/          Go: разбор подписки → конфиги sin
 <img src="docs/img/tags/fixed.svg" alt="Исправлено" height="22">
 
 - Одна ошибка в сохранённых настройках больше не сбрасывает все настройки
-
-### 1.9.3 · 28 октября 2026
-
-<img src="docs/img/tags/new.svg" alt="Новое" height="22">
-
-- Цветные метки в «Что нового»: Новое, Улучшено, Изменено, Исправлено, Удалено
-
-<img src="docs/img/tags/improved.svg" alt="Улучшено" height="22">
-
-- Вся история версий размечена по видам изменений
-
-<img src="docs/img/tags/changed.svg" alt="Изменено" height="22">
-
-- Описание новых версий на GitHub — с теми же метками
-
-📜 **[Все версии с метками →](docs/CHANGELOG.md)** · [Releases](https://github.com/Dubstep2004/apex-vpn/releases)
 
 ---
 

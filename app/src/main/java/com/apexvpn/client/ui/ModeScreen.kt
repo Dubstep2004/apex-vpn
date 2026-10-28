@@ -242,6 +242,7 @@ private val listColors = listOf(0xFF7B6CFF, 0xFF22D3EE, 0xFF34D399, 0xFFF59E0B, 
 @Composable
 private fun CustomListsSection(lists: List<com.apexvpn.client.data.CustomList>, viewModel: MainViewModel) {
     var editing by remember { mutableStateOf<com.apexvpn.client.data.CustomList?>(null) }
+    var picking by remember { mutableStateOf(false) }
     Group {
         lists.forEachIndexed { i, l ->
             if (i > 0) GroupDivider()
@@ -260,19 +261,37 @@ private fun CustomListsSection(lists: List<com.apexvpn.client.data.CustomList>, 
         if (lists.isNotEmpty()) GroupDivider()
         ListRow(
             title = "Новый список",
-            subtitle = "Например «Работа» или «Игры» — свои сайты через VPN",
+            subtitle = "Готовые шаблоны: Игры, Нейросети, Работа, Учёба… или свой",
             leading = { IconTile(Apex.AccentSoft) { Icon(Icons.Rounded.Add, null, tint = Apex.AccentText) } },
-            onClick = {
-                editing = com.apexvpn.client.data.CustomList(
-                    id = java.util.UUID.randomUUID().toString(),
-                    name = "",
-                    items = emptyList(),
-                    color = listColors[lists.size % listColors.size],
-                )
-            },
+            onClick = { picking = true },
         )
     }
     Caption("Нажмите на список, чтобы изменить или удалить его. Можно писать домены (example.com), IP и подсети, keyword:слово.")
+
+    // Выбор: готовый шаблон или пустой список
+    if (picking) {
+        TemplatePicker(
+            taken = lists.map { it.name }.toSet(),
+            onPick = { t ->
+                picking = false
+                editing = com.apexvpn.client.data.CustomList(
+                    id = java.util.UUID.randomUUID().toString(),
+                    name = t?.name ?: "",
+                    items = t?.items ?: emptyList(),
+                    color = t?.color ?: listColors[lists.size % listColors.size],
+                )
+            },
+            onAddAll = { chosen ->
+                picking = false
+                val add = chosen.map {
+                    com.apexvpn.client.data.CustomList(java.util.UUID.randomUUID().toString(), it.name, it.items, true, it.color)
+                }
+                viewModel.change { copy(customLists = customLists + add) }
+                viewModel.showMessage(if (add.size == 1) "Список «${add[0].name}» добавлен" else "Добавлено списков: ${add.size}")
+            },
+            onDismiss = { picking = false },
+        )
+    }
 
     editing?.let { l ->
         CustomListEditor(
@@ -402,4 +421,81 @@ private fun EditorField(value: String, hint: String, singleLine: Boolean, onChan
             modifier = Modifier.fillMaxSize(),
         )
     }
+}
+
+/** Готовые шаблоны: нажатие — открыть для правки, «Добавить» — сразу в списки. */
+@Composable
+private fun TemplatePicker(
+    taken: Set<String>,
+    onPick: (com.apexvpn.client.data.ListTemplate?) -> Unit,
+    onAddAll: (List<com.apexvpn.client.data.ListTemplate>) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val templates = com.apexvpn.client.data.ListTemplates.all
+    var selected by remember { mutableStateOf(setOf<String>()) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Apex.Dialog,
+        title = { Text("Новый список", color = Apex.Text) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                Text("Отметьте готовые шаблоны или нажмите на шаблон, чтобы сначала изменить его.", color = Apex.TextDim, fontSize = 13.sp)
+                Spacer(Modifier.height(10.dp))
+                templates.forEach { t ->
+                    val already = t.name in taken
+                    val on = t.id in selected
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .clickable(enabled = !already) { onPick(t) }
+                            .padding(vertical = 8.dp, horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(Color(t.color).copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center,
+                        ) { Text(t.glyph, fontSize = 20.sp) }
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(t.name, color = if (already) Apex.TextDim else Apex.Text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                if (already) "Уже добавлен" else "${t.items.size} сайтов · ${t.subtitle}",
+                                color = Apex.TextDim, fontSize = 12.sp, maxLines = 2,
+                            )
+                        }
+                        if (!already) {
+                            androidx.compose.material3.Checkbox(
+                                checked = on,
+                                onCheckedChange = { v -> selected = if (v) selected + t.id else selected - t.id },
+                                colors = androidx.compose.material3.CheckboxDefaults.colors(checkedColor = Apex.Accent),
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .clickable { onPick(null) }
+                        .padding(vertical = 10.dp, horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(Apex.AccentSoft), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Rounded.Add, null, tint = Apex.AccentText)
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Text("Пустой список", color = Apex.Text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(
+                onClick = { onAddAll(templates.filter { it.id in selected }) },
+                enabled = selected.isNotEmpty(),
+            ) { Text(if (selected.isEmpty()) "Добавить" else "Добавить (${selected.size})", color = if (selected.isEmpty()) Apex.TextDim else Apex.Accent, fontWeight = FontWeight.SemiBold) }
+        },
+        dismissButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Отмена", color = Apex.TextDim) } },
+    )
 }
