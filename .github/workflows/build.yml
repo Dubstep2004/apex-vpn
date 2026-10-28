@@ -34,6 +34,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Свежие базы сайтов внутри APK: из ветки «rules» (обновляется раз в день),
+      # если её нет — официальные базы sing-box. Не скачалось — остаются базы из репозитория.
+      - name: Fresh site bases
+        run: |
+          for f in geoip-ru.srs geosite-category-ru.srs geosite-category-ads-all.srs geosite-category-porn.srs geosite-category-betting-ru.srs; do
+            case "$f" in geoip-*) repo=sing-geoip ;; *) repo=sing-geosite ;; esac
+            if curl -fsSL --retry 2 -o "/tmp/$f" "https://raw.githubusercontent.com/${{ github.repository }}/rules/$f" ||
+               curl -fsSL --retry 2 -o "/tmp/$f" "https://raw.githubusercontent.com/SagerNet/$repo/rule-set/$f"; then
+              [ "$(head -c 3 "/tmp/$f")" = "SRS" ] && cp "/tmp/$f" "app/src/main/assets/rules/$f" || echo "::warning title=Базы::$f повреждён — оставлен старый"
+            else
+              echo "::warning title=Базы::$f не скачался — оставлен старый"
+            fi
+          done
+          ls -la app/src/main/assets/rules
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

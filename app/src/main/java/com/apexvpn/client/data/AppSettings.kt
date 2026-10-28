@@ -82,6 +82,7 @@ data class Settings(
     val photoBlur: Int = 6,                           // 563. размытие своего фото, dp (0…24)
     val photoDim: Int = 55,                           // 563. затемнение, % (0…90)
     val photoParallax: Boolean = true,                // 563. фото сдвигается при наклоне телефона
+    val rulesAuto: Boolean = true,                    // базы сайтов: проверять обновления раз в день
     // 20. Иконка на рабочем столе показывает, включён ли VPN
     val iconStatus: Boolean = false,
     // 94. Флаги в списке серверов колышутся
@@ -292,7 +293,7 @@ object AppSettings {
         put("remoteDns", s.remoteDns.json()); put("directDns", s.directDns.json()); put("rulesSource", s.rulesSource)
         put("warp", s.warp); put("warpConfig", s.warpConfig); put("shieldBackdrop", s.shieldBackdrop); put("backdropStamp", s.backdropStamp)
         put("iconStatus", s.iconStatus); put("animatedFlags", s.animatedFlags); put("task", s.task); put("hiddenApps", list(s.hiddenApps)); put("secret", s.secretUnlocked); put("shield3d", s.shield3d); put("automation", s.automation); put("appTraffic", s.appTraffic); put("autoSkipSpecial", s.autoSkipSpecial); put("autoWhitelist", s.autoWhitelist)
-        put("customAccent2", s.customAccent2); put("photoBlur", s.photoBlur); put("photoDim", s.photoDim); put("photoParallax", s.photoParallax)
+        put("customAccent2", s.customAccent2); put("photoBlur", s.photoBlur); put("photoDim", s.photoDim); put("photoParallax", s.photoParallax); put("rulesAuto", s.rulesAuto)
     }
 
     private fun fromJson(o: JSONObject): Settings {
@@ -390,6 +391,7 @@ object AppSettings {
             photoBlur = o.optInt("photoBlur", d.photoBlur).coerceIn(0, 24),
             photoDim = o.optInt("photoDim", d.photoDim).coerceIn(0, 90),
             photoParallax = o.optBoolean("photoParallax", d.photoParallax),
+            rulesAuto = o.optBoolean("rulesAuto", d.rulesAuto),
         )
     }
 }

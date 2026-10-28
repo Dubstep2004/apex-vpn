@@ -327,14 +327,20 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (_rulesUpdating.value) return
         viewModelScope.launch {
             _rulesUpdating.value = true
-            val ok = RulesUpdater.update(getApplication<Application>(), force = true)
+            val r = RulesUpdater.update(getApplication<Application>(), force = true)
             _rulesUpdating.value = false
-            if (ok) applyToVpn()
-            _message.value = if (ok) "Базы сайтов обновлены" else "Не удалось обновить базы"
+            if (r is RulesUpdater.Result.Updated) applyToVpn()
+            _message.value = when (r) {
+                is RulesUpdater.Result.Updated -> "Базы сайтов обновлены: ${r.files} из ${RulesUpdater.FILES.size}"
+                RulesUpdater.Result.Fresh -> "Базы сайтов уже свежие"
+                RulesUpdater.Result.Skipped -> "Базы сайтов уже свежие"
+                is RulesUpdater.Result.Failed -> "Не удалось обновить базы: ${r.error}"
+            }
         }
     }
 
     fun rulesUpdatedAt(): Long = RulesUpdater.lastUpdated(getApplication<Application>())
+    val rulesInfo = RulesUpdater.info
 
     // ─── 6. Приложения ───────────────────────────────────────────────────
 

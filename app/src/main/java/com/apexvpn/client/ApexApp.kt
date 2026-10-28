@@ -101,6 +101,13 @@ class ApexApp : Application() {
                     com.apexvpn.client.data.ConnectFeedback.onConnected(this@ApexApp)
                     // 382. Конфетти на первом и юбилейных подключениях
                     com.apexvpn.client.data.Celebrate.onConnected()
+                    // Базы сайтов: если давно не проверяли (телефон был без фоновых задач) — проверяем сейчас
+                    appScope.launch {
+                        kotlinx.coroutines.delay(15_000)
+                        if (com.apexvpn.client.data.RulesUpdater.update(this@ApexApp) is com.apexvpn.client.data.RulesUpdater.Result.Updated &&
+                            VpnState.status.value == com.apexvpn.client.vpn.VpnStatus.Started
+                        ) com.apexvpn.client.vpn.ApexVpnService.reload(this@ApexApp)
+                    }
                     // 220. Задача «Видео»: на автопилоте сами подбираем самый быстрый сервер
                     if (AppSettings.value.task == "video" && Prefs.selectedTag == com.apexvpn.client.data.AUTO_TAG) {
                         appScope.launch {
@@ -130,6 +137,7 @@ class ApexApp : Application() {
         }
 
         Prefs.initConnectCount()
+        com.apexvpn.client.data.RulesUpdater.load(this)
         // DNS «Авто» (499/516) и белые списки (491): после подключения и при каждой смене сети
         appScope.launch {
             var job: kotlinx.coroutines.Job? = null

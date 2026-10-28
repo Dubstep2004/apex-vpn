@@ -39,21 +39,103 @@ internal object Http {
 
 // ─── 59. Обновление баз российских сайтов и рекламы ─────────────────────
 
+/**
+ * Базы сайтов (*.srs) для маршрутизации, рекламы и семейного режима.
+ *
+ * Откуда: свой адрес из «Маршрутизации» → адрес при сборке → ветка «rules» нашего GitHub
+ * (обновляется раз в день) → её зеркало jsDelivr → официальные базы sing-box.
+ * В ветке есть rules.json с контрольными суммами: качаются только изменившиеся файлы,
+ * поэтому проверять можно раз в день почти без трафика.
+ */
 object RulesUpdater {
     val FILES = listOf(
         "geoip-ru.srs", "geosite-category-ru.srs", "geosite-category-ads-all.srs",
         // 15. Семейный режим
         "geosite-category-porn.srs", "geosite-category-betting-ru.srs",
     )
-    private const val WEEK = 7L * 24 * 3600 * 1000
 
-    /** Откуда качать: ваш сервер (RULES_BASE_URL) или зеркало официальных баз sing-box. */
-    fun urlFor(name: String): String {
-        // Свой источник из «Для опытных» важнее заданного при сборке
-        val base = AppSettings.value.rulesSource.trim().ifEmpty { BuildConfig.RULES_BASE_URL }.trimEnd('/')
-        if (base.isNotEmpty()) return "$base/$name"
+    /** Понятные названия баз для экрана «Маршрутизация». */
+    val TITLES = mapOf(
+        "geoip-ru.srs" to "IP-адреса России",
+        "geosite-category-ru.srs" to "Российские сайты",
+        "geosite-category-ads-all.srs" to "Реклама и трекеры",
+        "geosite-category-porn.srs" to "Сайты 18+ (семейный режим)",
+        "geosite-category-betting-ru.srs" to "Букмекеры (семейный режим)",
+    )
+
+    private const val DAY = 24L * 3600 * 1000
+    private const val WEEK = 7 * DAY
+    /** Метка «официальные базы sing-box» — у них свой адрес для каждого файла. */
+    private const val UPSTREAM = "upstream"
+
+    /** Итог обновления. */
+    sealed interface Result {
+        /** Скачано [files] изменившихся баз. */
+        data class Updated(val files: Int) : Result
+        /** Базы и так свежие. */
+        data object Fresh : Result
+        /** Проверять ещё рано или автообновление выключено. */
+        data object Skipped : Result
+        data class Failed(val error: String) : Result
+    }
+
+    /** Состояние для экрана: когда проверяли, от какого числа базы, откуда и сколько в них записей. */
+    data class Info(
+        val checkedAt: Long,
+        val basesDate: Long,
+        val source: String,
+        val counts: Map<String, Int>,
+        val error: String?,
+    )
+
+    private val _info = MutableStateFlow<Info?>(null)
+    val info: StateFlow<Info?> = _info.asStateFlow()
+
+    private fun sp(context: Context) = context.getSharedPreferences("rules", Context.MODE_PRIVATE)
+
+    fun load(context: Context): Info {
+        val p = sp(context)
+        val counts = runCatching {
+            val o = JSONObject(p.getString("counts", "{}") ?: "{}")
+            o.keys().asSequence().associateWith { o.optInt(it) }
+        }.getOrDefault(emptyMap())
+        return Info(
+            checkedAt = p.getLong("checkedAt", 0),
+            basesDate = p.getLong("basesDate", 0).takeIf { it > 0 } ?: lastUpdated(context),
+            source = p.getString("source", "") ?: "",
+            counts = counts,
+            error = p.getString("error", null),
+        ).also { _info.value = it }
+    }
+
+    /** Источники по порядку: если первый недоступен (например, заблокирован), берётся следующий. */
+    fun sources(): List<String> {
+        val custom = AppSettings.value.rulesSource.trim().trimEnd('/')
+        if (custom.isNotEmpty()) return listOf(custom)
+        val list = mutableListOf<String>()
+        BuildConfig.RULES_BASE_URL.trim().trimEnd('/').takeIf { it.isNotEmpty() }?.let(list::add)
+        val repo = BuildConfig.GITHUB_REPO
+        list += "https://raw.githubusercontent.com/$repo/rules"
+        list += "https://cdn.jsdelivr.net/gh/$repo@rules"
+        list += UPSTREAM
+        return list
+    }
+
+    private fun fileUrl(base: String, name: String): String {
+        if (base != UPSTREAM) return "$base/$name"
         val repo = if (name.startsWith("geoip")) "sing-geoip" else "sing-geosite"
         return "https://cdn.jsdelivr.net/gh/SagerNet/$repo@rule-set/$name"
+    }
+
+    /** Адрес файла у первого источника — для подписи на экране. */
+    fun urlFor(name: String): String = fileUrl(sources().first(), name)
+
+    fun sourceTitle(base: String): String = when {
+        base.isEmpty() -> "встроенные в приложение"
+        base == UPSTREAM -> "официальные базы sing-box"
+        base.startsWith("https://raw.githubusercontent.com/") -> "GitHub APEX VPN"
+        base.startsWith("https://cdn.jsdelivr.net/") -> "зеркало jsDelivr"
+        else -> base.removePrefix("https://")
     }
 
     fun remoteDir(context: Context) = File(context.filesDir, "rules-remote")
@@ -82,19 +164,81 @@ object RulesUpdater {
         dir.path
     }.getOrNull()
 
+    /** Когда скачаны базы (0 — пока встроенные). */
     fun lastUpdated(context: Context): Long =
         FILES.minOfOrNull { File(remoteDir(context), it).lastModified() } ?: 0L
 
-    /** Скачивает базы раз в неделю (или сразу при [force]). true — обновлено. */
-    suspend fun update(context: Context, force: Boolean = false): Boolean = withContext(Dispatchers.IO) {
-        if (!force && System.currentTimeMillis() - lastUpdated(context) < WEEK) return@withContext false
+    private fun sha256(f: File): String? = runCatching {
+        val md = java.security.MessageDigest.getInstance("SHA-256")
+        f.inputStream().use { s ->
+            val buf = ByteArray(32 * 1024)
+            while (true) {
+                val n = s.read(buf)
+                if (n < 0) break
+                md.update(buf, 0, n)
+            }
+        }
+        md.digest().joinToString("") { "%02x".format(it) }
+    }.getOrNull()
+
+    /**
+     * Проверка раз в день (с rules.json) или раз в неделю (источник без него).
+     * [force] — сразу, даже если автообновление выключено.
+     */
+    suspend fun update(context: Context, force: Boolean = false): Result = withContext(Dispatchers.IO) {
+        val p = sp(context)
+        if (!force) {
+            if (!AppSettings.value.rulesAuto) return@withContext Result.Skipped
+            val interval = if (p.getBoolean("hasManifest", true)) DAY else WEEK
+            val last = maxOf(p.getLong("checkedAt", 0), lastUpdated(context))
+            if (System.currentTimeMillis() - last < interval) return@withContext Result.Skipped
+        }
+        var lastError = "нет источников"
+        for (base in sources()) {
+            val r = runCatching { updateFrom(context, base) }
+            r.onSuccess { (result, manifest) ->
+                p.edit {
+                    putLong("checkedAt", System.currentTimeMillis())
+                    putString("source", base)
+                    putBoolean("hasManifest", manifest != null)
+                    remove("error")
+                    val date = manifest?.optLong("updated")?.takeIf { it > 0 }?.times(1000)
+                    if (date != null) putLong("basesDate", date)
+                    else if (result is Result.Updated) putLong("basesDate", System.currentTimeMillis())
+                    manifest?.optJSONObject("files")?.let { files ->
+                        val counts = JSONObject()
+                        files.keys().forEach { k -> files.optJSONObject(k)?.optInt("count", -1)?.takeIf { it >= 0 }?.let { counts.put(k, it) } }
+                        putString("counts", counts.toString())
+                    }
+                }
+                load(context)
+                return@withContext result
+            }
+            lastError = r.exceptionOrNull()?.message ?: "ошибка"
+        }
+        p.edit { putString("error", lastError) }
+        load(context)
+        Result.Failed(lastError)
+    }
+
+    /** Обновление из одного источника. Ошибка — исключение, чтобы перейти к следующему. */
+    private fun updateFrom(context: Context, base: String): Pair<Result, JSONObject?> {
+        val manifest = if (base == UPSTREAM) null else runCatching { JSONObject(Http.getText("$base/rules.json")) }.getOrNull()
+        val files = manifest?.optJSONObject("files")
         val dir = remoteDir(context).apply { mkdirs() }
+        // Что качать: с rules.json — только изменившиеся, без него — всё
+        val need = FILES.filter { name ->
+            val local = File(dir, name)
+            val want = files?.optJSONObject(name)?.optString("sha256").orEmpty()
+            !local.exists() || local.length() == 0L || want.isEmpty() || sha256(local) != want
+        }
+        if (need.isEmpty()) return Result.Fresh to manifest
         val tmp = File(context.cacheDir, "rules-tmp").apply { deleteRecursively(); mkdirs() }
-        runCatching {
-            for (name in FILES) {
-                val c = Http.open(urlFor(name), 30_000)
+        try {
+            for (name in need) {
+                val c = Http.open(fileUrl(base, name), 30_000)
                 try {
-                    if (c.responseCode != 200) error("HTTP ${c.responseCode}")
+                    if (c.responseCode != 200) error("$name: HTTP ${c.responseCode}")
                     c.inputStream.use { input -> File(tmp, name).outputStream().use { input.copyTo(it) } }
                 } finally {
                     c.disconnect()
@@ -102,10 +246,21 @@ object RulesUpdater {
                 // В начале файла .srs — сигнатура «SRS»
                 val head = File(tmp, name).inputStream().use { s -> ByteArray(3).also { s.read(it) } }
                 check(String(head) == "SRS") { "повреждён $name" }
+                val want = files?.optJSONObject(name)?.optString("sha256").orEmpty()
+                check(want.isEmpty() || sha256(File(tmp, name)) == want) { "не совпала сумма $name" }
             }
-            for (name in FILES) File(tmp, name).copyTo(File(dir, name), overwrite = true)
-            true
-        }.getOrDefault(false).also { tmp.deleteRecursively() }
+            // Без rules.json сравниваем сами: одинаковые файлы — значит, базы свежие
+            val changed = need.filter { name ->
+                val local = File(dir, name)
+                !local.exists() || sha256(local) != sha256(File(tmp, name))
+            }
+            for (name in changed) File(tmp, name).copyTo(File(dir, name), overwrite = true)
+            // Неизменённые файлы тоже должны быть на месте — иначе ядро возьмёт встроенные
+            if (!FILES.all { File(dir, it).length() > 0 }) error("скачаны не все базы")
+            return (if (changed.isEmpty()) Result.Fresh else Result.Updated(changed.size)) to manifest
+        } finally {
+            tmp.deleteRecursively()
+        }
     }
 }
 

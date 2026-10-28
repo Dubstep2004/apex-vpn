@@ -1559,13 +1559,33 @@ private fun AdvancedPage(viewModel: MainViewModel, onBack: () -> Unit) {
         // ── Базы сайтов (гео-файлы)
         SectionLabel("Базы сайтов")
         var source by rememberSaveable { mutableStateOf(s.rulesSource) }
+        val rulesInfo by viewModel.rulesInfo.collectAsStateWithLifecycle()
+        val ri = rulesInfo
+        Group {
+            ListRow(
+                "Автообновление баз",
+                if (s.rulesAuto) "Проверка раз в день, качаются только изменившиеся базы" else "Только по кнопке «Обновить базы»",
+                onClick = { viewModel.change(reload = false) { copy(rulesAuto = !rulesAuto) } },
+            ) { ApexSwitch(s.rulesAuto, { v -> viewModel.change(reload = false) { copy(rulesAuto = v) } }) }
+            GroupDivider()
+            ListRow(
+                if (ri != null && ri.basesDate > 0) "Базы от ${formatDate(ri.basesDate / 1000)}" else "Встроенные базы",
+                buildString {
+                    append("Проверено: ${formatAgo(ri?.checkedAt ?: 0)}")
+                    if (ri != null && ri.source.isNotEmpty()) append("\nИсточник: ${com.apexvpn.client.data.RulesUpdater.sourceTitle(ri.source)}")
+                    ri?.error?.let { append("\nПоследняя ошибка: $it") }
+                },
+            )
+        }
+        Spacer(Modifier.height(10.dp))
         Group {
             val dir = remember(updating) { com.apexvpn.client.data.RulesUpdater.activeDir(context)?.let { java.io.File(it) } }
             com.apexvpn.client.data.RulesUpdater.FILES.forEachIndexed { i, name ->
                 if (i > 0) GroupDivider()
                 val f = dir?.let { java.io.File(it, name) }
-                val info = if (f != null && f.exists()) "${formatBytes(f.length())} · ${formatDate(f.lastModified() / 1000)}" else "нет файла"
-                ListRow(name.removeSuffix(".srs"), info + "\n" + com.apexvpn.client.data.RulesUpdater.urlFor(name))
+                val count = ri?.counts?.get(name)?.let { "${"%,d".format(java.util.Locale("ru"), it)} записей · " } ?: ""
+                val info = if (f != null && f.exists()) "$count${formatBytes(f.length())} · ${formatDate(f.lastModified() / 1000)}" else "нет файла"
+                ListRow(com.apexvpn.client.data.RulesUpdater.TITLES[name] ?: name.removeSuffix(".srs"), info + "\n" + com.apexvpn.client.data.RulesUpdater.urlFor(name))
             }
         }
         Spacer(Modifier.height(10.dp))

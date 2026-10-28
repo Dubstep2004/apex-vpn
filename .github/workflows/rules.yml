@@ -1,0 +1,104 @@
+name: Site bases
+
+# Базы сайтов (*.srs) для приложения: раз в день берём свежие официальные базы sing-box,
+# проверяем и кладём в ветку «rules». Приложение скачивает оттуда только изменившиеся файлы
+# (по rules.json), а при недоступности GitHub — с зеркала jsDelivr.
+on:
+  schedule:
+    - cron: "23 1 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: site-bases
+  cancel-in-progress: false
+
+jobs:
+  rules:
+    runs-on: ubuntu-latest
+    env:
+      SING_BOX: "1.13.21"
+    steps:
+      - name: Download fresh bases
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          for f in geoip-ru.srs geosite-category-ru.srs geosite-category-ads-all.srs geosite-category-porn.srs geosite-category-betting-ru.srs; do
+            case "$f" in geoip-*) repo=sing-geoip ;; *) repo=sing-geosite ;; esac
+            curl -fsSL --retry 3 -o "out/$f" "https://raw.githubusercontent.com/SagerNet/$repo/rule-set/$f"
+            # Файл .srs начинается с сигнатуры «SRS»
+            [ "$(head -c 3 "out/$f")" = "SRS" ] || { echo "::error title=Базы::повреждён $f"; exit 1; }
+          done
+          ls -la out
+
+      - name: Count sites
+        run: |
+          set -uo pipefail
+          # Сколько доменов и сетей в каждой базе — приложение показывает это в «Маршрутизации»
+          curl -fsSL --retry 3 "https://github.com/SagerNet/sing-box/releases/download/v${SING_BOX}/sing-box-${SING_BOX}-linux-amd64.tar.gz" | tar xz
+          SB=$(ls -d sing-box-*/)sing-box
+          mkdir -p json
+          for f in out/*.srs; do
+            n=$(basename "$f" .srs)
+            "$SB" rule-set decompile "$f" -o "json/$n.json" 2>/dev/null || echo "::warning::не удалось разобрать $n"
+          done
+          ls json || true
+
+      - name: Manifest
+        run: |
+          set -euo pipefail
+          python3 - <<'EOF'
+          import hashlib, json, os, time
+          files = {}
+          for name in sorted(os.listdir("out")):
+              if not name.endswith(".srs"):
+                  continue
+              data = open(f"out/{name}", "rb").read()
+              entry = {"sha256": hashlib.sha256(data).hexdigest(), "size": len(data)}
+              j = f"json/{name[:-4]}.json"
+              if os.path.exists(j):
+                  count = 0
+                  for rule in json.load(open(j)).get("rules", []):
+                      for key in ("domain", "domain_suffix", "domain_keyword", "domain_regex", "ip_cidr"):
+                          v = rule.get(key)
+                          count += len(v) if isinstance(v, list) else (1 if v else 0)
+                  entry["count"] = count
+              files[name] = entry
+          json.dump({"updated": int(time.time()), "files": files}, open("out/rules.json", "w"), ensure_ascii=False, indent=1)
+          print(open("out/rules.json").read())
+          EOF
+
+      - name: Publish to branch «rules» if changed
+        env:
+          REPO: ${{ github.repository }}
+          TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          OLD=$(curl -fsSL "https://raw.githubusercontent.com/$REPO/rules/rules.json" 2>/dev/null || echo '{}')
+          same=$(python3 -c '
+          import json, sys
+          old = json.loads(sys.argv[1] or "{}").get("files", {})
+          new = json.load(open("out/rules.json"))["files"]
+          print("yes" if {k: v["sha256"] for k, v in old.items()} == {k: v["sha256"] for k, v in new.items()} else "no")
+          ' "$OLD")
+          if [ "$same" = "yes" ]; then
+            echo "::notice title=Базы::без изменений"
+            exit 0
+          fi
+          cd out
+          cat > README.md <<'EOF'
+          # Базы сайтов APEX VPN
+          Обновляются автоматически раз в день (официальные базы sing-box). Не редактируйте вручную.
+          EOF
+          git init -q -b rules
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -qm "Базы сайтов $(date -u +%F)"
+          # Одна запись в истории: ветка не растёт от ежедневных обновлений
+          git push -qf "https://x-access-token:${TOKEN}@github.com/${REPO}.git" rules
+          echo "::notice title=Базы::опубликованы"
+          # jsDelivr кэширует ветку — просим обновить зеркало
+          for f in *.srs rules.json; do curl -fsS "https://purge.jsdelivr.net/gh/${REPO}@rules/$f" > /dev/null || true; done

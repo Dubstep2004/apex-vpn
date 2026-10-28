@@ -36,7 +36,7 @@ class BackgroundWork(context: Context, params: WorkerParameters) : CoroutineWork
             }
         }
         ExpiryAlerts.check(ctx)
-        if (RulesUpdater.update(ctx)) ApexVpnService.reload(ctx)
+        if (RulesUpdater.update(ctx) is RulesUpdater.Result.Updated) ApexVpnService.reload(ctx)
         CrashReporter.cleanup(ctx)
         // Новая версия на GitHub — уведомление; нажатие открывает страницу версии
         if (AppSettings.value.autoCheckUpdates) {

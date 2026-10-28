@@ -97,6 +97,7 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
     val update by viewModel.update.collectAsStateWithLifecycle()
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
     val rulesUpdating by viewModel.rulesUpdating.collectAsStateWithLifecycle()
+    val rulesInfo by viewModel.rulesInfo.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf(false) }
     var supportDialog by remember { mutableStateOf(false) }
     var confirmRemove by remember { mutableStateOf(false) }
@@ -271,10 +272,14 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
             GroupDivider()
             ListRow("Проверить сайт", "Через VPN или напрямую", leading = { tile(Icons.Rounded.Search) }, onClick = { onOpenPage(Page.SiteCheck) }) { Chevron() }
             GroupDivider()
-            val at = viewModel.rulesUpdatedAt()
+            val ri = rulesInfo
             ListRow(
                 "Обновить базы сайтов",
-                if (at > 0) "Обновлено ${formatAgo(at)}" else "Используются встроенные базы",
+                when {
+                    rulesUpdating -> "Проверяем…"
+                    ri != null && ri.basesDate > 0 -> "Базы от ${formatDate(ri.basesDate / 1000)} · проверено ${formatAgo(ri.checkedAt)}"
+                    else -> "Встроенные базы · ${if (s.rulesAuto) "обновятся автоматически" else "автообновление выключено"}"
+                },
                 leading = { tile(Icons.Rounded.Storage) },
                 onClick = { viewModel.updateRules() },
             ) { if (rulesUpdating) Spinner() }
