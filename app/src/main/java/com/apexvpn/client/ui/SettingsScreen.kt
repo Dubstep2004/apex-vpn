@@ -302,6 +302,51 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
             }
         }
 
+        // ── Резервная копия настроек: после переустановки всё вернуть одним файлом ──
+        SectionLabel("Резервная копия")
+        val exportLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+            androidx.activity.result.contract.ActivityResultContracts.CreateDocument(com.apexvpn.client.data.SettingsBackup.MIME),
+        ) { uri ->
+            if (uri != null) {
+                viewModel.showMessage(
+                    if (com.apexvpn.client.data.SettingsBackup.export(context, uri)) "Настройки сохранены в файл" else "Не удалось сохранить файл",
+                )
+            }
+        }
+        val importLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+            androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
+        ) { uri ->
+            if (uri != null) {
+                val subUrl = com.apexvpn.client.data.SettingsBackup.import(context, uri)
+                when {
+                    subUrl == null -> viewModel.showMessage("Это не файл настроек APEX VPN")
+                    subUrl.isNotBlank() && subUrl != sub.url -> viewModel.setSubscription(subUrl) { err ->
+                        viewModel.showMessage(err ?: "Настройки и подписка восстановлены")
+                    }
+                    else -> {
+                        viewModel.change { this }
+                        viewModel.showMessage("Настройки восстановлены")
+                    }
+                }
+            }
+        }
+        Group {
+            ListRow(
+                "Сохранить настройки в файл",
+                "Всё, включая свои списки, правила, избранное и подписку",
+                leading = { tile(Icons.Rounded.Download) },
+                onClick = { exportLauncher.launch(com.apexvpn.client.data.SettingsBackup.fileName()) },
+            ) { Chevron() }
+            GroupDivider()
+            ListRow(
+                "Восстановить из файла",
+                "После переустановки или на новом телефоне",
+                leading = { tile(Icons.Rounded.Refresh) },
+                onClick = { importLauncher.launch(arrayOf("application/json", "application/octet-stream", "text/plain", "*/*")) },
+            ) { Chevron() }
+        }
+        Caption("Настройки сохраняются при обновлении приложения. Файл нужен, если приложение пришлось удалить. В нём ссылка подписки — не отправляйте его другим. Ещё настройки попадают в резервную копию Android, если она включена на телефоне.")
+
         // ── О приложении ──
         SectionLabel("О приложении")
         Group {

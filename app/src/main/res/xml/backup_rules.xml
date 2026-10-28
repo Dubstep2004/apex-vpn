@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Резервная копия Android (до Android 12): настройки, подписка и своё фото.
+     Журналы, сбои, базы сайтов и кэш не копируются. -->
+<full-backup-content>
+    <include domain="sharedpref" path="settings.xml" />
+    <include domain="sharedpref" path="apex.xml" />
+    <include domain="file" path="backdrop.jpg" />
+</full-backup-content>

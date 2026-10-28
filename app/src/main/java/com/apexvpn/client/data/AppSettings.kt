@@ -103,8 +103,13 @@ object AppSettings {
 
     fun init(context: Context) {
         sp = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-        val loaded = sp.getString("json", null)?.let { runCatching { fromJson(JSONObject(it)) }.getOrNull() }
-            ?: Settings(refreshHours = Prefs.updateIntervalHours)
+        val raw = sp.getString("json", null)
+        val parsed = raw?.let { runCatching { fromJson(JSONObject(it)) }.getOrNull() }
+        if (raw != null && parsed == null) {
+            // Не затираем: сохраняем копию, чтобы следующая версия могла её прочитать
+            sp.edit { putString("json_broken_${System.currentTimeMillis()}", raw) }
+        }
+        val loaded = parsed ?: Settings(refreshHours = Prefs.updateIntervalHours)
         _state.value = if (loaded.sharePass.isEmpty()) loaded.copy(sharePass = randomPassword()) else loaded
         save()
     }
@@ -116,6 +121,18 @@ object AppSettings {
     }
 
     private fun save() = sp.edit { putString("json", toJson(_state.value).toString()) }
+
+    /** Все настройки одним JSON — для резервной копии в файл. */
+    fun exportJson(): JSONObject = toJson(_state.value)
+
+    /** Восстановить из резервной копии; false — файл не подошёл. */
+    fun importJson(o: JSONObject): Boolean {
+        val s = runCatching { fromJson(o) }.getOrNull() ?: return false
+        _state.value = if (s.sharePass.isEmpty()) s.copy(sharePass = randomPassword()) else s
+        Prefs.updateIntervalHours = _state.value.refreshHours
+        save()
+        return true
+    }
 
     /** Возвращает null при успехе или текст ошибки. */
     fun addDomain(raw: String, direct: Boolean): String? {
@@ -190,7 +207,11 @@ object AppSettings {
 
     // ─── JSON ───────────────────────────────────────────────────────────
 
-    private fun JSONArray.strings(): List<String> = List(length()) { getString(it) }
+    /** Строки массива; не строки (из старых или повреждённых настроек) пропускаем, а не падаем. */
+    private fun JSONArray.strings(): List<String> = (0 until length()).mapNotNull { optString(it, null)?.takeIf { s -> s.isNotEmpty() } }
+
+    /** Одно поле не должно сбрасывать все настройки: при ошибке — значение по умолчанию. */
+    private inline fun <T> safe(default: T, block: () -> T): T = runCatching(block).getOrDefault(default)
     private fun list(v: Collection<String>) = JSONArray(v.toList())
 
     private fun toJson(s: Settings) = JSONObject().apply {
@@ -224,14 +245,14 @@ object AppSettings {
         return Settings(
             mode = RouteMode.of(o.optString("mode", d.mode.id)),
             // Новые сервисы каталога включаются сами (иначе их сайты пошли бы напрямую)
-            services = run {
+            services = safe(d.services) {
                 val known = o.optJSONArray("knownServices")?.strings()?.toSet() ?: KNOWN_BEFORE_CATALOG
                 arr("services", d.services).toSet() + (ServiceCatalog.defaultEnabled - known)
             },
             knownServices = d.knownServices,
-            customLists = o.optJSONArray("customLists")?.let { a ->
-                List(a.length()) { i ->
-                    a.getJSONObject(i).let { c ->
+            customLists = safe(d.customLists) { o.optJSONArray("customLists")?.let { a ->
+                (0 until a.length()).mapNotNull { i ->
+                    a.optJSONObject(i)?.let { c ->
                         CustomList(
                             id = c.optString("id").ifBlank { java.util.UUID.randomUUID().toString() },
                             name = c.optString("name"),
@@ -241,7 +262,7 @@ object AppSettings {
                         )
                     }
                 }
-            } ?: d.customLists,
+            } ?: d.customLists },
             customDomains = arr("custom", d.customDomains),
             directDomains = arr("direct", d.directDomains),
             hideFromBanks = o.optBoolean("banks", d.hideFromBanks),
@@ -282,9 +303,12 @@ object AppSettings {
             smoothMode = o.optBoolean("smooth", d.smoothMode),
             glassBlur = o.optBoolean("glassBlur", d.glassBlur),
             liveMap = o.optBoolean("liveMap", d.liveMap),
-            userRules = o.optJSONArray("userRules")?.let { a ->
-                List(a.length()) { i -> a.getJSONObject(i).let { UserRule(it.optString("value"), it.optString("action", "proxy")) } }
-            } ?: d.userRules,
+            userRules = safe(d.userRules) {
+                o.optJSONArray("userRules")?.let { a ->
+                    (0 until a.length()).mapNotNull { i -> a.optJSONObject(i)?.let { UserRule(it.optString("value"), it.optString("action", "proxy")) } }
+                        .filter { it.value.isNotBlank() }
+                } ?: d.userRules
+            },
             domainStrategy = o.optString("domainStrategy", d.domainStrategy),
             fakeDns = o.optBoolean("fakeDns", d.fakeDns),
             remoteDns = DnsSpec.from(o.optJSONObject("remoteDns")),

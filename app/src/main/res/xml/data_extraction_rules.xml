@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+: резервная копия в облако и перенос на новый телефон —
+     настройки, подписка и своё фото. Журналы, сбои, базы сайтов и кэш не копируются. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="sharedpref" path="settings.xml" />
+        <include domain="sharedpref" path="apex.xml" />
+        <include domain="file" path="backdrop.jpg" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="sharedpref" path="settings.xml" />
+        <include domain="sharedpref" path="apex.xml" />
+        <include domain="file" path="backdrop.jpg" />
+    </device-transfer>
+</data-extraction-rules>

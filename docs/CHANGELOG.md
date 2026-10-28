@@ -2,6 +2,17 @@
 
 <img src="img/tags/new.svg" height="22"> <img src="img/tags/improved.svg" height="22"> <img src="img/tags/changed.svg" height="22"> <img src="img/tags/fixed.svg" height="22"> <img src="img/tags/removed.svg" height="22">
 
+## 1.9.4 · 28 октября 2026
+
+<img src="img/tags/new.svg" alt="Новое" height="22">
+
+- Резервная копия настроек в файл и восстановление: Настройки → Резервная копия
+- Настройки и подписка попадают в резервную копию Android и возвращаются после переустановки
+
+<img src="img/tags/fixed.svg" alt="Исправлено" height="22">
+
+- Одна ошибка в сохранённых настройках больше не сбрасывает все настройки
+
 ## 1.9.3 · 28 октября 2026
 
 <img src="img/tags/new.svg" alt="Новое" height="22">
