@@ -196,7 +196,7 @@ fun Tag(text: String, color: Color = Apex.AccentText, background: Color = Apex.A
 
 /** Круглый флаг страны: картинка из assets/flags, иначе эмодзи. */
 @Composable
-fun FlagCircle(flag: String?, size: Dp = 40.dp) {
+fun FlagCircle(flag: String?, size: Dp = 40.dp, animated: Boolean = false) {
     val context = LocalContext.current
     val code = remember(flag) { flagCode(flag) }
     val bitmap = remember(code) { code?.let { FlagCache.get(context, it) } }
@@ -205,7 +205,9 @@ fun FlagCircle(flag: String?, size: Dp = 40.dp) {
         contentAlignment = Alignment.Center,
     ) {
         if (bitmap != null) {
-            Image(bitmap, null, Modifier.size(size).clip(CircleShape))
+            // 94. В списке серверов флаг колышется (у каждой страны — свой сдвиг волны)
+            val flagMod = if (animated) Modifier.animatedFlag(((code?.hashCode() ?: 0) and 0xFF) / 255f) else Modifier
+            Image(bitmap, null, Modifier.size(size).clip(CircleShape).then(flagMod))
         } else {
             Text(flag ?: "🌐", fontSize = (size.value * 0.55f).sp)
         }

@@ -73,6 +73,8 @@ data class Settings(
     val shieldBackdrop: String = "none",
     // 20. Иконка на рабочем столе показывает, включён ли VPN
     val iconStatus: Boolean = false,
+    // 94. Флаги в списке серверов колышутся
+    val animatedFlags: Boolean = true,
 )
 
 /** Своё правило маршрутизации: домен/IP и действие proxy | direct | block. */
@@ -200,7 +202,7 @@ object AppSettings {
         put("domainStrategy", s.domainStrategy); put("fakeDns", s.fakeDns)
         put("remoteDns", s.remoteDns.json()); put("directDns", s.directDns.json()); put("rulesSource", s.rulesSource)
         put("warp", s.warp); put("warpConfig", s.warpConfig); put("shieldBackdrop", s.shieldBackdrop)
-        put("iconStatus", s.iconStatus)
+        put("iconStatus", s.iconStatus); put("animatedFlags", s.animatedFlags)
     }
 
     private fun fromJson(o: JSONObject): Settings {
@@ -261,6 +263,7 @@ object AppSettings {
             warpConfig = o.optString("warpConfig", d.warpConfig),
             shieldBackdrop = o.optString("shieldBackdrop", d.shieldBackdrop),
             iconStatus = o.optBoolean("iconStatus", d.iconStatus),
+            animatedFlags = o.optBoolean("animatedFlags", d.animatedFlags),
         )
     }
 }

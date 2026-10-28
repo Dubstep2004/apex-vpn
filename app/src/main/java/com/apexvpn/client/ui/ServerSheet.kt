@@ -110,6 +110,7 @@ fun ServerSheet(viewModel: MainViewModel, onDismiss: () -> Unit) {
         dragHandle = { BottomSheetDefaults.DragHandle(color = Apex.SurfaceHigh) },
         shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
     ) {
+      ProvideFlagClock(settings.animatedFlags) {
         Column(
             Modifier
                 .fillMaxWidth()
@@ -260,6 +261,7 @@ fun ServerSheet(viewModel: MainViewModel, onDismiss: () -> Unit) {
             Caption("★ — добавить в избранное. Долгое нажатие на сервер — ярлык на рабочий стол. Метки протоколов выбирают конкретное подключение. Пинг — время соединения с сервером; при включённом VPN — задержка через сервер.")
             Spacer(Modifier.height(24.dp))
         }
+      }
     }
 }
 
@@ -294,7 +296,7 @@ private fun GroupRow(
             .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
     ) {
         Row(verticalAlignment = Alignment.Top) {
-            FlagCircle(group.flag)
+            FlagCircle(group.flag, animated = true)
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 // Название целиком, до двух строк — без обрезки «Германи…»

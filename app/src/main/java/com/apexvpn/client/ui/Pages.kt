@@ -680,6 +680,10 @@ private fun AppearancePage(viewModel: MainViewModel, onBack: () -> Unit) {
             ListRow("Живая карта", "Дышащие кольца и бегущий по дуге свет") {
                 ApexSwitch(s.liveMap, { v -> viewModel.change(reload = false) { copy(liveMap = v) } }, enabled = !s.smoothMode)
             }
+            GroupDivider()
+            ListRow("Анимированные флаги", "Флаги в списке серверов колышутся на ветру") {
+                ApexSwitch(s.animatedFlags, { v -> viewModel.change(reload = false) { copy(animatedFlags = v) } }, enabled = !s.smoothMode)
+            }
         }
 
         // 43. Живые обои
