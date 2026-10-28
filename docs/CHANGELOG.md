@@ -2,6 +2,23 @@
 
 <img src="img/tags/new.svg" height="22"> <img src="img/tags/improved.svg" height="22"> <img src="img/tags/changed.svg" height="22"> <img src="img/tags/fixed.svg" height="22"> <img src="img/tags/removed.svg" height="22">
 
+## 2.2.0 · 28 октября 2026
+
+<img src="img/tags/new.svg" alt="Новое" height="22">
+
+- Защита от подделок: приложение проверяет свою подпись и узнаёт перепакованные копии
+- Неофициальная копия при каждом запуске предупреждает и даёт ссылку на оригинал; красная плашка на главном и в уведомлении
+- «Настройки → О приложении»: «✓ Официальная сборка» у оригинала
+- В отчёте для поддержки видно, официальная ли сборка
+
+<img src="img/tags/improved.svg" alt="Улучшено" height="22">
+
+- Сборка на GitHub не выпустит релиз, подписанный не ключом автора
+
+<img src="img/tags/changed.svg" alt="Изменено" height="22">
+
+- Название и логотип APEX VPN не передаются по GPL — правила для форков в TRADEMARKS.md
+
 ## 2.1.1 · 28 октября 2026
 
 <img src="img/tags/improved.svg" alt="Улучшено" height="22">

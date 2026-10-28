@@ -49,6 +49,11 @@ object Diagnostics {
         b.appendLine("APEX VPN — отчёт для поддержки")
         b.appendLine("Время: $now")
         b.appendLine("Версия: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}), Xray ${BuildConfig.XRAY_VERSION}")
+        b.appendLine("Сборка: ${when (Integrity.status(context)) {
+            Integrity.Status.Official -> "официальная"
+            Integrity.Status.Test -> "тестовая"
+            Integrity.Status.Unofficial -> "НЕОФИЦИАЛЬНАЯ (${Integrity.fingerprint(context)}, ${context.packageName})"
+        }}")
         b.appendLine("Телефон: ${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
         b.appendLine()
         b.appendLine("── Состояние")

@@ -301,6 +301,35 @@ class MainActivity : ComponentActivity() {
                             dismissButton = { TextButton(onClick = { pendingTransfer.value = null }) { Text("Отмена", color = Apex.TextDim) } },
                         )
                     }
+                    // Защита от подделок: при каждом запуске неофициальной копии — предупреждение
+                    var cloneWarning by rememberSaveable {
+                        mutableStateOf(com.apexvpn.client.data.Integrity.status(this@MainActivity) == com.apexvpn.client.data.Integrity.Status.Unofficial)
+                    }
+                    if (cloneWarning && !splash) {
+                        AlertDialog(
+                            onDismissRequest = { },
+                            containerColor = Apex.Dialog,
+                            title = { Text("⚠ Неофициальная копия", color = Apex.Bad) },
+                            text = {
+                                Text(
+                                    "Это приложение похоже на APEX VPN, но подписано не автором. В копии может быть чужой код: " +
+                                        "реклама, слежка или кража ссылки подписки.\n\n" +
+                                        "Оригинал APEX VPN скачивается только со страницы github.com/Dubstep2004/apex-vpn.",
+                                    color = Apex.TextDim,
+                                )
+                            },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    runCatching {
+                                        startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(com.apexvpn.client.data.Integrity.OFFICIAL_URL)))
+                                    }
+                                }) { Text("Скачать оригинал", color = Apex.Accent, fontWeight = FontWeight.SemiBold) }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { cloneWarning = false }) { Text("Понимаю риск", color = Apex.TextDim) }
+                            },
+                        )
+                    }
                     // «Что нового» один раз после обновления приложения
                     var whatsNew by remember { mutableStateOf(Changelog.unseen(BuildConfig.VERSION_CODE)) }
                     if (whatsNew.isNotEmpty() && !splash && sub.url.isNotEmpty()) {

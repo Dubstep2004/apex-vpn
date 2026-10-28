@@ -134,6 +134,19 @@ jobs:
           # Проверка: APK целый и подписан
           APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner
           "$APKSIGNER" verify --print-certs "$APK" > signer.txt; head -3 signer.txt
+          # Защита от подделок: релиз должен быть подписан ключом автора — тем же, что записан
+          # в Integrity.kt. Иначе приложение назвало бы свою же сборку «неофициальной копией».
+          GOT=$(grep -oP 'certificate SHA-256 digest: \K[0-9a-f]+' signer.txt | head -1 | tr 'a-f' 'A-F')
+          WANT=$(grep -oP 'OFFICIAL_CERT = "\K[0-9A-F]+' app/src/main/java/com/apexvpn/client/data/Integrity.kt)
+          if [ "$GOT" != "$WANT" ]; then
+            if [ "${{ github.repository }}" = "Dubstep2004/apex-vpn" ]; then
+              echo "::error title=Подпись::APK подписан не официальным ключом ($GOT). Проверьте секреты APEX_KEYSTORE_BASE64 и APEX_KEYSTORE_PASSWORD — релиз не выпущен."
+              exit 1
+            fi
+            echo "::warning title=Подпись::Сборка подписана не ключом автора — приложение покажет «Неофициальная копия»."
+          else
+            echo "::notice title=Подпись::✓ Официальный ключ"
+          fi
           LIBS=$(unzip -l "$APK" | grep -oE "lib/[^ ]+\.so" | tr '\n' ' ')
           echo "::notice title=APK::$(du -h "$APK" | cut -f1) — $LIBS"
           echo "$LIBS" | grep -q "arm64-v8a/libxray.so" || { echo "::error title=APK::в APK нет ядра Xray"; exit 1; }

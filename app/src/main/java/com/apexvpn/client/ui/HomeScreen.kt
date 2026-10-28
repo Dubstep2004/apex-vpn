@@ -147,6 +147,18 @@ fun HomeScreen(
             StatusPill(status)
         }
 
+        // Защита от подделок: постоянное предупреждение в неофициальной копии
+        if (remember { com.apexvpn.client.data.Integrity.status(context) } == com.apexvpn.client.data.Integrity.Status.Unofficial) {
+            Spacer(Modifier.height(10.dp))
+            Banner(
+                Icons.Rounded.WarningAmber, Apex.Bad,
+                "Неофициальная копия APEX VPN",
+                "Её собрал не автор — она может украсть подписку. Нажмите, чтобы скачать оригинал.",
+                onClick = { openUrl(context, com.apexvpn.client.data.Integrity.OFFICIAL_URL) },
+                onClose = null,
+            )
+        }
+
         // 13. Подписка заканчивается
         ExpiryAlerts.warning(sub)?.let { w ->
             Spacer(Modifier.height(10.dp))

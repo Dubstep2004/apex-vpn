@@ -426,6 +426,21 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
                     Text("Версия ${BuildConfig.VERSION_NAME}", color = Apex.TextDim, fontSize = 14.sp)
                     Text("Ядро sing-box ${singBoxVersion()}", color = Apex.TextDim, fontSize = 13.sp)
                     Text("Ядро Xray ${BuildConfig.XRAY_VERSION}", color = Apex.TextDim, fontSize = 13.sp)
+                    // Подлинность сборки
+                    val integrity = remember { com.apexvpn.client.data.Integrity.status(context) }
+                    Text(
+                        when (integrity) {
+                            com.apexvpn.client.data.Integrity.Status.Official -> "✓ Официальная сборка"
+                            com.apexvpn.client.data.Integrity.Status.Test -> "Тестовая сборка"
+                            com.apexvpn.client.data.Integrity.Status.Unofficial -> "⚠ Неофициальная копия"
+                        },
+                        color = when (integrity) {
+                            com.apexvpn.client.data.Integrity.Status.Official -> Apex.Good
+                            com.apexvpn.client.data.Integrity.Status.Test -> Apex.TextDim
+                            com.apexvpn.client.data.Integrity.Status.Unofficial -> Apex.Bad
+                        },
+                        fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                    )
                 }
                 Spacer(Modifier.weight(1f))
                 Chevron()

@@ -423,6 +423,9 @@ class ApexVpnService : VpnService(), PlatformInterface, CommandServerHandler {
             else -> getString(R.string.notification_connecting)
         }
         val text = when {
+            // Защита от подделок: копия честно говорит, что она не оригинал
+            com.apexvpn.client.data.Integrity.status(this) == com.apexvpn.client.data.Integrity.Status.Unofficial ->
+                "⚠ Неофициальная копия APEX VPN — скачайте оригинал с GitHub"
             status == VpnStatus.Paused -> "VPN включится сам, когда вы выйдете из этой сети"
             status == VpnStatus.Blocked -> "Аварийный выключатель: без VPN интернет не работает"
             status == VpnStatus.Started && AppSettings.value.speedInNotification -> {
