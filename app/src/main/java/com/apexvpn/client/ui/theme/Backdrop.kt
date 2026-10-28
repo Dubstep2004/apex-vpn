@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -26,10 +27,14 @@ import kotlin.math.sin
 @Composable
 fun DesignBackground(modifier: Modifier = Modifier) {
     val p = Apex.palette
+    // Размытие стекла (Android 12+): пятна фона становятся мягче
+    val blurred = Apex.feel.blur && android.os.Build.VERSION.SDK_INT >= 31 &&
+        p.backdrop in setOf(Backdrop.Glass, Backdrop.Aurora, Backdrop.Pastel, Backdrop.Neon)
+    val modifier = if (blurred) modifier.blur(36.dp) else modifier
     when (p.backdrop) {
         Backdrop.Solid -> Canvas(modifier.fillMaxSize()) { drawRect(p.base) }
         Backdrop.Glass -> Canvas(modifier.fillMaxSize()) { drawGlass(p) }
-        Backdrop.Aurora -> AuroraBackground(modifier, p)
+        Backdrop.Aurora -> if (Apex.feel.smooth) Canvas(modifier.fillMaxSize()) { drawAurora(p, 0f) } else AuroraBackground(modifier, p)
         Backdrop.Neon -> Canvas(modifier.fillMaxSize()) { drawNeon(p) }
         Backdrop.Terminal -> Canvas(modifier.fillMaxSize()) { drawTerminal(p) }
         Backdrop.Pastel -> Canvas(modifier.fillMaxSize()) { drawPastel(p) }
@@ -54,20 +59,22 @@ private fun DrawScope.drawGlass(p: Palette) {
 private fun AuroraBackground(modifier: Modifier, p: Palette) {
     val t = rememberInfiniteTransition(label = "aurora")
     val phase by t.animateFloat(0f, (2 * Math.PI).toFloat(), infiniteRepeatable(tween(16000, easing = LinearEasing), RepeatMode.Restart), label = "phase")
-    Canvas(modifier.fillMaxSize()) {
-        drawRect(p.base)
-        val w = size.width
-        val h = size.height
-        val a = if (p.dark) 0.6f else 0.45f
-        val colors = listOf(Color(0xFF34D399), Color(0xFF818CF8), Color(0xFFF472B6), Color(0xFF22D3EE))
-        colors.forEachIndexed { i, c ->
-            val ph = phase + i * 1.6f
-            val center = Offset(
-                w * (0.5f + 0.38f * cos(ph)),
-                h * (0.25f + 0.18f * sin(ph * 0.7f) + i * 0.17f),
-            )
-            blob(c.copy(alpha = a), center, w * 0.7f)
-        }
+    Canvas(modifier.fillMaxSize()) { drawAurora(p, phase) }
+}
+
+private fun DrawScope.drawAurora(p: Palette, phase: Float) {
+    drawRect(p.base)
+    val w = size.width
+    val h = size.height
+    val a = if (p.dark) 0.6f else 0.45f
+    val colors = listOf(Color(0xFF34D399), Color(0xFF818CF8), Color(0xFFF472B6), Color(0xFF22D3EE))
+    colors.forEachIndexed { i, c ->
+        val ph = phase + i * 1.6f
+        val center = Offset(
+            w * (0.5f + 0.38f * cos(ph)),
+            h * (0.25f + 0.18f * sin(ph * 0.7f) + i * 0.17f),
+        )
+        blob(c.copy(alpha = a), center, w * 0.7f)
     }
 }
 

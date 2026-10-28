@@ -40,6 +40,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.FamilyRestroom
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material3.Button
@@ -85,7 +86,7 @@ import java.net.NetworkInterface
 import java.util.Locale
 
 /** Дополнительные страницы, открываются поверх вкладок. */
-enum class Page { Apps, SpeedTest, SiteCheck, Wifi, Share, Dns, Profile, Appearance, Changelog }
+enum class Page { Apps, SpeedTest, SiteCheck, Wifi, Share, Dns, Profile, Appearance, Changelog, Advanced }
 
 @Composable
 fun PageHost(page: Page, viewModel: MainViewModel, onBack: () -> Unit) {
@@ -99,6 +100,7 @@ fun PageHost(page: Page, viewModel: MainViewModel, onBack: () -> Unit) {
         Page.Profile -> ProfilePage(viewModel, onBack)
         Page.Appearance -> AppearancePage(viewModel, onBack)
         Page.Changelog -> ChangelogPage(onBack)
+        Page.Advanced -> AdvancedPage(viewModel, onBack)
     }
 }
 
@@ -579,17 +581,40 @@ private fun AppearancePage(viewModel: MainViewModel, onBack: () -> Unit) {
                 ChoiceRow(t.title, null, s.theme == t) { viewModel.change(reload = false) { copy(theme = t) } }
             }
         }
-        SectionLabel("Цвет акцента")
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+        // Главный экран: «Кнопка» или «Карта»
+        SectionLabel("Главный экран")
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            listOf("button" to "Кнопка", "map" to "Карта").forEach { (id, title) ->
+                val on = s.homeStyle == id
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Apex.Surface)
+                        .border(2.dp, if (on) Apex.Accent else Apex.Outline, RoundedCornerShape(18.dp))
+                        .clickable { viewModel.change(reload = false) { copy(homeStyle = id) } }
+                        .padding(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    HomeStylePreview(id == "map")
+                    Spacer(Modifier.height(8.dp))
+                    Text(title, color = if (on) Apex.Text else Apex.TextDim, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+        if (s.design == Design.Bento) Caption("В дизайне «Бенто» главный экран всегда из плиток.")
+
+        SectionLabel("Цвет")
+        Row(Modifier.fillMaxWidth()) {
             AccentColor.entries.forEach { a ->
                 val on = s.accent == a
                 Column(
-                    Modifier.clip(RoundedCornerShape(16.dp)).clickable { viewModel.change(reload = false) { copy(accent = a) } }.padding(8.dp),
+                    Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).clickable { viewModel.change(reload = false) { copy(accent = a) } }.padding(vertical = 8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Box(
                         Modifier
-                            .size(52.dp)
+                            .size(46.dp)
                             .clip(CircleShape)
                             .background(Color(a.argb))
                             .border(3.dp, if (on) Apex.Text else Color.Transparent, CircleShape),
@@ -598,6 +623,56 @@ private fun AppearancePage(viewModel: MainViewModel, onBack: () -> Unit) {
                     Spacer(Modifier.height(6.dp))
                     Text(a.title, color = if (on) Apex.Text else Apex.TextDim, fontSize = 12.sp)
                 }
+            }
+        }
+
+        // Ощущения
+        SectionLabel("Ощущения")
+        Group {
+            ListRow("Звук подключения", if (s.connectSound) com.apexvpn.client.data.ConnectFeedback.title(s.sound) + " · на беззвучном телефон молчит" else "Выключен") {
+                ApexSwitch(s.connectSound, { v -> viewModel.change(reload = false) { copy(connectSound = v) } })
+            }
+            if (s.connectSound) {
+                com.apexvpn.client.data.ConnectFeedback.sounds.forEach { snd ->
+                    GroupDivider()
+                    ListRow(
+                        snd.title,
+                        snd.subtitle,
+                        leading = { RadioDot(s.sound == snd.id) },
+                        onClick = {
+                            viewModel.change(reload = false) { copy(sound = snd.id) }
+                            com.apexvpn.client.data.ConnectFeedback.play(context, snd.id, force = true)
+                        },
+                    ) {
+                        Box(
+                            Modifier.size(40.dp).clip(CircleShape).clickable { com.apexvpn.client.data.ConnectFeedback.play(context, snd.id, force = true) },
+                            contentAlignment = Alignment.Center,
+                        ) { Icon(Icons.Rounded.PlayArrow, "Послушать", tint = Apex.Accent) }
+                    }
+                }
+            }
+            GroupDivider()
+            ListRow("Вибрация", "Отклик при нажатии и подключении") {
+                ApexSwitch(s.vibration, { v ->
+                    viewModel.change(reload = false) { copy(vibration = v) }
+                    if (v) com.apexvpn.client.data.ConnectFeedback.vibrate(context)
+                })
+            }
+        }
+
+        // Плавность
+        SectionLabel("Плавность")
+        Group {
+            ListRow("Плавный режим", "Меньше анимаций и свечения — для слабых телефонов и экономии батареи") {
+                ApexSwitch(s.smoothMode, { v -> viewModel.change(reload = false) { copy(smoothMode = v) } })
+            }
+            GroupDivider()
+            ListRow("Размытие стекла", if (android.os.Build.VERSION.SDK_INT >= 31) "Мягкий размытый фон за карточками" else "Нужен Android 12 или новее") {
+                ApexSwitch(s.glassBlur, { v -> viewModel.change(reload = false) { copy(glassBlur = v) } }, enabled = android.os.Build.VERSION.SDK_INT >= 31)
+            }
+            GroupDivider()
+            ListRow("Живая карта", "Дышащие кольца и бегущий по дуге свет") {
+                ApexSwitch(s.liveMap, { v -> viewModel.change(reload = false) { copy(liveMap = v) } }, enabled = !s.smoothMode)
             }
         }
 
@@ -759,6 +834,253 @@ fun ReleaseCard(r: com.apexvpn.client.data.Release, installed: Boolean) {
                 Text("•", color = Apex.Accent, fontSize = 15.sp, modifier = Modifier.width(16.dp))
                 Text(c, color = Apex.Text, fontSize = 15.sp, lineHeight = 20.sp)
             }
+        }
+    }
+}
+
+// ─── Маршрутизация для опытных (как «Правила маршрутизации» в v2rayNG) ──────
+
+private val ruleActions = listOf("proxy" to "VPN", "direct" to "Напрямую", "block" to "Блок")
+private val dnsTypes = listOf("https" to "DoH", "tls" to "DoT", "quic" to "DoQ", "udp" to "UDP")
+private val strategies = listOf(
+    "as_is" to ("Как есть" to "Правила по доменам, IP узнаём только при подключении"),
+    "ip_if_non_match" to ("IPIfNonMatch" to "Если домен не подошёл ни к одному правилу — проверить его IP"),
+    "ip_on_demand" to ("IPOnDemand" to "Сразу узнавать IP и проверять правила по IP"),
+)
+
+@Composable
+private fun AdvancedPage(viewModel: MainViewModel, onBack: () -> Unit) {
+    val s by viewModel.settings.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val updating by viewModel.rulesUpdating.collectAsStateWithLifecycle()
+    var confirmReset by remember { mutableStateOf(false) }
+    PageScaffold("Маршрутизация", onBack) {
+        Caption("Для опытных. Неверные настройки могут сломать доступ к сайтам — тогда нажмите «Сбросить» внизу.")
+
+        // ── Базы сайтов (гео-файлы)
+        SectionLabel("Базы сайтов")
+        var source by rememberSaveable { mutableStateOf(s.rulesSource) }
+        Group {
+            val dir = remember(updating) { com.apexvpn.client.data.RulesUpdater.activeDir(context)?.let { java.io.File(it) } }
+            com.apexvpn.client.data.RulesUpdater.FILES.forEachIndexed { i, name ->
+                if (i > 0) GroupDivider()
+                val f = dir?.let { java.io.File(it, name) }
+                val info = if (f != null && f.exists()) "${formatBytes(f.length())} · ${formatDate(f.lastModified() / 1000)}" else "нет файла"
+                ListRow(name.removeSuffix(".srs"), info + "\n" + com.apexvpn.client.data.RulesUpdater.urlFor(name))
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        PlainField(source, "Свой адрес баз (пусто — по умолчанию)") { source = it.trim() }
+        Spacer(Modifier.height(10.dp))
+        Button(
+            onClick = {
+                if (source.isNotEmpty() && !source.startsWith("https://")) {
+                    viewModel.showMessage("Адрес должен начинаться с https://")
+                } else {
+                    viewModel.change(reload = false) { copy(rulesSource = source) }
+                    viewModel.updateRules()
+                }
+            },
+            enabled = !updating,
+            modifier = Modifier.fillMaxWidth().height(50.dp),
+            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Apex.Accent, contentColor = Apex.OnAccent),
+        ) {
+            if (updating) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = Apex.OnAccent)
+            else Text("Обновить базы", fontWeight = FontWeight.SemiBold)
+        }
+
+        // ── Свои правила
+        SectionLabel("Свои правила", trailing = s.userRules.size.takeIf { it > 0 }?.toString())
+        var value by rememberSaveable { mutableStateOf("") }
+        var action by rememberSaveable { mutableStateOf("proxy") }
+        var ruleError by remember { mutableStateOf<String?>(null) }
+        if (s.userRules.isNotEmpty()) {
+            Group {
+                s.userRules.forEachIndexed { i, r ->
+                    if (i > 0) GroupDivider()
+                    ListRow(r.value, ruleActions.firstOrNull { it.first == r.action }?.second ?: r.action) {
+                        Box(
+                            Modifier.size(40.dp).clip(CircleShape).clickable {
+                                viewModel.change { copy(userRules = userRules.filterIndexed { j, _ -> j != i }) }
+                            },
+                            contentAlignment = Alignment.Center,
+                        ) { Icon(Icons.Rounded.Close, "Удалить", tint = Apex.TextDim) }
+                    }
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+        }
+        ChipRow(ruleActions, action) { action = it }
+        Spacer(Modifier.height(8.dp))
+        InputWithButton(value, "example.com, 1.2.3.4/24, keyword:…", Icons.Rounded.Add, { value = it; ruleError = null }) {
+            val v = value.trim()
+            ruleError = if (v.isEmpty()) "Введите домен или IP" else viewModel.validateUserRule(v)
+            if (ruleError == null) {
+                viewModel.change { copy(userRules = userRules.filterNot { it.value == v } + com.apexvpn.client.data.UserRule(v, action)) }
+                value = ""
+            }
+        }
+        ruleError?.let { Text(it, color = Apex.Bad, fontSize = 13.sp, modifier = Modifier.padding(start = 4.dp, top = 6.dp)) }
+        Caption("Домен — вместе с поддоменами. full: — только этот домен, keyword: — по слову, regexp: — выражение, IP или подсеть. Свои правила важнее остальных.")
+
+        // ── Настройки доменов
+        SectionLabel("Настройки доменов")
+        Group {
+            ListRow("Поддельный DNS (FakeDNS)", "Быстрее открывает сайты через VPN, адреса 198.18.x.x") {
+                ApexSwitch(s.fakeDns, { v -> viewModel.change { copy(fakeDns = v) } })
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        Group {
+            strategies.forEachIndexed { i, (id, t) ->
+                if (i > 0) GroupDivider()
+                ChoiceRow(t.first, t.second, s.domainStrategy == id) { viewModel.change { copy(domainStrategy = id) } }
+            }
+        }
+
+        // ── DNS
+        DnsEditor("Удалённый DNS (через VPN)", "https://dns.google/dns-query", s.remoteDns, viewModel) { d -> viewModel.change { copy(remoteDns = d) } }
+        DnsEditor("Домашний DNS (напрямую)", "77.88.8.8", s.directDns, viewModel) { d -> viewModel.change { copy(directDns = d) } }
+        Caption("Пусто — DNS из раздела «DNS». IP нужен, чтобы адрес сервера DNS не узнавать через другой DNS.")
+
+        Spacer(Modifier.height(20.dp))
+        androidx.compose.material3.OutlinedButton(
+            onClick = { confirmReset = true },
+            modifier = Modifier.fillMaxWidth().height(50.dp),
+            shape = RoundedCornerShape(14.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Apex.Bad),
+        ) { Text("Сбросить настройки для опытных", color = Apex.Bad, fontWeight = FontWeight.SemiBold) }
+        Spacer(Modifier.height(28.dp))
+    }
+    if (confirmReset) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirmReset = false },
+            containerColor = Apex.Dialog,
+            title = { Text("Сбросить?", color = Apex.Text) },
+            text = { Text("Свои правила, FakeDNS, стратегия и DNS вернутся по умолчанию.", color = Apex.TextDim) },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    confirmReset = false
+                    val d = com.apexvpn.client.data.Settings()
+                    viewModel.change {
+                        copy(userRules = d.userRules, domainStrategy = d.domainStrategy, fakeDns = d.fakeDns,
+                            remoteDns = d.remoteDns, directDns = d.directDns, rulesSource = d.rulesSource)
+                    }
+                    viewModel.showMessage("Настройки сброшены")
+                }) { Text("Сбросить", color = Apex.Bad) }
+            },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { confirmReset = false }) { Text("Отмена", color = Apex.TextDim) } },
+        )
+    }
+}
+
+@Composable
+private fun DnsEditor(
+    title: String,
+    hint: String,
+    current: com.apexvpn.client.data.DnsSpec,
+    viewModel: MainViewModel,
+    onSave: (com.apexvpn.client.data.DnsSpec) -> Unit,
+) {
+    var type by rememberSaveable(current) { mutableStateOf(current.type) }
+    var server by rememberSaveable(current) { mutableStateOf(current.server) }
+    var ip by rememberSaveable(current) { mutableStateOf(current.ip) }
+    var error by remember { mutableStateOf<String?>(null) }
+    SectionLabel(title, trailing = if (current.isSet) "вкл" else null)
+    ChipRow(dnsTypes, type) { type = it; error = null }
+    Spacer(Modifier.height(8.dp))
+    PlainField(server, hint) { server = it.trim(); error = null }
+    Spacer(Modifier.height(8.dp))
+    PlainField(ip, "IP сервера (необязательно)") { ip = it.trim(); error = null }
+    error?.let { Text(it, color = Apex.Bad, fontSize = 13.sp, modifier = Modifier.padding(start = 4.dp, top = 6.dp)) }
+    Spacer(Modifier.height(8.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Button(
+            onClick = {
+                val d = com.apexvpn.client.data.DnsSpec(type, server, ip)
+                error = if (d.isSet) viewModel.validateDnsSpec(d) else null
+                if (error == null) {
+                    onSave(d)
+                    viewModel.showMessage(if (d.isSet) "DNS сохранён" else "DNS по умолчанию")
+                }
+            },
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Apex.Accent, contentColor = Apex.OnAccent),
+        ) { Text("Сохранить") }
+        if (current.isSet) {
+            androidx.compose.material3.TextButton(onClick = { onSave(com.apexvpn.client.data.DnsSpec()) }) { Text("Очистить", color = Apex.TextDim) }
+        }
+    }
+}
+
+@Composable
+private fun ChipRow(items: List<Pair<String, String>>, selected: String, onSelect: (String) -> Unit) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        items.forEach { (id, label) ->
+            val on = id == selected
+            Box(
+                Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (on) Apex.Accent else Apex.Surface)
+                    .border(1.dp, if (on) Apex.Accent else Apex.Outline, RoundedCornerShape(12.dp))
+                    .clickable { onSelect(id) }
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center,
+            ) { Text(label, color = if (on) Apex.OnAccent else Apex.Text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
+        }
+    }
+}
+
+@Composable
+private fun PlainField(value: String, hint: String, onChange: (String) -> Unit) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(Apex.Surface)
+            .border(1.dp, Apex.Outline, RoundedCornerShape(14.dp))
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+    ) {
+        if (value.isEmpty()) Text(hint, color = Apex.TextDim, fontSize = 15.sp)
+        BasicTextField(
+            value = value,
+            onValueChange = onChange,
+            singleLine = true,
+            textStyle = TextStyle(color = Apex.Text, fontSize = 15.sp),
+            cursorBrush = SolidColor(Apex.Accent),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+/** Мини-превью главного экрана: щит или карта с дугой. */
+@Composable
+private fun HomeStylePreview(map: Boolean) {
+    val accent = Apex.Accent
+    val accent2 = Apex.Cyan
+    val dim = Apex.TextDim
+    androidx.compose.foundation.Canvas(Modifier.fillMaxWidth().height(72.dp)) {
+        if (map) {
+            val cw = size.width / WorldMap.W
+            val ch = size.height / WorldMap.H
+            WorldMap.rows.forEachIndexed { j, row ->
+                row.forEachIndexed { i, c ->
+                    if (c == '#' && i % 2 == 0 && j % 2 == 0) drawCircle(dim.copy(alpha = 0.35f), minOf(cw, ch) * 0.6f, androidx.compose.ui.geometry.Offset((i + 0.5f) * cw, (j + 0.5f) * ch))
+                }
+            }
+            val a = androidx.compose.ui.geometry.Offset(size.width * 0.6f, size.height * 0.32f)
+            val b = androidx.compose.ui.geometry.Offset(size.width * 0.5f, size.height * 0.38f)
+            val path = androidx.compose.ui.graphics.Path().apply { moveTo(a.x, a.y); quadraticBezierTo((a.x + b.x) / 2, a.y - 20f, b.x - 30f, b.y) }
+            drawPath(path, accent, style = androidx.compose.ui.graphics.drawscope.Stroke(2.dp.toPx()))
+            drawCircle(accent, 3.dp.toPx(), a)
+            drawCircle(accent2, 3.dp.toPx(), androidx.compose.ui.geometry.Offset(b.x - 30f, b.y))
+        } else {
+            val r = size.height * 0.42f
+            drawCircle(androidx.compose.ui.graphics.Brush.radialGradient(listOf(accent.copy(alpha = 0.4f), Color.Transparent), center, r * 1.3f), r * 1.3f)
+            drawCircle(accent, r * 0.7f)
         }
     }
 }

@@ -53,7 +53,33 @@ data class Settings(
     val theme: ThemeMode = ThemeMode.Dark,
     val design: Design = Design.Classic,
     val accent: AccentColor = AccentColor.Violet,
+    val homeStyle: String = "button",                 // главный экран: button | map
+    val connectSound: Boolean = false,                // звук подключения
+    val sound: String = "signal",                     // signal | crystal | sphere | chime
+    val vibration: Boolean = true,
+    val smoothMode: Boolean = false,                  // меньше анимаций для слабых телефонов
+    val glassBlur: Boolean = true,                    // размытие фона под стеклом
+    val liveMap: Boolean = true,                      // дышащие кольца и бегущий свет на карте
+    // Для опытных
+    val userRules: List<UserRule> = emptyList(),
+    val domainStrategy: String = "as_is",             // as_is | ip_if_non_match | ip_on_demand
+    val fakeDns: Boolean = false,
+    val remoteDns: DnsSpec = DnsSpec(),
+    val directDns: DnsSpec = DnsSpec(),
+    val rulesSource: String = "",                     // свой адрес баз сайтов (*.srs)
 )
+
+/** Своё правило маршрутизации: домен/IP и действие proxy | direct | block. */
+data class UserRule(val value: String, val action: String)
+
+/** DNS для «опытных»: тип (https/tls/quic/udp/tcp), адрес и IP. Пустой адрес — по умолчанию. */
+data class DnsSpec(val type: String = "https", val server: String = "", val ip: String = "") {
+    val isSet get() = server.isNotBlank() || ip.isNotBlank()
+    fun json(): JSONObject = JSONObject().put("type", type).put("server", server).put("ip", ip)
+    companion object {
+        fun from(o: JSONObject?) = if (o == null) DnsSpec() else DnsSpec(o.optString("type", "https"), o.optString("server"), o.optString("ip"))
+    }
+}
 
 /** Настройки маршрутизации и приложения. Хранятся одним JSON, изменения сразу видны всем. */
 object AppSettings {
@@ -114,6 +140,11 @@ object AppSettings {
         put("clashApi", Prefs.clashApiPort)
         put("xrayPort", Prefs.xrayBasePort)
         put("xrayAuth", Prefs.xrayAuth)
+        put("userRules", JSONArray(s.userRules.map { JSONObject().put("value", it.value).put("action", it.action) }))
+        put("domainStrategy", s.domainStrategy)
+        put("fakeDns", s.fakeDns)
+        if (s.remoteDns.isSet) put("remoteDns", s.remoteDns.json())
+        if (s.directDns.isSet) put("directDns", s.directDns.json())
         put("autoProtocols", JSONArray(if (s.protocol.isEmpty()) emptyList() else listOf(s.protocol)))
         put(
             "share",
@@ -155,6 +186,11 @@ object AppSettings {
         put("speedNotif", s.speedInNotification); put("expiryAlerts", s.expiryAlerts)
         put("autoUpdates", s.autoCheckUpdates); put("crashReports", s.crashReports); put("refreshHours", s.refreshHours)
         put("theme", s.theme.id); put("design", s.design.id); put("accent", s.accent.id)
+        put("homeStyle", s.homeStyle); put("connectSound", s.connectSound); put("sound", s.sound); put("vibration", s.vibration)
+        put("smooth", s.smoothMode); put("glassBlur", s.glassBlur); put("liveMap", s.liveMap)
+        put("userRules", JSONArray(s.userRules.map { JSONObject().put("value", it.value).put("action", it.action) }))
+        put("domainStrategy", s.domainStrategy); put("fakeDns", s.fakeDns)
+        put("remoteDns", s.remoteDns.json()); put("directDns", s.directDns.json()); put("rulesSource", s.rulesSource)
     }
 
     private fun fromJson(o: JSONObject): Settings {
@@ -196,6 +232,21 @@ object AppSettings {
             theme = ThemeMode.of(o.optString("theme", d.theme.id)),
             design = Design.of(o.optString("design", d.design.id)),
             accent = AccentColor.of(o.optString("accent", d.accent.id)),
+            homeStyle = o.optString("homeStyle", d.homeStyle),
+            connectSound = o.optBoolean("connectSound", d.connectSound),
+            sound = o.optString("sound", d.sound),
+            vibration = o.optBoolean("vibration", d.vibration),
+            smoothMode = o.optBoolean("smooth", d.smoothMode),
+            glassBlur = o.optBoolean("glassBlur", d.glassBlur),
+            liveMap = o.optBoolean("liveMap", d.liveMap),
+            userRules = o.optJSONArray("userRules")?.let { a ->
+                List(a.length()) { i -> a.getJSONObject(i).let { UserRule(it.optString("value"), it.optString("action", "proxy")) } }
+            } ?: d.userRules,
+            domainStrategy = o.optString("domainStrategy", d.domainStrategy),
+            fakeDns = o.optBoolean("fakeDns", d.fakeDns),
+            remoteDns = DnsSpec.from(o.optJSONObject("remoteDns")),
+            directDns = DnsSpec.from(o.optJSONObject("directDns")),
+            rulesSource = o.optString("rulesSource", d.rulesSource),
         )
     }
 }

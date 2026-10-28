@@ -101,8 +101,9 @@ object RulesUpdater {
     private const val WEEK = 7L * 24 * 3600 * 1000
 
     /** Откуда качать: ваш сервер (RULES_BASE_URL) или зеркало официальных баз sing-box. */
-    private fun urlFor(name: String): String {
-        val base = BuildConfig.RULES_BASE_URL.trimEnd('/')
+    fun urlFor(name: String): String {
+        // Свой источник из «Для опытных» важнее заданного при сборке
+        val base = AppSettings.value.rulesSource.trim().ifEmpty { BuildConfig.RULES_BASE_URL }.trimEnd('/')
         if (base.isNotEmpty()) return "$base/$name"
         val repo = if (name.startsWith("geoip")) "sing-geoip" else "sing-geosite"
         return "https://cdn.jsdelivr.net/gh/SagerNet/$repo@rule-set/$name"

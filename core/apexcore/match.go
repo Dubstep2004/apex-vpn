@@ -88,6 +88,9 @@ func MatchRoute(optionsJSON string, rawDomain string) (string, error) {
 	switch {
 	case domain == "":
 		res.Outbound, res.Reason = "", "Введите адрес сайта, например youtube.com"
+	case userMatch(opts.UserRules, domain) != "":
+		act := userMatch(opts.UserRules, domain)
+		res.Outbound, res.Reason = act, map[string]string{"block": "Своё правило: блокировать", "proxy": "Своё правило: через VPN", "direct": "Своё правило: напрямую"}[act]
 	case opts.AdBlock && matchSet(opts.rulesFile(fileAds), domain):
 		res.Outbound, res.Reason = "block", "Реклама или трекер — заблокировано"
 	case opts.Kids && (matchSet(opts.rulesFile(filePorn), domain) || matchSet(opts.rulesFile(fileBetting), domain) ||
@@ -158,4 +161,21 @@ func containsAny(s string, words []string) bool {
 		}
 	}
 	return false
+}
+
+// userMatch — действие своего правила для домена ("" — нет подходящего).
+func userMatch(list []UserRule, domain string) string {
+	sets, _ := groupUserRules(list)
+	for _, act := range []string{"block", "proxy", "direct"} {
+		st := sets[act]
+		if suffixMatch(domain, st.suffix) || containsAny(domain, st.keyword) {
+			return act
+		}
+		for _, f := range st.full {
+			if f == domain {
+				return act
+			}
+		}
+	}
+	return ""
 }

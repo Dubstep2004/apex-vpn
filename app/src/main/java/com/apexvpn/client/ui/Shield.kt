@@ -76,11 +76,12 @@ fun ShieldButton(status: VpnStatus, onClick: () -> Unit, diameter: androidx.comp
         infiniteRepeatable(tween(1300, easing = LinearEasing)),
         label = "runner",
     )
+    val feel = Apex.feel
     val check = remember { Animatable(0f) }
     val fill = remember { Animatable(0f) }
     LaunchedEffect(active) {
         if (active) {
-            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            // Вибрация при подключении — в ConnectFeedback (работает и из плитки, и из виджета)
             fill.animateTo(1f, tween(450, easing = FastOutSlowInEasing))
             check.animateTo(1f, tween(380, easing = FastOutSlowInEasing))
         } else {
@@ -101,7 +102,7 @@ fun ShieldButton(status: VpnStatus, onClick: () -> Unit, diameter: androidx.comp
                 indication = null,
                 enabled = status != VpnStatus.Stopping,
             ) {
-                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                if (feel.vibration) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onClick()
             },
         contentAlignment = Alignment.Center,
@@ -112,7 +113,7 @@ fun ShieldButton(status: VpnStatus, onClick: () -> Unit, diameter: androidx.comp
 
             // Свечение
             if (active || busy || paused) {
-                val r = size.minDimension * 0.48f * (if (active) glow else 1f)
+                val r = size.minDimension * 0.48f * (if (active && !feel.smooth) glow else 1f)
                 drawCircle(
                     Brush.radialGradient(
                         listOf(accent.copy(alpha = if (active) 0.45f else 0.2f), Color.Transparent),

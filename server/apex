@@ -10,12 +10,15 @@
 #   apex crashes [N]                последние N отчётов о сбоях (по умолчанию 5)
 #   apex crashes clear              удалить все отчёты
 #   apex status                     что сейчас выпущено
+#   apex                            меню (установка, резервные копии, сертификат, обновление скрипта…)
+#   apex backup | restore <файл> | update-script | uninstall
 set -euo pipefail
 
+APEX_SCRIPT_VERSION="1.6.0"
 CONFIG="${APEX_CONFIG:-/etc/apexvpn/config}"
 # shellcheck disable=SC1090
 [[ -f "$CONFIG" ]] && source "$CONFIG"
-: "${BASE_URL:?нет BASE_URL в $CONFIG — запустите install.sh}"
+BASE_URL="${BASE_URL:-}"
 WEB_DIR="${WEB_DIR:-/var/www/apexvpn}"
 CRASH_DIR="${CRASH_DIR:-/var/lib/apexvpn/crashes}"
 KEYSTORE="${KEYSTORE:-/etc/apexvpn/apex.jks}"
@@ -24,6 +27,7 @@ REPO="${REPO:-Dubstep2004/apex-vpn}"
 KEEP_APKS="${KEEP_APKS:-3}"
 
 die() { echo "Ошибка: $*" >&2; exit 1; }
+need_config() { [[ -n "$BASE_URL" ]] || die "сервер ещё не установлен — запустите apex и выберите «1. Установить»"; }
 need() { command -v "$1" >/dev/null || die "не найдено $1 (запустите install.sh)"; }
 
 write_json() { # атомарная запись: приложения никогда не увидят половину файла
@@ -56,6 +60,7 @@ download_release() { # <версия> <папка>
 }
 
 cmd_publish() {
+  need_config
   need jq; need apksigner; need sha256sum
   local src="" code="" name="" mandatory=false
   while [[ $# -gt 0 ]]; do
@@ -140,11 +145,13 @@ EOF
 }
 
 cmd_unpublish() {
+  need_config
   rm -f "$WEB_DIR/update.json"
   echo "Обновление снято: приложения больше его не предлагают."
 }
 
 cmd_news() {
+  need_config
   need jq
   [[ $# -gt 0 ]] || die 'apex news "Текст" [--title "Заголовок"] [--warning] [--url https://…]  или  apex news off'
   if [[ "$1" == "off" ]]; then
@@ -187,6 +194,7 @@ cmd_crashes() {
 }
 
 cmd_status() {
+  need_config
   echo "Адрес: $BASE_URL"
   if [[ -f "$WEB_DIR/update.json" ]]; then
     echo "Выпущено: $(jq -r '"\(.versionName) (сборка \(.versionCode))\(if .mandatory then ", обязательное" else "" end)"' "$WEB_DIR/update.json")"
@@ -198,11 +206,230 @@ cmd_status() {
   echo "Отчётов о сбоях: $(ls -1 "$CRASH_DIR"/*.txt 2>/dev/null | wc -l)"
 }
 
-case "${1:-help}" in
+# ─── Установка, резервные копии, сертификат, обновление скрипта ─────────
+
+need_root() { [[ $EUID -eq 0 ]] || die "нужны права root: sudo apex"; }
+
+fetch_repo() { # скачивает репозиторий в папку $1 и печатает путь к server/
+  local dir="$1"
+  if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+    curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" "https://api.github.com/repos/$REPO/tarball/main" | tar xz -C "$dir"
+  else
+    curl -fsSL "https://codeload.github.com/$REPO/tar.gz/refs/heads/main" | tar xz -C "$dir" \
+      || die "не удалось скачать $REPO (приватный репозиторий — нужен GITHUB_TOKEN в $CONFIG)"
+  fi
+  local server; server="$(find "$dir" -maxdepth 2 -type d -name server | head -n1)"
+  [[ -f "$server/install.sh" ]] || die "в репозитории нет server/install.sh"
+  echo "$server"
+}
+
+domain_now() { [[ -n "$BASE_URL" ]] && echo "$BASE_URL" | sed -E 's#https://([^/:]+).*#\1#'; }
+
+cmd_install() { # [домен]
+  need_root
+  local domain="${1:-}"
+  if [[ -z "$domain" ]]; then
+    local cur; cur="$(domain_now || true)"
+    read -r -p "Домен сервера${cur:+ [$cur]}: " domain
+    domain="${domain:-$cur}"
+  fi
+  [[ "$domain" =~ ^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]] || die "неверный домен: $domain"
+  command -v curl >/dev/null || { apt-get update -qq && apt-get install -y -qq curl >/dev/null; }
+  local tmp; tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' RETURN
+  local server; server="$(fetch_repo "$tmp")"
+  bash "$server/install.sh" "$domain"
+}
+
+cmd_backup() {
+  need_root
+  local out="${1:-/root/apexvpn-backup-$(date +%Y%m%d-%H%M%S).tar.gz}"
+  [[ -f "$KEYSTORE" ]] || die "нет ключа $KEYSTORE — сервер не установлен?"
+  ( umask 077; tar czf "$out" -C / etc/apexvpn \
+      $(cd / && ls -d var/www/apexvpn/*.json 2>/dev/null) )
+  chmod 600 "$out"
+  echo "💾 Копия: $out"
+  echo "   В ней ключ подписи APK — храните её в надёжном месте и никому не отправляйте."
+  echo "   Скачать к себе: scp root@$(domain_now || echo СЕРВЕР):$out ."
+}
+
+cmd_restore() { # <файл>
+  need_root
+  local file="${1:-}"
+  [[ -n "$file" ]] || read -r -p "Путь к файлу копии: " file
+  [[ -f "$file" ]] || die "нет файла $file"
+  tar tzf "$file" | grep -q '^etc/apexvpn/apex.jks$' || die "в этом файле нет ключа apex.jks — это не копия APEX"
+  if [[ -f "$KEYSTORE" ]] && ! cmp -s <(tar xzf "$file" -O etc/apexvpn/apex.jks) "$KEYSTORE"; then
+    echo "⚠️  Ключ в копии отличается от текущего. После замены обновления подписываются ключом из копии."
+    read -r -p "Заменить? [y/N] " a; [[ "$a" == [yY] ]] || die "отменено"
+  fi
+  tar xzf "$file" -C /
+  chmod 600 /etc/apexvpn/apex.jks /etc/apexvpn/keypass /etc/apexvpn/config 2>/dev/null || true
+  chmod 644 /var/www/apexvpn/*.json 2>/dev/null || true
+  echo "✅ Восстановлено из $file"
+}
+
+cmd_cert() {
+  local domain port
+  domain="$(domain_now || true)"; [[ -n "$domain" ]] || die "сервер не установлен"
+  port="$(echo "$BASE_URL" | sed -nE 's#https://[^/:]+:([0-9]+).*#\1#p')"; port="${port:-443}"
+  echo "Домен: $domain   порт: $port"
+  echo "Caddy: $(systemctl is-active caddy 2>/dev/null || echo нет)"
+  if command -v openssl >/dev/null; then
+    local dates
+    dates="$(echo | timeout 10 openssl s_client -connect "$domain:$port" -servername "$domain" 2>/dev/null | openssl x509 -noout -issuer -enddate 2>/dev/null || true)"
+    if [[ -n "$dates" ]]; then
+      echo "$dates" | sed -e 's/^issuer=/Выдал: /' -e 's/^notAfter=/Действует до: /'
+    else
+      echo "❌ Сертификат не получен. Проверьте, что домен указывает на этот сервер и порт 80 открыт."
+    fi
+  fi
+  echo "Caddy продлевает сертификат сам, за 30 дней до конца."
+}
+
+cmd_logs() {
+  echo "── Caddy"; journalctl -u caddy -n 30 --no-pager 2>/dev/null || true
+  echo "── Приём сбоев"; journalctl -u apexvpn-crash -n 15 --no-pager 2>/dev/null || true
+}
+
+cmd_update_script() {
+  need_root
+  local tmp; tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' RETURN
+  local server; server="$(fetch_repo "$tmp")"
+  local new; new="$(grep -m1 '^APEX_SCRIPT_VERSION=' "$server/apex" | cut -d'"' -f2)"
+  if [[ "$new" == "$APEX_SCRIPT_VERSION" ]]; then
+    echo "У вас последняя версия скрипта ($APEX_SCRIPT_VERSION)."
+    return
+  fi
+  bash -n "$server/apex" || die "скачанный скрипт с ошибкой — не обновляю"
+  install -m 755 "$server/apex" /usr/local/bin/apex
+  install -m 755 "$server/crash-receiver.py" /usr/local/lib/apexvpn/crash-receiver.py 2>/dev/null \
+    && systemctl restart apexvpn-crash 2>/dev/null || true
+  echo "✅ Скрипт обновлён: $APEX_SCRIPT_VERSION → $new. Запустите apex снова."
+  exit 0
+}
+
+cmd_uninstall() {
+  need_root
+  echo "Будут удалены: сайт APEX в Caddy, приём сбоев, файлы /var/www/apexvpn, команда apex."
+  echo "Сам Caddy и другие сайты не трогаем."
+  read -r -p "Сначала сделать резервную копию ключа? [Y/n] " a
+  [[ "$a" == [nN] ]] || ( cmd_backup )
+  read -r -p "Удалить сервер APEX? Напишите «да»: " a
+  [[ "$a" == "да" ]] || die "отменено"
+  systemctl disable --now apexvpn-crash 2>/dev/null || true
+  rm -f /etc/systemd/system/apexvpn-crash.service; systemctl daemon-reload
+  sed -i '/^import apexvpn.caddy$/d' /etc/caddy/Caddyfile 2>/dev/null || true
+  rm -f /etc/caddy/apexvpn.caddy
+  systemctl reload caddy 2>/dev/null || true
+  rm -rf "$WEB_DIR" /usr/local/lib/apexvpn /var/lib/apexvpn
+  read -r -p "Удалить и ключ подписи /etc/apexvpn? Без него обновления не встанут поверх старых. [y/N] " a
+  [[ "$a" == [yY] ]] && rm -rf /etc/apexvpn
+  rm -f /usr/local/bin/apex
+  echo "Сервер APEX удалён."
+  exit 0
+}
+
+# ─── Меню ────────────────────────────────────────────────────────────────
+
+if [[ -t 1 ]]; then B=$'\e[1m'; D=$'\e[2m'; V=$'\e[38;5;141m'; C=$'\e[38;5;80m'; G=$'\e[32m'; R=$'\e[31m'; N=$'\e[0m'
+else B=""; D=""; V=""; C=""; G=""; R=""; N=""; fi
+
+banner() {
+  clear 2>/dev/null || true
+  echo "${V}${B}    ___    ____  _______  __    _    ______  _   __${N}"
+  echo "${V}${B}   /   |  / __ \\/ ____/ |/ /   | |  / / __ \\/ | / /${N}"
+  echo "${C}${B}  / /| | / /_/ / __/  |   /    | | / / /_/ /  |/ /${N}"
+  echo "${C}${B} / ___ |/ ____/ /___ /   |     | |/ / ____/ /|  /${N}"
+  echo "${C}${B}/_/  |_/_/   /_____//_/|_|     |___/_/   /_/ |_/${N}"
+  echo
+  echo "  ${B}Сервер обновлений APEX VPN${N}   ${D}скрипт v$APEX_SCRIPT_VERSION${N}"
+  if [[ -n "$BASE_URL" ]]; then
+    local rel="не выпущено"
+    [[ -f "$WEB_DIR/update.json" ]] && rel="$(jq -r '.versionName' "$WEB_DIR/update.json" 2>/dev/null || echo ?)"
+    echo "  ${D}Адрес:${N} $BASE_URL   ${D}Версия приложения:${N} $rel"
+  else
+    echo "  ${R}Сервер ещё не установлен${N} — выберите 1"
+  fi
+  echo
+}
+
+item() { printf "  ${V}%2s.${N} %s\n" "$1" "$2"; }
+
+pause() { echo; read -r -p "${D}Нажмите Enter…${N}" _ || true; }
+
+menu() {
+  set +e   # ошибка в пункте меню не закрывает меню
+  while true; do
+    banner
+    item 1  "Установить / переустановить"
+    item 2  "Выпустить версию из GitHub"
+    item 3  "Выпустить свой файл APK"
+    item 4  "Снять обновление"
+    echo "  ${D}── Объявления и сбои${N}"
+    item 5  "Опубликовать объявление"
+    item 6  "Убрать объявление"
+    item 7  "Отчёты о сбоях"
+    item 8  "Удалить отчёты о сбоях"
+    echo "  ${D}── Управление${N}"
+    item 9  "Состояние и ссылки"
+    item 10 "Резервная копия (ключ и настройки)"
+    item 11 "Восстановить из копии"
+    item 12 "Сертификат и домен"
+    item 13 "Сменить домен"
+    item 14 "Журналы"
+    item 15 "Проверить обновления скрипта"
+    item 16 "Удалить сервер APEX"
+    echo
+    item 0  "Выход"
+    echo
+    local c; read -r -p "${B}Выберите пункт:${N} " c || exit 0
+    echo
+    case "$c" in
+      1) ( cmd_install ) ;;
+      2) local v m; read -r -p "Версия (например 1.6.0): " v; read -r -p "Обязательное обновление? [y/N] " m
+         ( if [[ "$m" == [yY] ]]; then cmd_publish "$v" --mandatory; else cmd_publish "$v"; fi ) ;;
+      3) local f code name; read -r -p "Путь к APK: " f; read -r -p "Номер сборки (versionCode, пусто — из .json рядом): " code
+         read -r -p "Версия (versionName, пусто — из .json): " name
+         ( cmd_publish "$f" ${code:+--code "$code"} ${name:+--name "$name"} ) ;;
+      4) ( cmd_unpublish ) ;;
+      5) local t ti w u; read -r -p "Текст: " t; read -r -p "Заголовок (можно пусто): " ti
+         read -r -p "Важное (жёлтое)? [y/N] " w; read -r -p "Ссылка (можно пусто): " u
+         ( args=("$t"); [[ -n "$ti" ]] && args+=(--title "$ti"); [[ "$w" == [yY] ]] && args+=(--warning)
+           [[ -n "$u" ]] && args+=(--url "$u"); cmd_news "${args[@]}" ) ;;
+      6) ( cmd_news off ) ;;
+      7) local n; read -r -p "Сколько последних показать [5]: " n; ( cmd_crashes "${n:-5}" ) | less -R -F -X 2>/dev/null || ( cmd_crashes "${n:-5}" ) ;;
+      8) ( cmd_crashes clear ) ;;
+      9) ( cmd_status; echo "Установить на телефон: $BASE_URL/apex-vpn-latest.apk" ) ;;
+      10) ( cmd_backup ) ;;
+      11) ( cmd_restore ) ;;
+      12) ( cmd_cert ) ;;
+      13) local d; read -r -p "Новый домен: " d; ( cmd_install "$d"; echo "⚠️  Пересоберите приложение с новым SERVER_URL — старые сборки ищут старый адрес." ) ;;
+      14) ( cmd_logs ) | less -R -F -X 2>/dev/null || ( cmd_logs ) ;;
+      15) ( cmd_update_script )
+          if [[ -x /usr/local/bin/apex ]] && ! grep -q "^APEX_SCRIPT_VERSION=\"$APEX_SCRIPT_VERSION\"" /usr/local/bin/apex; then exec /usr/local/bin/apex; fi ;;
+      16) ( cmd_uninstall ); [[ -f /usr/local/bin/apex ]] || exit 0 ;;
+      0|q|exit) exit 0 ;;
+      *) echo "Нет такого пункта" ;;
+    esac
+    pause
+  done
+}
+
+case "${1:-menu}" in
+  menu) menu ;;
   publish) shift; cmd_publish "$@" ;;
   unpublish) cmd_unpublish ;;
   news) shift; cmd_news "$@" ;;
   crashes) shift; cmd_crashes "$@" ;;
   status) cmd_status ;;
-  *) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//' ;;
+  install) shift; cmd_install "$@" ;;
+  backup) shift; cmd_backup "$@" ;;
+  restore) shift; cmd_restore "$@" ;;
+  cert) cmd_cert ;;
+  logs) cmd_logs ;;
+  update-script) cmd_update_script ;;
+  uninstall) cmd_uninstall ;;
+  -v|--version|version) echo "apex $APEX_SCRIPT_VERSION" ;;
+  *) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//' ;;
 esac
+

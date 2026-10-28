@@ -76,6 +76,13 @@ type routeOptions struct {
 	ExcludeAds bool `json:"excludeAds"`
 	// ClashAPI — порт локального API для замера задержки (0 — выключено)
 	ClashAPI int `json:"clashApi"`
+
+	// ── Для опытных ──
+	UserRules      []UserRule `json:"userRules"`      // свои правила: домен/IP → VPN, напрямую, блок
+	DomainStrategy string     `json:"domainStrategy"` // as_is | ip_if_non_match | ip_on_demand
+	FakeDNS        bool       `json:"fakeDns"`        // поддельные IP вместо настоящих для сайтов через VPN
+	RemoteDNS      *DNSSpec   `json:"remoteDns"`      // удалённый DNS (через VPN), вместо выбора из списка
+	DirectDNS      *DNSSpec   `json:"directDns"`      // домашний DNS (напрямую), вместо системного
 }
 
 // профиль подключения: как часто проверять серверы и рвать ли соединения при смене
@@ -296,6 +303,21 @@ func buildAll(nodesJSON string, selectedTag string, optionsJSON string) (string,
 	}
 	// Соединения Xray к его серверам — мимо туннеля, иначе петля
 	rules = append(rules, xray.singBoxRules()...)
+	// Для опытных: стратегия «узнать IP сразу» — правила по IP работают и для доменов
+	if opts.DomainStrategy == "ip_on_demand" {
+		rules = append(rules, map[string]any{"action": "resolve"})
+	}
+	// Свои правила — выше всех остальных: блок, затем VPN, затем напрямую
+	userSets, _ := groupUserRules(opts.UserRules)
+	if r := userSets["block"].rule(map[string]any{"action": "reject"}); r != nil {
+		rules = append(rules, r)
+	}
+	if r := userSets["proxy"].rule(map[string]any{"outbound": "proxy"}); r != nil {
+		rules = append(rules, r)
+	}
+	if r := userSets["direct"].rule(map[string]any{"outbound": "direct"}); r != nil {
+		rules = append(rules, r)
+	}
 	if ads != "" {
 		rules = append(rules, map[string]any{"rule_set": "ads", "action": "reject"})
 	}
@@ -346,12 +368,39 @@ func buildAll(nodesJSON string, selectedTag string, optionsJSON string) (string,
 	case ModeSelected:
 		final = "direct"
 	}
+	// Для опытных: «IP, если домен не подошёл» — узнаём IP и ещё раз проверяем правила по IP
+	if opts.DomainStrategy == "ip_if_non_match" {
+		rules = append(rules, map[string]any{"action": "resolve"})
+		if len(userSets["block"].cidr) > 0 {
+			rules = append(rules, map[string]any{"ip_cidr": userSets["block"].cidr, "action": "reject"})
+		}
+		if len(userSets["proxy"].cidr) > 0 {
+			rules = append(rules, map[string]any{"ip_cidr": userSets["proxy"].cidr, "outbound": "proxy"})
+		}
+		if len(userSets["direct"].cidr) > 0 {
+			rules = append(rules, map[string]any{"ip_cidr": userSets["direct"].cidr, "outbound": "direct"})
+		}
+		if len(onCIDR) > 0 {
+			rules = append(rules, map[string]any{"ip_cidr": onCIDR, "outbound": "proxy"})
+		}
+		if len(offCIDR) > 0 {
+			rules = append(rules, map[string]any{"ip_cidr": offCIDR, "outbound": "direct"})
+		}
+		if opts.Mode == ModeSmart && geoipRU != "" {
+			rules = append(rules, map[string]any{"rule_set": "geoip-ru", "outbound": "direct"})
+		}
+	}
 
 	// ── DNS ───────────────────────────────────────────────────────────────
 	remote := dnsServers[opts.DNS]
 	if opts.DNS == "custom" {
 		if c, err := customDNSServer(opts.CustomDNS); err == nil {
 			remote = c
+		}
+	}
+	if !opts.RemoteDNS.empty() && !opts.Kids {
+		if r, err := dnsFromSpec(*opts.RemoteDNS); err == nil {
+			remote = r
 		}
 	}
 	if opts.Kids {
@@ -374,10 +423,26 @@ func buildAll(nodesJSON string, selectedTag string, optionsJSON string) (string,
 		}
 		servers = append(servers, fam)
 		directDNS = "family-direct"
+	} else if !opts.DirectDNS.empty() {
+		if h, err := dnsFromSpec(*opts.DirectDNS); err == nil {
+			h["tag"] = "home"
+			servers = append(servers, h)
+			directDNS = "home"
+		}
 	}
 	var dnsRules []any
 	if ads != "" {
 		dnsRules = append(dnsRules, map[string]any{"rule_set": "ads", "action": "reject"})
+	}
+	// Свои правила и в DNS: заблокированные не узнаём вовсе, остальные — нужным DNS
+	if r := userSets["block"].domainOnly().rule(map[string]any{"action": "reject"}); r != nil {
+		dnsRules = append(dnsRules, r)
+	}
+	if r := userSets["proxy"].domainOnly().rule(map[string]any{"server": "remote"}); r != nil {
+		dnsRules = append(dnsRules, r)
+	}
+	if r := userSets["direct"].domainOnly().rule(map[string]any{"server": directDNS}); r != nil {
+		dnsRules = append(dnsRules, r)
 	}
 	if len(custom) > 0 || len(onDomains) > 0 {
 		dnsRules = append(dnsRules, map[string]any{"domain_suffix": append(append([]string{}, custom...), onDomains...), "server": "remote"})
@@ -394,6 +459,14 @@ func buildAll(nodesJSON string, selectedTag string, optionsJSON string) (string,
 	dnsFinal := "remote"
 	if opts.Mode == ModeSelected {
 		dnsFinal = directDNS
+	}
+	// FakeDNS: сайтам через VPN отдаём поддельные IP — быстрее открываются, DNS не утекает
+	if opts.FakeDNS && dnsFinal == "remote" {
+		servers = append(servers, map[string]any{
+			"type": "fakeip", "tag": "fakeip",
+			"inet4_range": "198.18.0.0/15", "inet6_range": "fc00::/18",
+		})
+		dnsRules = append(dnsRules, map[string]any{"query_type": []string{"A", "AAAA"}, "server": "fakeip"})
 	}
 	strategy := "ipv4_only"
 	if opts.IPv6 {

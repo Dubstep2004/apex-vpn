@@ -117,7 +117,8 @@ enum class AccentColor(val id: String, val title: String, val argb: Long) {
     Violet("violet", "Фиолетовый", 0xFF7B6CFF),
     Blue("blue", "Синий", 0xFF3B82F6),
     Green("green", "Зелёный", 0xFF22C55E),
-    Turquoise("turquoise", "Бирюзовый", 0xFF14B8C4);
+    Turquoise("turquoise", "Бирюзовый", 0xFF14B8C4),
+    Pink("pink", "Розовый", 0xFFEC4899);
 
     companion object {
         fun of(id: String) = entries.firstOrNull { it.id == id } ?: Violet

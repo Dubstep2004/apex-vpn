@@ -177,8 +177,28 @@ fun HomeScreen(
                 Text(it, color = Apex.Bad, fontSize = 14.sp, modifier = Modifier.apexCard(Apex.Bad.copy(alpha = 0.12f)).padding(horizontal = 14.dp, vertical = 9.dp))
             }
         } else {
-        Spacer(Modifier.height(18.dp))
-        ShieldButton(status, onToggle)
+        if (settings.homeStyle == "map") {
+            // Главный экран «Карта»: дуга от вас до сервера
+            val pings by viewModel.pings.collectAsStateWithLifecycle()
+            val target = if (auto) {
+                sub.nodes.filter { !it.ads }.mapNotNull { n -> pings[n.tag]?.takeIf { it > 0 }?.let { n to it } }.minByOrNull { it.second }?.first
+            } else selected
+            Spacer(Modifier.height(16.dp))
+            WorldMapCard(
+                status = status,
+                serverCountry = target?.let { flagCode(ServerInfo.flag(it.name)) },
+                serverTitle = when {
+                    !auto -> ServerInfo.title(selected!!.name)
+                    target != null -> "Автопилот · ${ServerInfo.title(target.name)}"
+                    else -> "Автопилот"
+                },
+            )
+            Spacer(Modifier.height(14.dp))
+            ShieldButton(status, onToggle, diameter = 150.dp)
+        } else {
+            Spacer(Modifier.height(18.dp))
+            ShieldButton(status, onToggle)
+        }
 
         val label = when (status) {
             VpnStatus.Started -> "Защищено"

@@ -81,6 +81,17 @@ class ApexApp : Application() {
                 }
         }
 
+        // «Ощущения»: звук и вибрация при подключении
+        appScope.launch {
+            var last = VpnState.status.value
+            VpnState.status.collect { st ->
+                if (st == com.apexvpn.client.vpn.VpnStatus.Started &&
+                    (last == com.apexvpn.client.vpn.VpnStatus.Starting || last == com.apexvpn.client.vpn.VpnStatus.Stopped)
+                ) com.apexvpn.client.data.ConnectFeedback.onConnected(this@ApexApp)
+                last = st
+            }
+        }
+
         // Ярлыки избранных серверов (долгое нажатие на иконку)
         appScope.launch {
             combine(AppSettings.state, Subscription.state) { st, sub -> st.favorites to sub.nodes.map { it.name } }

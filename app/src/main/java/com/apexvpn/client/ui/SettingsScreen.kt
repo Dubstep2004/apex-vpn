@@ -36,6 +36,7 @@ import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Route
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SettingsEthernet
@@ -151,6 +152,13 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
                 if (s.kids) "Семейный режим" else if (s.dns == DnsChoice.Custom) s.customDns else s.dns.title,
                 leading = { tile(Icons.Rounded.Dns) },
                 onClick = { onOpenPage(Page.Dns) },
+            ) { Chevron() }
+            GroupDivider()
+            ListRow(
+                "Маршрутизация",
+                "Для опытных: свои правила, FakeDNS, DNS" + if (s.userRules.isNotEmpty()) " · правил: ${s.userRules.size}" else "",
+                leading = { tile(Icons.Rounded.Route) },
+                onClick = { onOpenPage(Page.Advanced) },
             ) { Chevron() }
             GroupDivider()
             ListRow(

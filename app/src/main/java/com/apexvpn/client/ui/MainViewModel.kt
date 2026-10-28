@@ -276,6 +276,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { _apps.value = InstalledApps.load(getApplication<Application>()) }
     }
 
+    fun validateUserRule(value: String): String? =
+        runCatching { Apexcore.validateUserRule(value).ifBlank { null } }.getOrElse { it.message ?: "Неверное правило" }
+
+    fun validateDnsSpec(d: com.apexvpn.client.data.DnsSpec): String? =
+        runCatching { Apexcore.validateDNSSpec(d.type, d.server, d.ip).ifBlank { null } }.getOrElse { it.message ?: "Неверный DNS" }
+
     fun validateDns(url: String): String? =
         runCatching { Apexcore.validateDNS(url).ifBlank { null } }.getOrElse { it.message ?: "Неверный адрес" }
 

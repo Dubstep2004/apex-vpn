@@ -237,6 +237,10 @@ object Apex {
     var palette by mutableStateOf(darkPalette(Color(AccentColor.Violet.argb), amoled = false))
         internal set
 
+    /** Ощущения и плавность: вибрация, плавный режим, размытие, живая карта. */
+    var feel by mutableStateOf(Feel())
+        internal set
+
     val Bg get() = palette.bg
     val Base get() = palette.base
     val Surface get() = palette.surface
@@ -321,6 +325,19 @@ fun paletteFor(
         Design.Terminal -> terminalPalette()
         Design.Pastel -> pastelPalette()
     }
+}
+
+/** Настройки «Ощущения» и «Плавность» для экранов. */
+data class Feel(
+    val vibration: Boolean = true,
+    /** Плавный режим: без бесконечных анимаций и свечения — для слабых телефонов */
+    val smooth: Boolean = false,
+    val blur: Boolean = true,
+    val liveMap: Boolean = true,
+)
+
+fun applyFeel(f: Feel) {
+    if (Apex.feel != f) Apex.feel = f
 }
 
 /** Применить палитру (вызывается вне отрисовки — из Activity). */

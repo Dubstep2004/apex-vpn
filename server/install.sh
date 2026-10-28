@@ -21,7 +21,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 echo "==> пакеты"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq curl jq unzip python3 apksigner default-jre-headless debian-keyring debian-archive-keyring apt-transport-https gnupg >/dev/null
+apt-get install -y -qq curl jq unzip openssl python3 apksigner default-jre-headless debian-keyring debian-archive-keyring apt-transport-https gnupg >/dev/null
 
 if ! command -v caddy >/dev/null; then
   echo "==> Caddy"
@@ -56,12 +56,15 @@ if [[ ! -f /etc/apexvpn/apex.jks ]]; then
 fi
 chmod 600 /etc/apexvpn/apex.jks /etc/apexvpn/keypass
 
+# Токен GitHub сохраняем при переустановке и смене домена
+OLD_TOKEN=""
+[[ -f /etc/apexvpn/config ]] && OLD_TOKEN="$(sed -nE 's/^GITHUB_TOKEN="(.*)"$/\1/p' /etc/apexvpn/config)"
 cat > /etc/apexvpn/config <<EOF
 # Настройки команды apex
 BASE_URL="$BASE_URL"
 REPO="Dubstep2004/apex-vpn"
 # Для приватного репозитория: токен GitHub с доступом на чтение (Contents: Read)
-GITHUB_TOKEN=""
+GITHUB_TOKEN="$OLD_TOKEN"
 EOF
 chmod 600 /etc/apexvpn/config
 
@@ -135,3 +138,5 @@ echo "     Name: SERVER_URL    Value: $BASE_URL"
 echo "  2. Запустите сборку (Actions → Build APEX VPN → Run workflow)"
 echo "  3. Когда сборка закончится:  apex publish <версия>   (например apex publish 1.4.2)"
 echo "  4. Ссылка для установки на телефон: $BASE_URL/apex-vpn-latest.apk"
+echo
+echo "Меню управления: apex"

@@ -135,6 +135,9 @@ class MainActivity : ComponentActivity() {
                 } else null
                 val p = paletteFor(s.design, s.theme, s.accent, systemDark, wallpaper)
                 applyPalette(p)
+                com.apexvpn.client.ui.theme.applyFeel(
+                    com.apexvpn.client.ui.theme.Feel(s.vibration, s.smoothMode, s.glassBlur, s.liveMap),
+                )
                 val style = if (p.dark) {
                     SystemBarStyle.dark(AndroidColor.TRANSPARENT)
                 } else {
