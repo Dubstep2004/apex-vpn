@@ -84,4 +84,4 @@ fi
 mkdir -p "$(dirname "$OUT")"
 cp libbox.aar "$OUT"
 echo "==> готово: $OUT ($(du -h "$OUT" | cut -f1))"
-echo "::notice title=Ядро::libbox.aar $(du -h "$OUT" | cut -f1), $(unzip -l "$OUT" | grep -c 'libgojni.so') ABI"
+echo "::notice title=Ядро::libbox.aar $(du -h "$OUT" | cut -f1), $(unzip -l "$OUT" | grep -c 'libbox.so') ABI"

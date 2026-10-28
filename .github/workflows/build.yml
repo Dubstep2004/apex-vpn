@@ -122,9 +122,11 @@ jobs:
           APK="dist/apex-vpn-${VERSION_NAME}.apk"
           cp app/build/outputs/apk/release/app-release.apk "$APK"
           # Проверка: APK целый и подписан
-          "$ANDROID_HOME"/build-tools/*/apksigner verify --print-certs "$APK" | head -3
-          unzip -l "$APK" | grep -E "libxray.so|libgojni.so"
-          echo "APK: $(du -h "$APK" | cut -f1)"
+          APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner
+          "$APKSIGNER" verify --print-certs "$APK" | head -3
+          LIBS=$(unzip -l "$APK" | grep -oE "lib/[^ ]+\.so" | tr '\n' ' ')
+          echo "::notice title=APK::$(du -h "$APK" | cut -f1) — $LIBS"
+          echo "$LIBS" | grep -q "arm64-v8a/libxray.so" || { echo "::error title=APK::в APK нет ядра Xray"; exit 1; }
           # Что нового — из data/Changelog.kt (первая запись)
           awk '/^ +Release\(/{n++} n==1 && /^ +"[^"]*",$/ {gsub(/^ +"|",$/,""); print "• " $0}' \
             app/src/main/java/com/apexvpn/client/data/Changelog.kt > dist/changelog.txt || true
