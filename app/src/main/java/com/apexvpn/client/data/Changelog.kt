@@ -6,6 +6,12 @@ data class Release(val version: String, val code: Int, val date: String, val cha
 object Changelog {
     val releases = listOf(
         Release(
+            "1.7.4", 18, "28 октября 2026",
+            listOf(
+                "Объявления и отчёты о сбоях работают через сервер panel.apex.knownhosts.xyz",
+            ),
+        ),
+        Release(
             "1.7.3", 17, "28 октября 2026",
             listOf(
                 "Обновления — с GitHub: приложение сообщает о новой версии и открывает её страницу, само ничего не скачивает",

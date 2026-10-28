@@ -9,7 +9,9 @@ plugins {
 // ─── Настройки приложения ──────────────────────────────────────────────
 // Ваш сервер (VPS, папка server/): там лежат APK, update.json, news.json и принимаются отчёты о сбоях.
 // Например https://vpn.example.com/apexvpn — переменная SERVER_URL в GitHub (Settings → Variables).
-val serverUrl: String = ((project.findProperty("serverUrl") as String?) ?: System.getenv("SERVER_URL") ?: "").trim().trimEnd('/')
+// Если переменная SERVER_URL в GitHub не задана — ваш сервер по умолчанию
+val serverUrl: String = ((project.findProperty("serverUrl") as String?) ?: System.getenv("SERVER_URL")?.takeIf { it.isNotBlank() }
+    ?: "https://panel.apex.knownhosts.xyz/apexvpn").trim().trimEnd('/')
 
 // Адрес JSON-файла с информацией об обновлении: панель или свой сервер.
 // Можно переопределить при сборке: -PupdateUrl=https://...  или env UPDATE_URL
@@ -52,8 +54,8 @@ android {
         applicationId = "com.apexvpn.client"
         minSdk = 24
         targetSdk = 35
-        versionCode = 17
-        versionName = "1.7.3"
+        versionCode = 18
+        versionName = "1.7.4"
 
         buildConfigField("String", "UPDATE_URL", "\"$updateUrl\"")
         buildConfigField("String", "SUBSCRIPTION_HOST", "\"$subscriptionHost\"")

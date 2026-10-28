@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
-# Установка сервера обновлений APEX VPN на Ubuntu / Debian.
+# Установка сервера APEX VPN на Ubuntu / Debian: объявления, отчёты о сбоях,
+# страница для скачивания (ведёт на GitHub Releases). Обновления приложения — с GitHub.
 #
 #   sudo bash install.sh vpn.example.com
 #
 # Что делает:
 #   • Caddy — https с бесплатным сертификатом Let's Encrypt (продлевается сам)
-#   • https://ДОМЕН/apexvpn/ — APK, update.json, news.json и страница для скачивания
+#   • https://ДОМЕН/apexvpn/ — news.json (объявления) и страница для скачивания
 #   • https://ДОМЕН/apexvpn/crash — приём отчётов о сбоях (сервис apexvpn-crash)
-#   • ключ подписи APK — создаётся здесь один раз и никуда не уходит
-#   • команда apex — выпуск версий, объявления, отчёты о сбоях
+#   • ключ подписи — можно добавить в секреты GitHub (меню apex, пункт 15)
+#   • команда apex — меню управления
 #
 # Если порт 443 уже занят (например, VPN-сервером), сайт поднимется на 8443.
 set -euo pipefail
@@ -21,7 +22,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 echo "==> пакеты"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq curl jq unzip openssl python3 apksigner default-jre-headless debian-keyring debian-archive-keyring apt-transport-https gnupg >/dev/null
+apt-get install -y -qq curl jq unzip openssl python3 default-jre-headless debian-keyring debian-archive-keyring apt-transport-https gnupg >/dev/null
 
 if ! command -v caddy >/dev/null; then
   echo "==> Caddy"
@@ -154,10 +155,9 @@ echo
 echo "     $BASE_URL"
 echo
 echo "Дальше:"
-echo "  1. В GitHub: Settings → Secrets and variables → Actions → Variables → New variable"
-echo "     Name: SERVER_URL    Value: $BASE_URL"
-echo "  2. Запустите сборку (Actions → Build APEX VPN → Run workflow)"
-echo "  3. Когда сборка закончится:  apex publish <версия>   (например apex publish 1.4.2)"
-echo "  4. Ссылка для установки на телефон: $BASE_URL/apex-vpn-latest.apk"
+echo "  1. Адрес сервера вписан в приложение при сборке (переменная SERVER_URL в GitHub"
+echo "     или значение по умолчанию в app/build.gradle.kts) — пропишите туда: $BASE_URL"
+echo "  2. Объявления и отчёты о сбоях: sudo apex"
+echo "  3. Страница для скачивания: $BASE_URL/ — ведёт на последнюю версию на GitHub"
 echo
 echo "Меню управления: apex"

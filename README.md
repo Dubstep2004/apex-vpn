@@ -7,7 +7,7 @@
 <p>
 <a href="https://github.com/Dubstep2004/apex-vpn/releases/latest"><b>⬇️ Скачать APK</b></a>
 &nbsp;&nbsp;·&nbsp;&nbsp;
-<a href="#-что-нового"><b>🆕 Что нового в 1.7.3</b></a>
+<a href="#-что-нового"><b>🆕 Что нового в 1.7.4</b></a>
 &nbsp;&nbsp;·&nbsp;&nbsp;
 <a href="#setup"><b>🚀 Как установить</b></a>
 </p>
@@ -127,7 +127,7 @@
 <summary><b>Как добавить свой ключ</b></summary>
 
 1. Создайте ключ:
-   - **на VPS** с установленным сервером APEX: `sudo apex` → пункт **22** покажет оба значения;
+   - **на VPS** с установленным сервером APEX: `sudo apex` → пункт **15** покажет оба значения;
    - **или на компьютере** с Java: `bash scripts/make-keystore.sh`, затем `base64 -w0 apex-release.jks` — это значение для `APEX_KEYSTORE_BASE64`.
 2. GitHub → **Settings → Secrets and variables → Actions → Secrets → New repository secret**:
 
@@ -169,7 +169,9 @@ curl -fsSL -o apex https://raw.githubusercontent.com/Dubstep2004/apex-vpn/main/s
 
 Добавьте его в GitHub: **Settings → Secrets and variables → Actions → Variables → New repository variable**, Name `SERVER_URL`, Value — адрес. Пересоберите приложение.
 
-Управление сервером — `sudo apex` (объявления, отчёты о сбоях, статистика, резервные копии). Все команды — в **[server/README.md](server/README.md)**.
+Адрес по умолчанию уже вписан в `app/build.gradle.kts` (`https://panel.apex.knownhosts.xyz/apexvpn`), переменная `SERVER_URL` нужна, только если адрес другой.
+
+Управление сервером — `sudo apex` (объявления, отчёты о сбоях, сводка, резервные копии). Все команды — в **[server/README.md](server/README.md)**.
 
 </details>
 
@@ -351,6 +353,10 @@ server/                 сервер обновлений для VPS (install.sh
 </details>
 
 ## 📝 Что нового
+
+**1.7.4**
+- Объявления и отчёты о сбоях — через ваш сервер (адрес вписан в сборку)
+- Меню VPS без лишнего: убраны выпуск версий, автопубликация и зеркала
 
 **1.7.3**
 - Обновления через GitHub: окно «Доступна версия» открывает страницу релиза, без загрузки в приложении

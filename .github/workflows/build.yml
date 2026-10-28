@@ -107,7 +107,7 @@ jobs:
           UPDATE_URL: ${{ vars.UPDATE_URL }}
         run: |
           set -o pipefail
-          if [ -n "$SERVER_URL" ]; then echo "Сервер: $SERVER_URL"; else echo "::warning title=Сервер::переменная SERVER_URL не задана — обновления, новости и отчёты о сбоях в приложении выключены (см. server/README.md)"; fi
+          if [ -n "$SERVER_URL" ]; then echo "Сервер: $SERVER_URL"; else echo "Сервер: адрес по умолчанию из app/build.gradle.kts"; fi
           if ! ./gradlew --no-daemon assembleRelease 2>&1 | tee gradle.log; then
             # Ошибки сборки — в аннотации, чтобы их было видно без полного лога
             grep -E "^e: |error:|Error:|What went wrong|Could not|^> [^T]" gradle.log | sed 's/%/%25/g' | head -200 > errors.txt || true
