@@ -2,6 +2,13 @@
 
 <img src="img/tags/new.svg" height="22"> <img src="img/tags/improved.svg" height="22"> <img src="img/tags/changed.svg" height="22"> <img src="img/tags/fixed.svg" height="22"> <img src="img/tags/removed.svg" height="22">
 
+## 2.2.1 · 28 октября 2026
+
+<img src="img/tags/changed.svg" alt="Изменено" height="22">
+
+- Приложение для часов теперь называется «APEX Watch» и получило свою иконку: циферблат и щит
+- Файл для часов на странице версии: apex-watch-<версия>.apk
+
 ## 2.2.0 · 28 октября 2026
 
 <img src="img/tags/new.svg" alt="Новое" height="22">

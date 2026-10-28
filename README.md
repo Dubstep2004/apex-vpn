@@ -7,7 +7,7 @@
 <p>
 <a href="https://github.com/Dubstep2004/apex-vpn/releases/latest"><b>⬇️ Скачать APK</b></a>
 &nbsp;&nbsp;·&nbsp;&nbsp;
-<a href="#-что-нового"><b>🆕 Что нового в 2.2.0</b></a>
+<a href="#-что-нового"><b>🆕 Что нового в 2.2.1</b></a>
 &nbsp;&nbsp;·&nbsp;&nbsp;
 <a href="#setup"><b>🚀 Как установить</b></a>
 </p>
@@ -54,6 +54,7 @@
 <br>→ [Глобус, фото страны, темы](#globe)
 <br>→ [Скрыть VPN от приложений](#hide)
 <br>→ [Android TV](#tv)
+<br>→ [APEX Watch (часы)](#watch)
 <br>→ [Резервная копия](#backup)
 <br>→ [Перенос на новый телефон](#transfer)
 <br>→ [Очистить данные](#clear)
@@ -263,6 +264,22 @@ APEX сам настроит профиль и выбор сервера под 
 - **справа** — страны крупными карточками: стрелками выберите страну, **OK** — подключиться. Выбранная карточка увеличивается и светится.
 
 Подписку на ТВ удобно добавить [ссылкой-приглашением](#invite) или [переносом по QR](#transfer).
+
+</details>
+
+<a id="watch"></a>
+<details>
+<summary><b>⌚ APEX Watch — часы Wear OS</b></summary>
+
+<img src="docs/img/apex-watch.png" width="120" align="right">
+
+**APEX Watch** — пульт VPN на часах: кнопка включить/выключить, сервер, пинг и скорость. Работает вместе с APEX VPN на телефоне.
+
+1. Откройте [последнюю версию](https://github.com/Dubstep2004/apex-vpn/releases/latest) и скачайте **`apex-watch-<версия>.apk`**.
+2. Установите его на часы (например, через приложение «Wear Installer» или `adb install` по Wi-Fi).
+3. На часах появится **APEX Watch** со своей иконкой — циферблат и щит.
+
+Телефон и часы должны быть сопряжены, а APEX VPN — установлен на телефоне.
 
 </details>
 
@@ -550,7 +567,7 @@ APEX напомнит **три раза**: **за 3 дня**, **за 1 день*
 <td valign="top">
 
 ### 🧩 Удобство
-- Плитка в шторке, 4 виджета (в том числе 4×2 с серверами), **Wear OS**, **Android TV 2.0**
+- Плитка в шторке, 4 виджета (в том числе 4×2 с серверами), **APEX Watch** для часов Wear OS, **Android TV 2.0**
 - **Скрыть VPN от приложений**, **очистка данных** одной кнопкой, знакомство при первом запуске
 - Голос: «включи VPN в APEX VPN»
 - **Перенос на новый телефон одним QR**, резервная копия в файл, **ссылка-приглашение**, **WARP-цепочка**
@@ -636,7 +653,7 @@ app/                    Android-приложение (Kotlin, Jetpack Compose)
   …/data/               подписка, настройки, пинг, звуки, обновление баз
   …/update/             обновление приложения
   …/ui/                 экраны, темы, карта
-wear/                   приложение для часов Wear OS
+wear/                   APEX Watch — приложение для часов Wear OS
 core/apexcore/          Go: разбор подписки → конфиги sing-box и Xray (+ тесты)
 .github/workflows/      сборка APK
 ```
@@ -666,7 +683,19 @@ core/apexcore/          Go: разбор подписки → конфиги sin
 
 <img src="docs/img/tags/new.svg" alt="Новое" height="22"> <img src="docs/img/tags/improved.svg" alt="Улучшено" height="22"> <img src="docs/img/tags/changed.svg" alt="Изменено" height="22"> <img src="docs/img/tags/fixed.svg" alt="Исправлено" height="22"> <img src="docs/img/tags/removed.svg" alt="Удалено" height="22">
 
-### 2.2.0 · 28 октября 2026
+### 2.2.1 · 28 октября 2026
+
+<img src="docs/img/tags/changed.svg" alt="Изменено" height="22">
+
+- Приложение для часов теперь называется «APEX Watch» и получило свою иконку: циферблат и щит
+- Файл для часов на странице версии: apex-watch-<версия>.apk
+
+#### 📚 Все версии (35)
+
+Каждая версия — отдельная вкладка.
+
+<details>
+<summary><b>2.2.0</b> · 28 октября 2026</summary>
 
 <img src="docs/img/tags/new.svg" alt="Новое" height="22">
 
@@ -683,9 +712,7 @@ core/apexcore/          Go: разбор подписки → конфиги sin
 
 - Название и логотип APEX VPN не передаются по GPL — правила для форков в TRADEMARKS.md
 
-#### 📚 Все версии (34)
-
-Каждая версия — отдельная вкладка.
+</details>
 
 <details>
 <summary><b>2.1.1</b> · 28 октября 2026</summary>

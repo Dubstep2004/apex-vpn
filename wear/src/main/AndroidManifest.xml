@@ -5,7 +5,7 @@
 
     <application
         android:icon="@mipmap/ic_launcher"
-        android:label="APEX VPN"
+        android:label="APEX Watch"
         android:theme="@android:style/Theme.DeviceDefault">
 
         <!-- Работает только вместе с приложением на телефоне -->

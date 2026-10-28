@@ -126,7 +126,7 @@ jobs:
           APK="dist/apex-vpn-${VERSION_NAME}.apk"
           cp app/build/outputs/apk/release/app-release.apk "$APK"
           # 11. Приложение для часов Wear OS
-          WEAR="dist/apex-vpn-wear-${VERSION_NAME}.apk"
+          WEAR="dist/apex-watch-${VERSION_NAME}.apk"
           if [ -f wear/build/outputs/apk/release/wear-release.apk ]; then
             cp wear/build/outputs/apk/release/wear-release.apk "$WEAR"
             echo "::notice title=Wear OS::$(du -h "$WEAR" | cut -f1)"
@@ -178,5 +178,5 @@ jobs:
           files: |
             ${{ steps.apk.outputs.apk }}
             dist/apex-vpn-${{ steps.apk.outputs.name }}.json
-            dist/apex-vpn-wear-${{ steps.apk.outputs.name }}.apk
+            dist/apex-watch-${{ steps.apk.outputs.name }}.apk
           make_latest: true

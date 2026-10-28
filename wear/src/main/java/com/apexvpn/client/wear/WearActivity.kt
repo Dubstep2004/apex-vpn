@@ -122,7 +122,7 @@ private fun WearScreen(s: PhoneState, linked: Boolean, onToggle: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Text("APEX VPN", color = Color(0xFF8E8E9A), fontSize = 12.sp)
+        Text("APEX Watch", color = Color(0xFF8E8E9A), fontSize = 12.sp)
         Spacer(Modifier.height(6.dp))
         Button(
             onClick = onToggle,

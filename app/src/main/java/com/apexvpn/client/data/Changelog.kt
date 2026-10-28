@@ -25,6 +25,13 @@ private fun d(text: String) = Change(ChangeKind.Removed, text)  // Удален�
 object Changelog {
     val releases = listOf(
         Release(
+            "2.2.1", 35, "28 октября 2026",
+            listOf(
+                c("Приложение для часов теперь называется «APEX Watch» и получило свою иконку: циферблат и щит"),
+                c("Файл для часов на странице версии: apex-watch-<версия>.apk"),
+            ),
+        ),
+        Release(
             "2.2.0", 34, "28 октября 2026",
             listOf(
                 n("Защита от подделок: приложение проверяет свою подпись и узнаёт перепакованные копии"),

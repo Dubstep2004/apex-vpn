@@ -1,40 +1,60 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- APEX Watch: циферблат-кольцо (как индикатор защиты) и щит с галочкой в центре -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Вершина «A» -->
-    <path android:pathData="M54,27 L79,77 Q80,79.5 77.5,79.5 L70.5,79.5 Q68.6,79.5 67.8,77.8 L54,49 L40.2,77.8 Q39.4,79.5 37.5,79.5 L30.5,79.5 Q28,79.5 29,77 Z">
-        <aapt:attr name="android:fillColor">
+    <!-- Кольцо-безель: тонкая дорожка -->
+    <path
+        android:pathData="M54,27 A27,27 0 1,1 53.99,27"
+        android:strokeWidth="3"
+        android:strokeColor="#3322D3EE"
+        android:fillColor="#00000000" />
+    <!-- Заполненная часть кольца — «защищено» -->
+    <path
+        android:pathData="M54,27 A27,27 0 1,1 30.62,40.5"
+        android:strokeWidth="3.6"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000">
+        <aapt:attr name="android:strokeColor">
             <gradient
                 android:type="linear"
                 android:startX="30"
                 android:startY="80"
-                android:endX="78"
-                android:endY="26">
+                android:endX="80"
+                android:endY="28">
+                <item android:offset="0" android:color="#FF8B5CF6" />
+                <item android:offset="1" android:color="#FF22D3EE" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Деления часов на 12, 3, 6, 9 -->
+    <path android:fillColor="#FFA5F3FC" android:pathData="M53,31.5h2v3h-2z" />
+    <path android:fillColor="#99A5F3FC" android:pathData="M73.5,53h3v2h-3z" />
+    <path android:fillColor="#99A5F3FC" android:pathData="M53,73.5h2v3h-2z" />
+    <path android:fillColor="#99A5F3FC" android:pathData="M31.5,53h3v2h-3z" />
+    <!-- Щит -->
+    <path android:pathData="M54,38 L66,42.5 L66,52 Q66,62 54,68 Q42,62 42,52 L42,42.5 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="42"
+                android:startY="68"
+                android:endX="66"
+                android:endY="38">
                 <item android:offset="0" android:color="#FF7C3AED" />
                 <item android:offset="1" android:color="#FF22D3EE" />
             </gradient>
         </aapt:attr>
     </path>
-    <!-- Шеврон-перекладина -->
-    <path android:pathData="M45.5,69 L54,62.5 L62.5,69 L62.5,73 L54,66.5 L45.5,73 Z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:type="linear"
-                android:startX="44"
-                android:startY="0"
-                android:endX="64"
-                android:endY="0">
-                <item android:offset="0" android:color="#FF22D3EE" />
-                <item android:offset="1" android:color="#FFA5F3FC" />
-            </gradient>
-        </aapt:attr>
-    </path>
-    <!-- Искра -->
+    <!-- Галочка -->
     <path
-        android:fillColor="#FFA5F3FC"
-        android:pathData="M70,22 Q70.9,27.1 76,28 Q70.9,28.9 70,34 Q69.1,28.9 64,28 Q69.1,27.1 70,22 Z" />
+        android:pathData="M48.5,52.5 L52.5,56.5 L59.5,48.5"
+        android:strokeWidth="2.8"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000" />
 </vector>
