@@ -7,7 +7,7 @@
 <p>
 <a href="https://github.com/Dubstep2004/apex-vpn/releases/latest"><b>⬇️ Скачать APK</b></a>
 &nbsp;&nbsp;·&nbsp;&nbsp;
-<a href="#-что-нового"><b>🆕 Что нового в 1.7.5</b></a>
+<a href="#-что-нового"><b>🆕 Что нового в 1.7.6</b></a>
 &nbsp;&nbsp;·&nbsp;&nbsp;
 <a href="#setup"><b>🚀 Как установить</b></a>
 </p>
@@ -206,7 +206,10 @@ curl -fsSL -o apex https://raw.githubusercontent.com/Dubstep2004/apex-vpn/main/s
 
 Добавьте его в GitHub: **Settings → Secrets and variables → Actions → Variables → New repository variable**, Name `SERVER_URL`, Value — адрес. Пересоберите приложение.
 
-Адрес по умолчанию уже вписан в `app/build.gradle.kts` (`https://panel.apex.knownhosts.xyz/apexvpn`), переменная `SERVER_URL` нужна, только если адрес другой.
+Чтобы приложение знало адрес сервера, добавьте его в GitHub как переменную `SERVER_URL` (**Settings → Secrets and variables → Actions → Variables**) и пересоберите. Переменная видна только вам — адрес не попадает в README и код.
+
+> [!NOTE]
+> Без `SERVER_URL` приложение работает полностью: объявления приходят из Remnawave, обновления — с GitHub. Не будет только отчётов о сбоях и объявлений с VPS.
 
 Управление сервером — `sudo apex`:
 
@@ -406,6 +409,9 @@ server/                 сервер обновлений для VPS (install.sh
 </details>
 
 ## 📝 Что нового
+
+**1.7.6**
+- Адрес сервера больше не вшит в приложение — свой сервер по желанию
 
 **1.7.5**
 - Объявления из Remnawave — баннером на главном экране

@@ -12,10 +12,10 @@ curl -fsSL -o apex https://raw.githubusercontent.com/Dubstep2004/apex-vpn/main/s
 
 В меню выберите **1** и введите домен (A-запись домена должна указывать на IP сервера).
 Скрипт поставит Caddy с бесплатным сертификатом и напечатает адрес сервера, например
-`https://panel.apex.knownhosts.xyz/apexvpn`.
+`https://vpn.ваш-домен.ru/apexvpn`.
 
-Этот адрес должен быть вписан в приложение: переменная `SERVER_URL` в GitHub
-(**Settings → Secrets and variables → Actions → Variables**) или значение по умолчанию в `app/build.gradle.kts`.
+Чтобы приложение отправляло на него отчёты о сбоях и брало объявления, добавьте адрес в GitHub как переменную
+`SERVER_URL` (**Settings → Secrets and variables → Actions → Variables**) и пересоберите. Без неё всё остальное работает.
 
 Если порт 443 занят VPN-сервером, сайт поднимется на 8443 — адрес будет с `:8443`.
 

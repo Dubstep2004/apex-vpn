@@ -155,8 +155,8 @@ echo
 echo "     $BASE_URL"
 echo
 echo "Дальше:"
-echo "  1. Адрес сервера вписан в приложение при сборке (переменная SERVER_URL в GitHub"
-echo "     или значение по умолчанию в app/build.gradle.kts) — пропишите туда: $BASE_URL"
+echo "  1. GitHub → Settings → Secrets and variables → Actions → Variables:"
+echo "     SERVER_URL = $BASE_URL   (и пересоберите приложение)"
 echo "  2. Объявления и отчёты о сбоях: sudo apex"
 echo "  3. Страница для скачивания: $BASE_URL/ — ведёт на последнюю версию на GitHub"
 echo
