@@ -69,8 +69,9 @@ data class Settings(
     val rulesSource: String = "",                     // свой адрес баз сайтов (*.srs)
     val warp: Boolean = false,                        // 31. WARP-цепочка
     val warpConfig: String = "",                      // данные аккаунта WARP (JSON из ядра)
-    // 17. Фон за щитом: none | waves | particles | stars
+    // 17. Фон за щитом: none | waves | particles | stars | photo (157)
     val shieldBackdrop: String = "none",
+    val backdropStamp: Long = 0,                      // 157. меняется при выборе нового фото
     // 20. Иконка на рабочем столе показывает, включён ли VPN
     val iconStatus: Boolean = false,
     // 94. Флаги в списке серверов колышутся
@@ -146,6 +147,8 @@ object AppSettings {
         put("core", s.core.id)
         put("excludeAds", s.excludeAds)
         put("clashApi", Prefs.clashApiPort)
+        // 197. Счётчик рекламы: DNS приложения, если он запущен
+        if (s.adBlock && AdCounter.running) put("adsDnsPort", Prefs.adsDnsPort)
         put("xrayPort", Prefs.xrayBasePort)
         put("xrayAuth", Prefs.xrayAuth)
         put("userRules", JSONArray(s.userRules.map { JSONObject().put("value", it.value).put("action", it.action) }))
@@ -201,7 +204,7 @@ object AppSettings {
         put("userRules", JSONArray(s.userRules.map { JSONObject().put("value", it.value).put("action", it.action) }))
         put("domainStrategy", s.domainStrategy); put("fakeDns", s.fakeDns)
         put("remoteDns", s.remoteDns.json()); put("directDns", s.directDns.json()); put("rulesSource", s.rulesSource)
-        put("warp", s.warp); put("warpConfig", s.warpConfig); put("shieldBackdrop", s.shieldBackdrop)
+        put("warp", s.warp); put("warpConfig", s.warpConfig); put("shieldBackdrop", s.shieldBackdrop); put("backdropStamp", s.backdropStamp)
         put("iconStatus", s.iconStatus); put("animatedFlags", s.animatedFlags)
     }
 
@@ -262,6 +265,7 @@ object AppSettings {
             warp = o.optBoolean("warp", d.warp),
             warpConfig = o.optString("warpConfig", d.warpConfig),
             shieldBackdrop = o.optString("shieldBackdrop", d.shieldBackdrop),
+            backdropStamp = o.optLong("backdropStamp", d.backdropStamp),
             iconStatus = o.optBoolean("iconStatus", d.iconStatus),
             animatedFlags = o.optBoolean("animatedFlags", d.animatedFlags),
         )

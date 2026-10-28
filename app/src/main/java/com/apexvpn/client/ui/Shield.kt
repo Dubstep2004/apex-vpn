@@ -28,6 +28,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathMeasure
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -83,15 +85,33 @@ fun ShieldButton(status: VpnStatus, onClick: () -> Unit, diameter: androidx.comp
     var focused by remember { androidx.compose.runtime.mutableStateOf(false) }
     val check = remember { Animatable(0f) }
     val fill = remember { Animatable(0f) }
+    // 147. «Тоннель» при подключении: вспышка, кольца и лучи наружу
+    val burst = remember { Animatable(1f) }
+    // 196. «Щит закрывается» при отключении: галочка стирается, щит сжимается, кольцо сходится к нему
+    val close = remember { Animatable(1f) }
+    var wasActive by remember { androidx.compose.runtime.mutableStateOf(active) }
     LaunchedEffect(active) {
+        val animate = !feel.smooth
         if (active) {
             // Вибрация при подключении — в ConnectFeedback (работает и из плитки, и из виджета)
+            if (animate && !wasActive) {
+                burst.snapTo(0f)
+                launch { burst.animateTo(1f, tween(1100, easing = LinearOutSlowInEasing)) }
+            }
             fill.animateTo(1f, tween(450, easing = FastOutSlowInEasing))
             check.animateTo(1f, tween(380, easing = FastOutSlowInEasing))
         } else {
-            check.snapTo(0f)
-            fill.animateTo(0f, tween(300))
+            if (animate && wasActive) {
+                close.snapTo(0f)
+                launch { close.animateTo(1f, tween(700, easing = FastOutSlowInEasing)) }
+                check.animateTo(0f, tween(260, easing = FastOutSlowInEasing))
+                fill.animateTo(0f, tween(420))
+            } else {
+                check.snapTo(0f)
+                fill.animateTo(0f, tween(300))
+            }
         }
+        wasActive = active
     }
 
     val surface = Apex.SurfaceHigh
@@ -132,8 +152,46 @@ fun ShieldButton(status: VpnStatus, onClick: () -> Unit, diameter: androidx.comp
                 )
             }
 
+            // 147. Тоннель: два кольца и лучи разлетаются от щита
+            val b = burst.value
+            if (b < 1f) {
+                val fade = 1f - b
+                for (k in 0..1) {
+                    val p = (b * 1.2f - k * 0.2f).coerceIn(0f, 1f)
+                    drawCircle(
+                        Apex.Cyan.copy(alpha = fade * 0.7f),
+                        radius = size.minDimension * (0.32f + p * 0.3f),
+                        style = Stroke((3f - k).dp.toPx() * fade + 1f),
+                    )
+                }
+                val rays = 14
+                for (i in 0 until rays) {
+                    val a = (i * 360f / rays) * (Math.PI / 180f).toFloat()
+                    val r0 = size.minDimension * (0.30f + b * 0.12f)
+                    val r1 = r0 + size.minDimension * 0.12f * fade
+                    drawLine(
+                        Color.White.copy(alpha = fade * 0.75f),
+                        Offset(center.x + kotlin.math.cos(a) * r0, center.y + kotlin.math.sin(a) * r0),
+                        Offset(center.x + kotlin.math.cos(a) * r1, center.y + kotlin.math.sin(a) * r1),
+                        strokeWidth = 2.dp.toPx(),
+                        cap = StrokeCap.Round,
+                    )
+                }
+            }
+            // 196. Кольцо сходится к щиту при отключении
+            val c = close.value
+            if (c < 1f) {
+                drawCircle(
+                    accent.copy(alpha = (1f - c) * 0.6f),
+                    radius = size.minDimension * (0.62f - c * 0.28f),
+                    style = Stroke(2.5.dp.toPx()),
+                )
+            }
+            val squeeze = if (c < 1f) 1f - 0.07f * kotlin.math.sin(c * Math.PI.toFloat()) else 1f
+            val pop = if (b < 1f) 1f + 0.05f * kotlin.math.sin(b * Math.PI.toFloat()) else 1f
+
             // Тело щита
-            scale(0.82f, center) {
+            scale(0.82f * squeeze * pop, center) {
                 drawPath(shield, surface)
                 if (fill.value > 0f) {
                     drawPath(
@@ -142,6 +200,8 @@ fun ShieldButton(status: VpnStatus, onClick: () -> Unit, diameter: androidx.comp
                         alpha = fill.value,
                     )
                 }
+                // Вспышка в начале «тоннеля»
+                if (b < 0.35f) drawPath(shield, Color.White, alpha = (0.35f - b) * 1.6f)
                 // Контур
                 if (busy) {
                     drawRunner(shield, runner, accent)
@@ -154,7 +214,7 @@ fun ShieldButton(status: VpnStatus, onClick: () -> Unit, diameter: androidx.comp
                 }
 
                 // Значок: галочка при подключении, иначе «питание»
-                if (active) {
+                if (active || check.value > 0f) {
                     val path = checkPath(s)
                     val measure = PathMeasure().apply { setPath(path, false) }
                     val part = Path()

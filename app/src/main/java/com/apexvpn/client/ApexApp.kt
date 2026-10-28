@@ -33,6 +33,7 @@ class ApexApp : Application() {
         super.onCreate()
         instance = this
         CrashReporter.install(this)
+        com.apexvpn.client.data.AdCounter.init(this)
         Prefs.init(this)
         AppSettings.init(this)
         com.apexvpn.client.update.UpdateManager.init(this)

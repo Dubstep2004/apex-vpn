@@ -42,6 +42,7 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SettingsEthernet
 import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material.icons.rounded.SportsEsports
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material.icons.rounded.SupportAgent
 import androidx.compose.material.icons.rounded.SystemUpdate
@@ -116,6 +117,25 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
             ListRow("Изменить ссылку", leading = { tile(Icons.Rounded.Edit) }, onClick = { editing = true }) { Chevron() }
             GroupDivider()
             ListRow("Сканировать QR-код", "Добавить подписку с экрана другого устройства", leading = { tile(Icons.Rounded.QrCodeScanner) }, onClick = onScanQr) { Chevron() }
+            GroupDivider()
+            // 210. Ссылка-приглашение: страница на GitHub Pages, ссылка подписки — после # (не уходит на сервер)
+            ListRow(
+                "Ссылка-приглашение",
+                "Для своего второго телефона или семьи: установка и подписка в одно касание",
+                leading = { tile(Icons.Rounded.Share) },
+                onClick = {
+                    val invite = com.apexvpn.client.data.Invite.link(sub.url)
+                    val send = android.content.Intent(android.content.Intent.ACTION_SEND)
+                        .setType("text/plain")
+                        .putExtra(android.content.Intent.EXTRA_TEXT, "APEX VPN — установка и подписка: $invite")
+                    runCatching { context.startActivity(android.content.Intent.createChooser(send, "Отправить приглашение")) }
+                        .onFailure {
+                            val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                            cm.setPrimaryClip(android.content.ClipData.newPlainText("APEX VPN", invite))
+                            viewModel.showMessage("Ссылка-приглашение скопирована")
+                        }
+                },
+            ) { Chevron() }
             GroupDivider()
             ListRow("Удалить подписку", leading = { tile(Icons.Rounded.Delete, Apex.Bad) }, titleColor = Apex.Bad, onClick = { confirmRemove = true })
         }

@@ -92,3 +92,12 @@ func TestPortRulesAndWarp(t *testing.T) {
 		t.Fatalf("нет правил по портам или WARP:\n%s", cfg)
 	}
 }
+
+func TestAdsCounterDNS(t *testing.T) {
+	nodes := parseNodes(t, "vless://"+testUUID+"@1.2.3.4:443?type=tcp&security=tls&sni=a.example.com#A")
+	opts, _ := json.Marshal(map[string]any{"adBlock": true, "rulesDir": rulesDirForTest(), "adsDnsPort": 45123})
+	cfg := checkAll(t, nodes, string(opts))
+	if !strings.Contains(cfg, `"adblock"`) || !strings.Contains(cfg, `45123`) {
+		t.Fatalf("нет DNS счётчика рекламы:\n%s", cfg)
+	}
+}

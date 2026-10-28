@@ -92,6 +92,8 @@ object Prefs {
             ?: (20000 + java.security.SecureRandom().nextInt(3000) * 10).also { sp.edit { putInt("port_base", it) } }
     val clashApiPort: Int get() = localPortBase
     val xrayBasePort: Int get() = localPortBase + 10
+    /** 197. Локальный DNS счётчика рекламы */
+    val adsDnsPort: Int get() = localPortBase + 5
 
     /** Секрет локального SOCKS между sing-box и Xray (постоянный, чтобы Xray не перезапускался зря) */
     val xrayAuth: String

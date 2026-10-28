@@ -56,6 +56,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -105,6 +107,9 @@ fun HomeScreen(
         viewModel.startLivePing()
         onDispose { viewModel.stopLivePing() }
     }
+
+    // 157. Своё фото за щитом (из галереи)
+    if (settings.shieldBackdrop == "photo") PhotoBackdrop(settings.backdropStamp)
 
     Column(
         Modifier
@@ -247,6 +252,22 @@ fun HomeScreen(
                     .clip(RoundedCornerShape(14.dp))
                     .background(Apex.Bad.copy(alpha = 0.12f))
                     .padding(horizontal = 14.dp, vertical = 9.dp),
+            )
+        }
+
+        // 197. Сколько рекламы заблокировано сегодня
+        val adsToday by com.apexvpn.client.data.AdCounter.today.collectAsStateWithLifecycle()
+        if (settings.adBlock && adsToday > 0) {
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "🛡 Заблокировано рекламы сегодня: $adsToday",
+                color = Apex.Good,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(Apex.Good.copy(alpha = 0.12f))
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
             )
         }
 
@@ -562,6 +583,14 @@ private fun SubscriptionCard(
             }
         }
 
+        // 160. Обратный отсчёт до конца подписки, обновляется раз в 30 секунд
+        var now by remember { mutableStateOf(System.currentTimeMillis()) }
+        LaunchedEffect(sub.expireAt) {
+            while (sub.expireAt > 0) {
+                now = System.currentTimeMillis()
+                kotlinx.coroutines.delay(30_000)
+            }
+        }
         val expire = when {
             sub.expireAt > 0 -> "Действует до ${formatDate(sub.expireAt)}"
             sub.expireAt == 0L -> "Бессрочно"
@@ -570,6 +599,12 @@ private fun SubscriptionCard(
         expire?.let {
             Spacer(Modifier.height(6.dp))
             Text(it, color = Apex.TextDim, fontSize = 13.sp)
+        }
+        if (sub.expireAt > 0) {
+            val left = sub.expireAt * 1000 - now
+            val (label, color) = countdown(left)
+            Spacer(Modifier.height(6.dp))
+            Text(label, color = color, fontSize = 15.sp, fontWeight = FontWeight.Bold)
         }
 
         // Объявление от сервиса (заголовок announce из Remnawave)
@@ -691,5 +726,64 @@ private fun ConnectionTimer(connectedAt: Long) {
 private fun openUrl(context: android.content.Context, url: String) {
     runCatching {
         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+}
+
+/** 160. «Осталось 12 дн. 4 ч», в последний день — часы и минуты. */
+@Composable
+private fun countdown(leftMs: Long): Pair<String, androidx.compose.ui.graphics.Color> {
+    if (leftMs <= 0) return "Подписка закончилась" to Apex.Bad
+    val minutes = leftMs / 60_000
+    val days = minutes / (24 * 60)
+    val hours = (minutes / 60) % 24
+    val mins = minutes % 60
+    val text = when {
+        days >= 1 -> "Осталось ${days} ${plural(days, "день", "дня", "дней")} ${hours} ч"
+        hours >= 1 -> "Осталось ${hours} ч ${mins} мин"
+        else -> "Осталось ${mins} мин"
+    }
+    val color = when {
+        days >= 7 -> Apex.Good
+        days >= 2 -> Apex.Warn
+        else -> Apex.Bad
+    }
+    return text to color
+}
+
+private fun plural(n: Long, one: String, few: String, many: String): String {
+    val m10 = n % 10
+    val m100 = n % 100
+    return when {
+        m10 == 1L && m100 != 11L -> one
+        m10 in 2..4 && m100 !in 12..14 -> few
+        else -> many
+    }
+}
+
+/** 157. Фото из галереи на весь экран, с затемнением, чтобы текст читался. */
+@Composable
+private fun PhotoBackdrop(stamp: Long) {
+    val context = LocalContext.current
+    val bitmap by androidx.compose.runtime.produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, stamp) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            com.apexvpn.client.data.Backdrop.load(context)?.asImageBitmap()
+        }
+    }
+    val img = bitmap ?: return
+    val base = Apex.Base
+    val blur = Apex.feel.blur && android.os.Build.VERSION.SDK_INT >= 31
+    Box(Modifier.fillMaxSize()) {
+        androidx.compose.foundation.Image(
+            img, null,
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+            modifier = Modifier.fillMaxSize().then(if (blur) Modifier.blur(6.dp) else Modifier),
+        )
+        Box(
+            Modifier.fillMaxSize().background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(
+                    listOf(base.copy(alpha = 0.55f), base.copy(alpha = 0.25f), base.copy(alpha = 0.85f)),
+                ),
+            ),
+        )
     }
 }

@@ -609,6 +609,34 @@ private fun AppearancePage(viewModel: MainViewModel, onBack: () -> Unit) {
         ChipRow(listOf("none" to "Нет", "waves" to "Волны", "particles" to "Частицы", "stars" to "Звёзды"), s.shieldBackdrop) {
             viewModel.change(reload = false) { copy(shieldBackdrop = it) }
         }
+        // 157. Своё фото из галереи
+        val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+            if (uri != null) {
+                if (com.apexvpn.client.data.Backdrop.save(context, uri)) {
+                    viewModel.change(reload = false) { copy(shieldBackdrop = "photo", backdropStamp = System.currentTimeMillis()) }
+                    viewModel.showMessage("Фото установлено на главный экран")
+                } else {
+                    viewModel.showMessage("Не удалось открыть фото")
+                }
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        Group {
+            ListRow(
+                "Своё фото",
+                if (s.shieldBackdrop == "photo") "Выбрано — нажмите, чтобы сменить" else "Фото из галереи на главный экран",
+                onClick = { pickPhoto.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+            ) {
+                if (s.shieldBackdrop == "photo") {
+                    androidx.compose.material3.TextButton(onClick = {
+                        com.apexvpn.client.data.Backdrop.clear(context)
+                        viewModel.change(reload = false) { copy(shieldBackdrop = "none") }
+                    }) { Text("Убрать", color = Apex.Bad) }
+                } else {
+                    Chevron()
+                }
+            }
+        }
 
         SectionLabel("Цвет")
         Row(Modifier.fillMaxWidth()) {
@@ -704,11 +732,13 @@ private fun AppearancePage(viewModel: MainViewModel, onBack: () -> Unit) {
 
         // 20. Иконка приложения
         SectionLabel("Иконка приложения")
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            com.apexvpn.client.data.AppIcons.all.forEach { icon ->
+        com.apexvpn.client.data.AppIcons.all.chunked(4).forEach { rowIcons ->
+        Row(Modifier.fillMaxWidth().padding(bottom = 6.dp)) {
+            rowIcons.forEach { icon ->
                 val on = s.appIcon == icon.id
                 Column(
                     Modifier
+                        .weight(1f)
                         .clip(RoundedCornerShape(16.dp))
                         .clickable {
                             if (!on) {
@@ -732,6 +762,8 @@ private fun AppearancePage(viewModel: MainViewModel, onBack: () -> Unit) {
                     Text(icon.title, color = if (on) Apex.Text else Apex.TextDim, fontSize = 12.sp)
                 }
             }
+            repeat(4 - rowIcons.size) { Spacer(Modifier.weight(1f)) }
+        }
         }
         Spacer(Modifier.height(10.dp))
         Group {

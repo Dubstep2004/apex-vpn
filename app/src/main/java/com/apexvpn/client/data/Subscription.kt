@@ -124,6 +124,12 @@ object Subscription {
         require(url.isNotEmpty()) { "Подписка не добавлена" }
         fetch(validate(url))
         _state.value = load()
+        // 195. Серверов, которых больше нет в подписке, в избранном не держим
+        val names = _state.value.nodes.map { it.name }.toSet()
+        if (names.isNotEmpty()) {
+            val fav = AppSettings.value.favorites
+            if (fav.any { it !in names }) AppSettings.update { copy(favorites = fav.intersect(names)) }
+        }
     }
 
     fun needsRefresh(): Boolean {

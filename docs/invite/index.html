@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Приглашение в APEX VPN</title>
+<meta name="description" content="Установите APEX VPN и подключите подписку в одно касание">
+<link rel="icon" href="icon.png">
+<style>
+  :root { --bg:#07070d; --card:#12121c; --line:#262636; --text:#f2f2f7; --dim:#9a9aae; --acc:#7b6cff; --cy:#22d3ee; --ok:#34d399; --bad:#ff6b6b; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; background:var(--bg); color:var(--text); font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  body::before { content:""; position:fixed; inset:0; z-index:-1; background:
+     radial-gradient(60vmax 60vmax at 10% -10%, #7b6cff55, transparent 60%),
+     radial-gradient(50vmax 50vmax at 110% 100%, #22d3ee33, transparent 60%); }
+  main { max-width:460px; margin:0 auto; padding:36px 16px 48px; }
+  .logo { display:flex; align-items:center; gap:12px; margin-bottom:22px; }
+  .logo img { width:52px; height:52px; border-radius:15px; box-shadow:0 8px 30px #7b6cff55; }
+  .logo b { font-size:24px; letter-spacing:2px; font-weight:900; }
+  .logo span { color:var(--cy); font-weight:500; }
+  h1 { font-size:26px; line-height:1.2; margin:0 0 6px; }
+  p.lead { color:var(--dim); margin:0 0 22px; }
+  .step { display:flex; gap:14px; padding:16px; background:var(--card); border:1px solid var(--line); border-radius:20px; margin-bottom:12px; }
+  .num { flex:none; width:32px; height:32px; border-radius:50%; background:var(--acc); display:grid; place-items:center; font-weight:800; }
+  .step h2 { font-size:17px; margin:2px 0 4px; }
+  .step p { margin:0 0 12px; color:var(--dim); font-size:14px; }
+  .btn { display:block; width:100%; text-align:center; padding:14px; border-radius:14px; border:0; font:inherit; font-weight:700; text-decoration:none; cursor:pointer; color:#fff; background:var(--acc); }
+  .btn.alt { background:#262636; }
+  .btn + .btn { margin-top:8px; }
+  .qr { display:grid; place-items:center; padding:16px; background:#fff; border-radius:18px; margin:6px auto 0; width:fit-content; }
+  .qr img, .qr canvas { display:block; }
+  input { width:100%; padding:14px; border-radius:14px; border:1px solid var(--line); background:#0c0c14; color:var(--text); font:inherit; margin-bottom:10px; }
+  .msg { font-size:14px; margin:8px 0 0; min-height:20px; }
+  .ok { color:var(--ok); } .bad { color:var(--bad); }
+  .note { color:var(--dim); font-size:13px; margin-top:18px; }
+  [hidden] { display:none !important; }
+</style>
+</head>
+<body>
+<main>
+  <div class="logo"><img src="icon.png" alt=""><b>APEX <span>VPN</span></b></div>
+
+  <!-- Приглашение: ссылка подписки после # (не уходит на сервер GitHub) -->
+  <section id="invite" hidden>
+    <h1>Вас пригласили в APEX VPN</h1>
+    <p class="lead">Два шага — и VPN готов.</p>
+    <div class="step"><div class="num">1</div><div style="flex:1">
+      <h2>Установите приложение</h2>
+      <p>На странице версии откройте «Assets» и нажмите <b>apex-vpn-….apk</b>.</p>
+      <a class="btn" id="dl" href="#" rel="noopener">Скачать APEX VPN</a>
+    </div></div>
+    <div class="step"><div class="num">2</div><div style="flex:1">
+      <h2>Добавьте подписку</h2>
+      <p>Нажмите — приложение откроется и само добавит подписку.</p>
+      <a class="btn" id="open" href="#">Открыть в APEX VPN</a>
+      <button class="btn alt" id="copySub" type="button">Скопировать ссылку подписки</button>
+      <p class="msg" id="msg1"></p>
+    </div></div>
+    <div class="step"><div class="num">↗</div><div style="flex:1">
+      <h2>На другой телефон</h2>
+      <p>Отсканируйте камерой или в APEX VPN → «Сканировать QR-код».</p>
+      <div class="qr" id="qr1"></div>
+    </div></div>
+  </section>
+
+  <!-- Создать приглашение -->
+  <section id="make" hidden>
+    <h1>Ссылка-приглашение</h1>
+    <p class="lead">Вставьте ссылку подписки — получите страницу для друга или своего второго телефона.</p>
+    <input id="sub" type="url" inputmode="url" placeholder="https://sub.knownhosts.ru/…" autocomplete="off">
+    <button class="btn" id="makeBtn" type="button">Создать приглашение</button>
+    <p class="msg" id="msg2"></p>
+    <div id="result" hidden>
+      <div class="step"><div style="flex:1">
+        <h2>Готово</h2>
+        <p>Отправьте ссылку или покажите QR-код.</p>
+        <button class="btn" id="copyInvite" type="button">Скопировать ссылку-приглашение</button>
+        <div class="qr" id="qr2" style="margin-top:12px"></div>
+      </div></div>
+    </div>
+  </section>
+
+  <p class="note">Ссылка подписки хранится только после знака # в адресе — браузер не отправляет её на сервер. По приглашению подключаются к <b>вашей</b> подписке: делитесь только с теми, кому доверяете.</p>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script>
+(function () {
+  var REPO = "Dubstep2004/apex-vpn";
+  var HOST = "sub.knownhosts.ru";
+  function valid(u) {
+    try { var x = new URL(u); return x.protocol === "https:" && x.hostname === HOST; } catch (e) { return false; }
+  }
+  function qr(el, text) {
+    el.innerHTML = "";
+    try {
+      var q = qrcode(0, "M"); q.addData(text); q.make();
+      el.innerHTML = q.createImgTag(5, 0);
+    } catch (e) { el.innerHTML = '<span style="color:#333;font-size:14px">QR-код не загрузился — обновите страницу</span>'; }
+  }
+  function copy(text, msgEl, ok) {
+    function done() { msgEl.textContent = ok; msgEl.className = "msg ok"; }
+    if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
+    function fallback() {
+      var t = document.createElement("textarea"); t.value = text; document.body.appendChild(t); t.select();
+      try { document.execCommand("copy"); done(); } catch (e) { msgEl.textContent = text; }
+      document.body.removeChild(t);
+    }
+  }
+  window.addEventListener("hashchange", function () { location.reload(); });
+  var base = location.href.split("#")[0];
+  var sub = decodeURIComponent(location.hash.slice(1));
+  if (sub && valid(sub)) {
+    document.getElementById("invite").hidden = false;
+    document.getElementById("dl").href = "https://github.com/" + REPO + "/releases/latest";
+    document.getElementById("open").href = "apexvpn://import?url=" + encodeURIComponent(sub);
+    document.getElementById("copySub").onclick = function () {
+      copy(sub, document.getElementById("msg1"), "Скопировано — вставьте в APEX VPN");
+    };
+    qr(document.getElementById("qr1"), sub);
+    history.replaceState(null, "", base + location.hash); // не теряем ссылку при обновлении
+  } else {
+    document.getElementById("make").hidden = false;
+    if (sub) { var m = document.getElementById("msg2"); m.textContent = "В приглашении неверная ссылка подписки"; m.className = "msg bad"; }
+    document.getElementById("makeBtn").onclick = function () {
+      var v = document.getElementById("sub").value.trim(), m = document.getElementById("msg2");
+      if (!valid(v)) { m.textContent = "Нужна ссылка вида https://" + HOST + "/…"; m.className = "msg bad"; return; }
+      m.textContent = "";
+      var link = base + "#" + encodeURIComponent(v);
+      document.getElementById("result").hidden = false;
+      qr(document.getElementById("qr2"), link);
+      document.getElementById("copyInvite").onclick = function () { copy(link, m, "Ссылка-приглашение скопирована"); };
+    };
+  }
+})();
+</script>
+</body>
+</html>

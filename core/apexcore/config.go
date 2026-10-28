@@ -87,6 +87,9 @@ type routeOptions struct {
 	Warp *WarpConfig `json:"warp"`
 	// 24. LogFile — журнал ядра для отчёта в поддержку (только предупреждения и ошибки)
 	LogFile string `json:"logFile"`
+	// 197. AdsDNSPort — локальный DNS приложения, который отвечает «нет такого адреса»
+	// рекламным доменам и считает блокировки (0 — просто отказ в ядре)
+	AdsDNSPort int `json:"adsDnsPort"`
 }
 
 // профиль подключения: как часто проверять серверы и рвать ли соединения при смене
@@ -440,7 +443,15 @@ func buildAll(nodesJSON string, selectedTag string, optionsJSON string) (string,
 	}
 	var dnsRules []any
 	if ads != "" {
-		dnsRules = append(dnsRules, map[string]any{"rule_set": "ads", "action": "reject"})
+		if opts.AdsDNSPort > 1024 && opts.AdsDNSPort < 65536 {
+			// Счётчик заблокированной рекламы: запросы уходят в DNS приложения
+			servers = append(servers, map[string]any{
+				"type": "udp", "tag": "adblock", "server": "127.0.0.1", "server_port": opts.AdsDNSPort,
+			})
+			dnsRules = append(dnsRules, map[string]any{"rule_set": "ads", "server": "adblock"})
+		} else {
+			dnsRules = append(dnsRules, map[string]any{"rule_set": "ads", "action": "reject"})
+		}
 	}
 	// Свои правила и в DNS: заблокированные не узнаём вовсе, остальные — нужным DNS
 	if r := userSets["block"].domainOnly().rule(map[string]any{"action": "reject"}); r != nil {

@@ -176,6 +176,7 @@ class ApexVpnService : VpnService(), PlatformInterface, CommandServerHandler {
         if (VpnState.status.value != VpnStatus.Started) return@withLock
         runCatching { commandServer?.closeService() }
         XrayCore.stop()
+        com.apexvpn.client.data.AdCounter.stop()
         closeTun()
         VpnState.set(VpnStatus.Paused)
         showNotification()
@@ -272,6 +273,12 @@ class ApexVpnService : VpnService(), PlatformInterface, CommandServerHandler {
     /** Собирает конфиги, запускает/перезапускает Xray при необходимости, возвращает конфиг sing-box. */
     private fun prepareConfig(): String {
         com.apexvpn.client.data.Diagnostics.trimCoreLog(this)
+        // 197. Счётчик рекламы: локальный DNS до сборки конфига
+        if (com.apexvpn.client.data.AppSettings.value.adBlock) {
+            com.apexvpn.client.data.AdCounter.ensure(com.apexvpn.client.data.Prefs.adsDnsPort)
+        } else {
+            com.apexvpn.client.data.AdCounter.stop()
+        }
         val (singBox, xray) = Subscription.buildConfigs(this)
         XrayCore.apply(this, xray)
         return singBox
