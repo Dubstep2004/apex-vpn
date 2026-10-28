@@ -6,6 +6,13 @@ data class Release(val version: String, val code: Int, val date: String, val cha
 object Changelog {
     val releases = listOf(
         Release(
+            "1.7.5", 19, "28 октября 2026",
+            listOf(
+                "Объявления из панели Remnawave — баннером вверху главного экрана, его можно закрыть до следующего объявления",
+                "Подписка обновляется при открытии приложения (если прошло больше 30 минут) — объявления доходят быстрее",
+            ),
+        ),
+        Release(
             "1.7.4", 18, "28 октября 2026",
             listOf(
                 "Объявления и отчёты о сбоях работают через сервер panel.apex.knownhosts.xyz",

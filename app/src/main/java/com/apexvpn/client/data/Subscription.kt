@@ -132,6 +132,10 @@ object Subscription {
         return age > Prefs.updateIntervalHours * 3_600_000L
     }
 
+    /** При открытии приложения подписку обновляем чаще — чтобы объявления из панели доходили быстро. */
+    fun needsRefreshOnLaunch(): Boolean =
+        Prefs.subscriptionUrl.isNotEmpty() && System.currentTimeMillis() - Prefs.lastUpdated > 30 * 60_000L
+
     fun select(tag: String) {
         Prefs.selectedTag = tag
         _state.value = _state.value.copy(selectedTag = tag)
@@ -242,7 +246,8 @@ object Subscription {
                 if (it in 1..168) Prefs.updateIntervalHours = it
             }
             parseUserInfo(header("subscription-userinfo"))
-            Prefs.announce = decodeTitle(header("announce"))?.take(500) ?: ""
+            // Объявление из Remnawave (заголовок announce, как у Happ); «0» — убрать
+            Prefs.announce = decodeTitle(header("announce"))?.trim()?.takeIf { it != "0" }?.take(500) ?: ""
             Prefs.supportUrl = header("support-url")?.trim()?.takeIf { it.startsWith("http") || it.startsWith("tg:") } ?: ""
             Prefs.webPageUrl = header("profile-web-page-url")?.trim()?.takeIf { it.startsWith("http") } ?: ""
 

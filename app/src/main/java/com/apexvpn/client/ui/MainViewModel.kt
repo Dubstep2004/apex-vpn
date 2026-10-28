@@ -68,7 +68,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             // После обновления приложения перезагружаем серверы один раз: у новых версий новые поля
             val oldFormat = Subscription.state.value.nodes.isNotEmpty() && Prefs.nodesVersion < BuildConfig.VERSION_CODE
-            if (Subscription.needsRefresh() || oldFormat) refresh(silent = true)
+            if (Subscription.needsRefreshOnLaunch() || oldFormat) refresh(silent = true)
         }
         if (AppSettings.value.autoCheckUpdates) {
             viewModelScope.launch { UpdateManager.check(silent = true) }

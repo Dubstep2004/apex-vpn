@@ -66,6 +66,11 @@ object Prefs {
         get() = sp.getInt("nodes_version", 0)
         set(v) = sp.edit { putInt("nodes_version", v) }
 
+    /** Закрытое объявление из Remnawave (по тексту): новое объявление покажется снова */
+    var dismissedAnnounce: String
+        get() = sp.getString("announce_closed", "") ?: ""
+        set(v) = sp.edit { putString("announce_closed", v) }
+
     var announce: String
         get() = sp.getString("announce", "") ?: ""
         set(v) = sp.edit { putString("announce", v) }
