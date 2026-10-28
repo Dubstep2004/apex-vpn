@@ -77,6 +77,7 @@ class ApexApp : Application() {
                     ApexWidget.refresh(this@ApexApp)
                     com.apexvpn.client.vpn.NewWidgets.update(this@ApexApp)
                     com.apexvpn.client.vpn.WearBridge.publish(this@ApexApp)
+                    com.apexvpn.client.vpn.WearBridge.publishServers(this@ApexApp)
                     ApexTileService.refresh(this@ApexApp)
                 }
         }
@@ -122,10 +123,21 @@ class ApexApp : Application() {
         appScope.launch {
             combine(AppSettings.state, Subscription.state) { st, sub -> st.favorites to sub.nodes.map { it.name } }
                 .distinctUntilChanged()
-                .collect { com.apexvpn.client.vpn.Shortcuts.refresh(this@ApexApp) }
+                .collect {
+                    com.apexvpn.client.vpn.Shortcuts.refresh(this@ApexApp)
+                    com.apexvpn.client.vpn.WearBridge.publishServers(this@ApexApp)
+                }
         }
 
         Prefs.initConnectCount()
+        // 413. Трафик по приложениям — пока VPN включён
+        com.apexvpn.client.data.AppTraffic.init(this)
+        appScope.launch {
+            VpnState.status.collect { st ->
+                if (st == com.apexvpn.client.vpn.VpnStatus.Started) com.apexvpn.client.data.AppTraffic.start(appScope)
+                else if (st == com.apexvpn.client.vpn.VpnStatus.Stopped) com.apexvpn.client.data.AppTraffic.stop()
+            }
+        }
         BackgroundWork.schedule(this)
         // 259. Точные напоминания о конце подписки — при каждой новой дате окончания
         appScope.launch {

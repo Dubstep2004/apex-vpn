@@ -41,6 +41,8 @@ fun DesignBackground(modifier: Modifier = Modifier) {
         Backdrop.Apex2 -> Canvas(modifier.fillMaxSize()) { drawApex2(p) }
         Backdrop.Steampunk -> SteampunkBackground(modifier, p)
         Backdrop.Synthwave -> SynthwaveBackground(modifier, p)
+        Backdrop.Cosmos -> CosmosBackground(modifier, p)
+        Backdrop.Japan -> Canvas(modifier.fillMaxSize()) { drawJapan(p) }
     }
 }
 
@@ -216,4 +218,59 @@ private fun SynthwaveBackground(modifier: Modifier, p: Palette) {
         }
         drawLine(Color(0xFFFF8AC6), Offset(0f, horizon), Offset(w, horizon), 2f)
     }
+}
+
+// ─── 430. Космос: мерцающие звёзды и туманность ────────────────────────
+
+private val stars: List<FloatArray> by lazy {
+    val r = java.util.Random(42)
+    List(170) { floatArrayOf(r.nextFloat(), r.nextFloat(), 0.4f + r.nextFloat() * 1.6f, r.nextFloat() * 6.28f) }
+}
+
+@Composable
+private fun CosmosBackground(modifier: Modifier, p: Palette) {
+    val phase = if (Apex.feel.smooth) 0f else {
+        val t = rememberInfiniteTransition(label = "stars")
+        t.animateFloat(0f, (2 * Math.PI).toFloat(), infiniteRepeatable(tween(5000, easing = LinearEasing)), label = "twinkle").value
+    }
+    Canvas(modifier.fillMaxSize()) {
+        drawRect(p.base)
+        val w = size.width
+        val h = size.height
+        blob(Color(0xFF3B2A9E).copy(alpha = 0.35f), Offset(w * 0.15f, h * 0.2f), w * 0.8f)
+        blob(Color(0xFFB04A8F).copy(alpha = 0.18f), Offset(w * 0.9f, h * 0.55f), w * 0.7f)
+        blob(Color(0xFF1E6FA8).copy(alpha = 0.2f), Offset(w * 0.4f, h * 0.95f), w * 0.8f)
+        for (st in stars) {
+            val a = 0.35f + 0.65f * (0.5f + 0.5f * sin(phase + st[3]))
+            drawCircle(Color.White.copy(alpha = a * 0.8f), st[2] * density * 0.6f, Offset(st[0] * w, st[1] * h))
+        }
+    }
+}
+
+// ─── 431. Японский минимализм: бумага, тушь и солнце ───────────────────
+
+private val fibers: List<FloatArray> by lazy {
+    val r = java.util.Random(7)
+    List(260) { floatArrayOf(r.nextFloat(), r.nextFloat(), (r.nextFloat() - 0.5f) * 0.6f, 6f + r.nextFloat() * 18f) }
+}
+
+private fun DrawScope.drawJapan(p: Palette) {
+    drawRect(Brush.verticalGradient(listOf(Color(0xFFF7F2E8), p.base, Color(0xFFEFE8DA))))
+    val w = size.width
+    val h = size.height
+    // Волокна рисовой бумаги
+    for (f in fibers) {
+        val x = f[0] * w
+        val y = f[1] * h
+        val len = f[3] * density
+        drawLine(Color(0xFF8A7B60).copy(alpha = 0.07f), Offset(x, y), Offset(x + len * cos(f[2]), y + len * sin(f[2])), 1f)
+    }
+    // Красное солнце, наполовину за краем
+    drawCircle(p.accent.copy(alpha = 0.10f), w * 0.42f, Offset(w * 1.02f, h * 0.12f))
+    // Мазок тушью снизу
+    val path = androidx.compose.ui.graphics.Path().apply {
+        moveTo(-20f, h * 0.9f)
+        cubicTo(w * 0.3f, h * 0.84f, w * 0.6f, h * 0.95f, w + 20f, h * 0.87f)
+    }
+    drawPath(path, Color(0xFF1B1B1B).copy(alpha = 0.06f), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 26f * density, cap = androidx.compose.ui.graphics.StrokeCap.Round))
 }

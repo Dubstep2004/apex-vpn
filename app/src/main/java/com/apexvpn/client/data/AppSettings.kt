@@ -88,6 +88,12 @@ data class Settings(
     val hiddenApps: Set<String> = emptySet(),
     // 387. Секретная тема открыта
     val secretUnlocked: Boolean = false,
+    // 429. Щит поворачивается при наклоне телефона
+    val shield3d: Boolean = true,
+    // 426. Разрешить управление из Tasker / MacroDroid
+    val automation: Boolean = false,
+    // 413. Считать трафик по приложениям
+    val appTraffic: Boolean = true,
 ) {
     /** Цвет акцента с учётом «Своего». */
     val accentArgb: Long get() = if (accent == AccentColor.Custom) customAccent else accent.argb
@@ -185,6 +191,8 @@ object AppSettings {
         put("customDns", s.customDns)
         put("kids", s.kids)
         put("adBlock", s.adBlock)
+        // 413. Ядро определяет приложение каждого соединения (Android 10+)
+        put("findProcess", s.appTraffic && android.os.Build.VERSION.SDK_INT >= 29)
         put("ipv6", s.ipv6)
         put("profile", s.profile.id)
         put("core", s.core.id)
@@ -255,7 +263,7 @@ object AppSettings {
         put("domainStrategy", s.domainStrategy); put("fakeDns", s.fakeDns)
         put("remoteDns", s.remoteDns.json()); put("directDns", s.directDns.json()); put("rulesSource", s.rulesSource)
         put("warp", s.warp); put("warpConfig", s.warpConfig); put("shieldBackdrop", s.shieldBackdrop); put("backdropStamp", s.backdropStamp)
-        put("iconStatus", s.iconStatus); put("animatedFlags", s.animatedFlags); put("task", s.task); put("hiddenApps", list(s.hiddenApps)); put("secret", s.secretUnlocked)
+        put("iconStatus", s.iconStatus); put("animatedFlags", s.animatedFlags); put("task", s.task); put("hiddenApps", list(s.hiddenApps)); put("secret", s.secretUnlocked); put("shield3d", s.shield3d); put("automation", s.automation); put("appTraffic", s.appTraffic)
     }
 
     private fun fromJson(o: JSONObject): Settings {
@@ -344,6 +352,9 @@ object AppSettings {
             task = o.optString("task", d.task),
             hiddenApps = arr("hiddenApps", d.hiddenApps).toSet(),
             secretUnlocked = o.optBoolean("secret", d.secretUnlocked),
+            shield3d = o.optBoolean("shield3d", d.shield3d),
+            automation = o.optBoolean("automation", d.automation),
+            appTraffic = o.optBoolean("appTraffic", d.appTraffic),
         )
     }
 }

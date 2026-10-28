@@ -75,6 +75,17 @@ object Prefs {
         get() = sp.getString("announce", "") ?: ""
         set(v) = sp.edit { putString("announce", v) }
 
+    /** 434. Картинка и кнопка объявления из панели */
+    var announceImage: String
+        get() = sp.getString("announce_img", "") ?: ""
+        set(v) = sp.edit { putString("announce_img", v) }
+    var announceButton: String
+        get() = sp.getString("announce_btn", "") ?: ""
+        set(v) = sp.edit { putString("announce_btn", v) }
+    var announceUrl: String
+        get() = sp.getString("announce_url", "") ?: ""
+        set(v) = sp.edit { putString("announce_url", v) }
+
     var supportUrl: String
         get() = sp.getString("support_url", "") ?: ""
         set(v) = sp.edit { putString("support_url", v) }
@@ -127,6 +138,6 @@ object Prefs {
     fun clearSubscription() = sp.edit {
         remove("sub_url"); remove("nodes"); remove("selected"); remove("title")
         remove("used"); remove("total"); remove("expire"); remove("updated")
-        remove("announce"); remove("support_url"); remove("web_url")
+        remove("announce"); remove("announce_img"); remove("announce_btn"); remove("announce_url"); remove("support_url"); remove("web_url")
     }
 }

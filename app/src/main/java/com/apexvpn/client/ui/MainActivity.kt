@@ -147,7 +147,7 @@ class MainActivity : ComponentActivity() {
                 val p = paletteFor(s.design, s.theme, s.accent, systemDark, wallpaper, customArgb = s.customAccent)
                 applyPalette(p)
                 com.apexvpn.client.ui.theme.applyFeel(
-                    com.apexvpn.client.ui.theme.Feel(s.vibration, s.smoothMode, s.glassBlur, s.liveMap),
+                    com.apexvpn.client.ui.theme.Feel(s.vibration, s.smoothMode, s.glassBlur, s.liveMap, s.shield3d),
                 )
                 val style = if (p.dark) {
                     SystemBarStyle.dark(AndroidColor.TRANSPARENT)
@@ -182,7 +182,7 @@ class MainActivity : ComponentActivity() {
                     val st by viewModel.settings.collectAsStateWithLifecycle()
                     val tv = remember { isTv(this@MainActivity) }
                     // 313. Блики Liquid Glass 2.0 следуют за наклоном телефона
-                    com.apexvpn.client.ui.theme.TiltSensor(st.design == com.apexvpn.client.data.Design.Glass && !st.smoothMode)
+                    com.apexvpn.client.ui.theme.TiltSensor((st.design == com.apexvpn.client.data.Design.Glass || st.shield3d) && !st.smoothMode)
                     var onboarded by remember { mutableStateOf(com.apexvpn.client.data.Prefs.onboarded) }
                     ThemeRevealHost {
                         // Фон рисуем внутри — чтобы «волна» меняла и его

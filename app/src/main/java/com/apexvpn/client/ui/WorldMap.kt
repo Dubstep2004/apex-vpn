@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,6 +62,19 @@ fun WorldMapCard(status: VpnStatus, serverCountry: String?, serverTitle: String,
     val breath by t.animateFloat(0f, 1f, infiniteRepeatable(tween(2200, easing = FastOutSlowInEasing), RepeatMode.Restart), label = "breath")
     val runner by t.animateFloat(0f, 1f, infiniteRepeatable(tween(if (busy) 900 else 2600, easing = LinearEasing)), label = "runner")
 
+    // 433. Самолётик при смене сервера: от старой страны к новой
+    var lastTo by remember { androidx.compose.runtime.mutableStateOf(to) }
+    var flyFrom by remember { androidx.compose.runtime.mutableStateOf<Pair<Float, Float>?>(null) }
+    val fly = remember { androidx.compose.animation.core.Animatable(1f) }
+    androidx.compose.runtime.LaunchedEffect(to) {
+        val prev = lastTo
+        lastTo = to
+        if (prev != null && to != null && prev != to && !feel.smooth) {
+            flyFrom = prev
+            fly.snapTo(0f)
+            fly.animateTo(1f, tween(1800, easing = FastOutSlowInEasing))
+        }
+    }
     val dot = Apex.TextDim
     val accent = Apex.Accent
     val accent2 = Apex.Cyan
@@ -95,6 +109,21 @@ fun WorldMapCard(status: VpnStatus, serverCountry: String?, serverTitle: String,
                     pin(b, if (connected) accent2 else dot, rings = connected && live, phase = breath)
                 }
                 pin(a, accent, rings = live && (connected || busy), phase = (breath + 0.5f) % 1f)
+                val ff = flyFrom
+                val f = fly.value
+                if (ff != null && b != null && f < 1f) {
+                    val s0 = project(ff)
+                    val ctrl2 = Offset((s0.x + b.x) / 2, minOf(s0.y, b.y) - (s0 - b).getDistance() * 0.45f)
+                    var k = 0f
+                    while (k < f) {
+                        drawCircle(Color.White.copy(alpha = 0.5f), 1.3.dp.toPx(), bezier(s0, ctrl2, b, k))
+                        k += 0.05f
+                    }
+                    val now = bezier(s0, ctrl2, b, f)
+                    val next = bezier(s0, ctrl2, b, (f + 0.02f).coerceAtMost(1f))
+                    val ang = Math.toDegrees(kotlin.math.atan2((next.y - now.y).toDouble(), (next.x - now.x).toDouble())).toFloat()
+                    drawPlane(now, ang, 9.dp.toPx(), Color.White, accent2)
+                }
             }
         }
         Spacer(Modifier.height(8.dp))

@@ -61,6 +61,10 @@ data class SubscriptionState(
     val lastUpdated: Long = 0,
     /** Объявление от сервиса (заголовок announce) */
     val announce: String = "",
+    /** 434. Картинка (https) и кнопка «текст → ссылка» под объявлением */
+    val announceImage: String = "",
+    val announceButton: String = "",
+    val announceUrl: String = "",
     /** Поддержка (support-url) и сайт (profile-web-page-url) */
     val supportUrl: String = "",
     val webPageUrl: String = "",
@@ -87,6 +91,9 @@ object Subscription {
         expireAt = Prefs.expireAt,
         lastUpdated = Prefs.lastUpdated,
         announce = Prefs.announce,
+        announceImage = Prefs.announceImage,
+        announceButton = Prefs.announceButton,
+        announceUrl = Prefs.announceUrl,
         supportUrl = Prefs.supportUrl,
         webPageUrl = Prefs.webPageUrl,
         updateHours = Prefs.updateIntervalHours,
@@ -254,7 +261,15 @@ object Subscription {
             }
             parseUserInfo(header("subscription-userinfo"))
             // Объявление из Remnawave (заголовок announce, как у Happ); «0» — убрать
-            Prefs.announce = decodeTitle(header("announce"))?.trim()?.takeIf { it != "0" }?.take(500) ?: ""
+            // 434. Картинка и кнопка: заголовки announce-image / announce-button / announce-url
+            // или прямо в тексте: ![](https://…картинка) и [Текст кнопки](https://…)
+            val rich = AnnounceParser.parse(decodeTitle(header("announce"))?.trim()?.takeIf { it != "0" } ?: "")
+            Prefs.announce = rich.text.take(500)
+            Prefs.announceImage = (header("announce-image")?.trim() ?: rich.image).takeIf { AnnounceParser.safeImage(it) } ?: ""
+            Prefs.announceUrl = (header("announce-url")?.trim() ?: rich.url).takeIf { AnnounceParser.safeLink(it) } ?: ""
+            Prefs.announceButton = if (Prefs.announceUrl.isEmpty()) "" else
+                (decodeTitle(header("announce-button"))?.trim()?.takeIf { it.isNotEmpty() } ?: rich.button.ifBlank { "Подробнее" }).take(40)
+            if (Prefs.announce.isEmpty()) { Prefs.announceImage = ""; Prefs.announceUrl = ""; Prefs.announceButton = "" }
             Prefs.supportUrl = header("support-url")?.trim()?.takeIf { it.startsWith("http") || it.startsWith("tg:") } ?: ""
             Prefs.webPageUrl = header("profile-web-page-url")?.trim()?.takeIf { it.startsWith("http") } ?: ""
 

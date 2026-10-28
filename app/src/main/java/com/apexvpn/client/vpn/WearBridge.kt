@@ -27,6 +27,33 @@ object WearBridge {
         lastHello = System.currentTimeMillis()
     }
 
+    private var lastServers = ""
+
+    /** 408. Список серверов для часов: по одному на страну/группу (без рекламных), плюс «Автопилот». */
+    fun publishServers(context: Context, force: Boolean = false) {
+        runCatching {
+            val sub = Subscription.state.value
+            val groups = sub.nodes.filter { !it.ads }.distinctBy { ServerInfo.title(it.name) }.take(40)
+            val tags = arrayListOf(AUTO_TAG).apply { addAll(groups.map { it.tag }) }
+            val titles = arrayListOf("Автопилот").apply { addAll(groups.map { ServerInfo.title(it.name) }) }
+            val flags = arrayListOf("⚡").apply { addAll(groups.map { ServerInfo.flag(it.name) ?: "🌐" }) }
+            // Выбранная группа: сервер может быть любым из её протоколов
+            val selTitle = sub.nodes.find { it.tag == sub.selectedTag }?.let { ServerInfo.title(it.name) }
+            val selected = if (sub.selectedTag == AUTO_TAG || selTitle == null) AUTO_TAG else groups.find { ServerInfo.title(it.name) == selTitle }?.tag ?: sub.selectedTag
+            val payload = tags.joinToString(",") + "|" + selected
+            if (!force && payload == lastServers) return
+            lastServers = payload
+            val req = PutDataMapRequest.create("/apex/servers").apply {
+                dataMap.putStringArrayList("tags", tags)
+                dataMap.putStringArrayList("titles", titles)
+                dataMap.putStringArrayList("flags", flags)
+                dataMap.putString("selected", selected)
+                dataMap.putLong("t", System.currentTimeMillis())
+            }.asPutDataRequest().setUrgent()
+            Wearable.getDataClient(context).putDataItem(req)
+        }.onFailure { Log.d("ApexWear", "no wear: ${it.message}") }
+    }
+
     fun publish(context: Context) {
         if (connected && System.currentTimeMillis() - lastHello > 10 * 60_000) connected = false
         runCatching {
@@ -58,7 +85,16 @@ class WearListener : WearableListenerService() {
         when (event.path) {
             "/apex/toggle" -> runCatching { VpnToggle.toggle(applicationContext) }
                 .onFailure { Log.w("ApexWear", "toggle failed", it) }
-            "/apex/hello" -> Unit
+            "/apex/hello" -> WearBridge.publishServers(applicationContext, force = true)
+            // 408. Выбор сервера с часов
+            "/apex/select" -> runCatching {
+                val tag = String(event.data, Charsets.UTF_8)
+                if (tag == AUTO_TAG || Subscription.state.value.nodes.any { it.tag == tag }) {
+                    Subscription.select(tag)
+                    ApexVpnService.reload(applicationContext)
+                    WearBridge.publishServers(applicationContext)
+                }
+            }.onFailure { Log.w("ApexWear", "select failed", it) }
         }
         WearBridge.publish(applicationContext)
     }

@@ -66,5 +66,12 @@ dependencies {
     implementation("com.google.android.gms:play-services-wearable:19.0.0")
     // Открыть ссылку (GitHub, Telegram) на сопряжённом телефоне
     implementation("androidx.wear:wear-remote-interactions:1.1.0")
+    // 409. Плитка
+    implementation("androidx.wear.tiles:tiles:1.4.1")
+    implementation("androidx.wear.protolayout:protolayout:1.2.1")
+    implementation("androidx.concurrent:concurrent-futures:1.2.0")
+    implementation("com.google.guava:listenablefuture:1.0")
+    // 410. Значок на циферблат
+    implementation("androidx.wear.watchface:watchface-complications-data-source-ktx:1.2.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
 }

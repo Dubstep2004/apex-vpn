@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-feature android:name="android.hardware.type.watch" />
+    <!-- 411. Вибрация, когда VPN отключился -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
         android:icon="@mipmap/ic_launcher"
@@ -22,5 +24,48 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Состояние с телефона, даже когда приложение закрыто: плитка, значок, вибрация -->
+        <service
+            android:name=".WatchListener"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/apex" />
+            </intent-filter>
+        </service>
+
+        <!-- 409. Плитка APEX VPN -->
+        <service
+            android:name=".ApexTile"
+            android:exported="true"
+            android:icon="@drawable/ic_complication_on"
+            android:label="APEX VPN"
+            android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
+            <intent-filter>
+                <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
+            </intent-filter>
+            <meta-data
+                android:name="androidx.wear.tiles.PREVIEW"
+                android:resource="@drawable/ic_launcher_foreground" />
+        </service>
+
+        <!-- 410. Значок на циферблат -->
+        <service
+            android:name=".ApexComplication"
+            android:exported="true"
+            android:icon="@drawable/ic_complication_on"
+            android:label="APEX VPN"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+            <intent-filter>
+                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+            </intent-filter>
+            <meta-data
+                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+                android:value="SHORT_TEXT,MONOCHROMATIC_IMAGE" />
+            <meta-data
+                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+                android:value="0" />
+        </service>
     </application>
 </manifest>

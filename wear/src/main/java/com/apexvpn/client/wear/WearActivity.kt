@@ -47,6 +47,10 @@ import kotlinx.coroutines.tasks.await
 /** Состояние с телефона: путь /apex/status в Wearable Data Layer. */
 data class PhoneState(val status: String = "", val server: String = "", val ping: Int = 0, val down: String = "")
 
+/** 408. Серверы с телефона: по одному на страну, плюс «Автопилот». */
+data class ServerItem(val tag: String, val title: String, val flag: String)
+data class ServerList(val items: List<ServerItem> = emptyList(), val selected: String = "")
+
 class WearActivity : ComponentActivity(), DataClient.OnDataChangedListener {
 
     /** На часах обычно нет браузера — ссылка открывается на сопряжённом телефоне. */
@@ -62,6 +66,8 @@ class WearActivity : ComponentActivity(), DataClient.OnDataChangedListener {
 
     private var state by mutableStateOf(PhoneState())
     private var linked by mutableStateOf(true)
+    private var servers by mutableStateOf(ServerList())
+    private var picking by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -96,7 +102,15 @@ class WearActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         }
         setContent {
             MaterialTheme {
-                WearScreen(state, linked, onToggle = { send("/apex/toggle") }, onOpenLink = { openOnPhone(it) })
+                if (picking) {
+                    ServerPicker(servers, onPick = { tag ->
+                        send("/apex/select", tag.toByteArray())
+                        servers = servers.copy(selected = tag)
+                        picking = false
+                    }, onBack = { picking = false })
+                } else {
+                    WearScreen(state, linked, onToggle = { send("/apex/toggle") }, onOpenLink = { openOnPhone(it) }, onServers = { picking = true })
+                }
             }
             LaunchedEffect(Unit) { loadCurrent() }
         }
@@ -118,6 +132,9 @@ class WearActivity : ComponentActivity(), DataClient.OnDataChangedListener {
             if (e.type == DataEvent.TYPE_CHANGED && e.dataItem.uri.path == "/apex/status") {
                 state = parse(DataMapItem.fromDataItem(e.dataItem).dataMap)
             }
+            if (e.type == DataEvent.TYPE_CHANGED && e.dataItem.uri.path == "/apex/servers") {
+                servers = parseServers(DataMapItem.fromDataItem(e.dataItem).dataMap)
+            }
         }
     }
 
@@ -128,21 +145,34 @@ class WearActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         down = m.getString("down", ""),
     )
 
+    private fun parseServers(m: com.google.android.gms.wearable.DataMap): ServerList {
+        val tags = m.getStringArrayList("tags") ?: arrayListOf()
+        val titles = m.getStringArrayList("titles") ?: arrayListOf()
+        val flags = m.getStringArrayList("flags") ?: arrayListOf()
+        return ServerList(
+            tags.indices.map { ServerItem(tags[it], titles.getOrElse(it) { tags[it] }, flags.getOrElse(it) { "🌐" }) },
+            m.getString("selected", ""),
+        )
+    }
+
     private suspend fun loadCurrent() {
         runCatching {
             val items = Wearable.getDataClient(this).dataItems.await()
-            items.forEach { if (it.uri.path == "/apex/status") state = parse(DataMapItem.fromDataItem(it).dataMap) }
+            items.forEach {
+                if (it.uri.path == "/apex/status") state = parse(DataMapItem.fromDataItem(it).dataMap)
+                if (it.uri.path == "/apex/servers") servers = parseServers(DataMapItem.fromDataItem(it).dataMap)
+            }
             items.release()
         }
     }
 
-    private fun send(path: String) {
+    private fun send(path: String, data: ByteArray = ByteArray(0)) {
         val activity = this
         kotlinx.coroutines.MainScope().launch {
             runCatching {
                 val nodes = Wearable.getNodeClient(activity).connectedNodes.await()
                 linked = nodes.isNotEmpty()
-                nodes.forEach { Wearable.getMessageClient(activity).sendMessage(it.id, path, ByteArray(0)).await() }
+                nodes.forEach { Wearable.getMessageClient(activity).sendMessage(it.id, path, data).await() }
             }.onFailure { linked = false }
         }
     }
@@ -155,7 +185,7 @@ object Links {
 }
 
 @Composable
-private fun WearScreen(s: PhoneState, linked: Boolean, onToggle: () -> Unit, onOpenLink: (String) -> Unit) {
+private fun WearScreen(s: PhoneState, linked: Boolean, onToggle: () -> Unit, onOpenLink: (String) -> Unit, onServers: () -> Unit) {
     val on = s.status == "started"
     val label = when (s.status) {
         "started" -> "Защищено"
@@ -197,8 +227,10 @@ private fun WearScreen(s: PhoneState, linked: Boolean, onToggle: () -> Unit, onO
         if (on && s.ping > 0) {
             item { Text("${s.ping} мс · ${s.down}", color = Color(0xFF5BD69A), fontSize = 12.sp) }
         }
-        // Наши ссылки: открываются на телефоне
+        // 408. Выбор сервера прямо с часов
         item { Spacer(Modifier.height(8.dp)) }
+        item { LinkChip("Сервер", s.server.ifBlank { "Выбрать" }, onServers) }
+        // Наши ссылки: открываются на телефоне
         item { LinkChip("GitHub", "Исходный код и версии") { onOpenLink(Links.GITHUB) } }
         if (Links.TELEGRAM.isNotEmpty()) {
             item { LinkChip("Telegram", "Наш канал") { onOpenLink(Links.TELEGRAM) } }
@@ -215,4 +247,41 @@ private fun LinkChip(title: String, subtitle: String, onClick: () -> Unit) {
         colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF1C1C24), contentColor = Color.White),
         modifier = Modifier.padding(horizontal = 8.dp),
     )
+}
+
+/** 408. Список стран с телефона: нажатие — переключить сервер. */
+@Composable
+private fun ServerPicker(list: ServerList, onPick: (String) -> Unit, onBack: () -> Unit) {
+    ScalingLazyColumn(
+        Modifier.fillMaxSize().background(Color(0xFF0A0A0D)),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        item { Text("Сервер", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold) }
+        if (list.items.isEmpty()) {
+            item { Text("Откройте APEX VPN на телефоне", color = Color(0xFF8E8E9A), fontSize = 12.sp, textAlign = TextAlign.Center) }
+        }
+        list.items.forEach { srv ->
+            item {
+                val on = srv.tag == list.selected
+                Chip(
+                    onClick = { onPick(srv.tag) },
+                    label = { Text("${srv.flag}  ${srv.title}", maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal) },
+                    secondaryLabel = if (on) ({ Text("✓ выбран", color = Color(0xFF5BD69A)) }) else null,
+                    colors = ChipDefaults.chipColors(
+                        backgroundColor = if (on) Color(0xFF2A2350) else Color(0xFF1C1C24),
+                        contentColor = Color.White,
+                    ),
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                )
+            }
+        }
+        item {
+            Chip(
+                onClick = onBack,
+                label = { Text("Назад") },
+                colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF26262E), contentColor = Color.White),
+                modifier = Modifier.padding(horizontal = 8.dp),
+            )
+        }
+    }
 }

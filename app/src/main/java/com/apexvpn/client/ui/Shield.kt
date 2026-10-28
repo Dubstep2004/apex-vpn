@@ -21,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -121,6 +122,14 @@ fun ShieldButton(status: VpnStatus, onClick: () -> Unit, diameter: androidx.comp
     Box(
         Modifier
             .size(diameter)
+            // 429. 3D-щит: поворачивается вслед за наклоном телефона (чтение наклона — только при отрисовке)
+            .graphicsLayer {
+                if (feel.shield3d && !feel.smooth) {
+                    rotationY = com.apexvpn.client.ui.theme.Tilt.x * 22f
+                    rotationX = -com.apexvpn.client.ui.theme.Tilt.y * 16f
+                    cameraDistance = 10f * density
+                }
+            }
             .onFocusChanged { focused = it.isFocused }
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },

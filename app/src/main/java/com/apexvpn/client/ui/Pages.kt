@@ -87,7 +87,7 @@ import java.net.NetworkInterface
 import java.util.Locale
 
 /** Дополнительные страницы, открываются поверх вкладок. */
-enum class Page { Apps, SpeedTest, SiteCheck, Wifi, Share, Dns, Profile, Appearance, Changelog, Advanced, HideApps }
+enum class Page { Apps, SpeedTest, SiteCheck, Wifi, Share, Dns, Profile, Appearance, Changelog, Advanced, HideApps, AppTraffic, Help }
 
 @Composable
 fun PageHost(page: Page, viewModel: MainViewModel, onBack: () -> Unit) {
@@ -103,6 +103,8 @@ fun PageHost(page: Page, viewModel: MainViewModel, onBack: () -> Unit) {
         Page.Changelog -> ChangelogPage(onBack)
         Page.Advanced -> AdvancedPage(viewModel, onBack)
         Page.HideApps -> HideAppsPage(viewModel, onBack)
+        Page.AppTraffic -> AppTrafficPage(viewModel, onBack)
+        Page.Help -> HelpPage(onBack)
     }
 }
 
@@ -190,6 +192,119 @@ private fun AppsPage(viewModel: MainViewModel, onBack: () -> Unit) {
             Caption("Выберите режим выше, чтобы отметить отдельные приложения.")
         }
         Spacer(Modifier.height(12.dp))
+    }
+}
+
+// ─── 413. Трафик по приложениям ─────────────────────────────────────────
+
+@Composable
+private fun AppTrafficPage(viewModel: MainViewModel, onBack: () -> Unit) {
+    val s by viewModel.settings.collectAsStateWithLifecycle()
+    val today by com.apexvpn.client.data.AppTraffic.today.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    var week by rememberSaveable { mutableStateOf(false) }
+    val list = if (week) remember(today) { com.apexvpn.client.data.AppTraffic.period(7) } else today
+    PageScaffold("Трафик приложений", onBack) {
+        Group {
+            ListRow("Считать трафик по приложениям", if (android.os.Build.VERSION.SDK_INT >= 29) "Только то, что идёт через VPN. Данные — только на телефоне" else "Нужен Android 10 или новее") {
+                ApexSwitch(s.appTraffic, { v -> viewModel.change { copy(appTraffic = v) } }, enabled = android.os.Build.VERSION.SDK_INT >= 29)
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        ChipRow(listOf("today" to "Сегодня", "week" to "7 дней"), if (week) "week" else "today") { week = it == "week" }
+        Spacer(Modifier.height(12.dp))
+        val total = list.sumOf { it.total }
+        Text(formatBytes(total), color = Apex.Text, fontSize = 34.sp, fontWeight = FontWeight.ExtraBold)
+        Text(if (week) "через VPN за 7 дней" else "через VPN сегодня", color = Apex.TextDim, fontSize = 14.sp)
+        Spacer(Modifier.height(12.dp))
+        if (list.isEmpty()) {
+            Caption("Пока пусто. Включите VPN и пользуйтесь приложениями — здесь появится, кто сколько потратил.")
+        } else {
+            val top = list.first().total.coerceAtLeast(1)
+            Group {
+                list.take(40).forEachIndexed { i, u ->
+                    if (i > 0) GroupDivider()
+                    val info = remember(u.pkg) {
+                        runCatching {
+                            val ai = context.packageManager.getApplicationInfo(u.pkg, 0)
+                            context.packageManager.getApplicationLabel(ai).toString() to
+                                runCatching { context.packageManager.getApplicationIcon(ai).toBitmap(96, 96).asImageBitmap() }.getOrNull()
+                        }.getOrDefault(u.pkg to null)
+                    }
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
+                        val icon = info.second
+                        if (icon != null) Image(icon, null, Modifier.size(40.dp)) else GlyphTile(info.first.take(1), Apex.Accent)
+                        Spacer(Modifier.width(14.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(info.first, color = Apex.Text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                            Text("↓ ${formatBytes(u.down)}   ↑ ${formatBytes(u.up)}", color = Apex.TextDim, fontSize = 13.sp)
+                            Spacer(Modifier.height(5.dp))
+                            Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(Apex.SurfaceHigh)) {
+                                Box(Modifier.fillMaxWidth((u.total.toFloat() / top).coerceIn(0.02f, 1f)).height(4.dp).clip(RoundedCornerShape(2.dp)).background(Apex.accent))
+                            }
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Text(formatBytes(u.total), color = Apex.Text, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+        Caption("Считается примерно: раз в 3 секунды. Сайты, которые идут напрямую, не учитываются.")
+        Spacer(Modifier.height(24.dp))
+    }
+}
+
+// ─── 424. Справка ───────────────────────────────────────────────────────
+
+@Composable
+private fun HelpPage(onBack: () -> Unit) {
+    val context = LocalContext.current
+    var open by rememberSaveable { mutableStateOf(-1) }
+    PageScaffold("Справка", onBack) {
+        Caption("Короткие инструкции с картинками — те же, что на странице APEX VPN на GitHub.")
+        Spacer(Modifier.height(10.dp))
+        com.apexvpn.client.data.HelpTopics.all.forEachIndexed { i, t ->
+            val expanded = open == i
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 10.dp)
+                    .apexCard()
+                    .clickable { open = if (expanded) -1 else i }
+                    .padding(16.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(t.emoji, fontSize = 24.sp)
+                    Spacer(Modifier.width(12.dp))
+                    Text(t.title, color = Apex.Text, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                    Text(if (expanded) "−" else "+", color = Apex.TextDim, fontSize = 22.sp)
+                }
+                androidx.compose.animation.AnimatedVisibility(expanded) {
+                    Column {
+                        t.image?.let { name ->
+                            val img = remember(name) {
+                                runCatching { context.assets.open("help/$name.webp").use { android.graphics.BitmapFactory.decodeStream(it) }?.asImageBitmap() }.getOrNull()
+                            }
+                            if (img != null) {
+                                Spacer(Modifier.height(12.dp))
+                                Image(img, null, Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)), contentScale = androidx.compose.ui.layout.ContentScale.FillWidth)
+                            }
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        t.steps.forEachIndexed { k, step ->
+                            Row(Modifier.padding(vertical = 4.dp)) {
+                                Box(Modifier.size(22.dp).clip(CircleShape).background(Apex.AccentSoft), contentAlignment = Alignment.Center) {
+                                    Text("${k + 1}", color = Apex.AccentText, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                                Spacer(Modifier.width(10.dp))
+                                Text(step, color = Apex.Text, fontSize = 15.sp, lineHeight = 21.sp)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(24.dp))
     }
 }
 
@@ -809,8 +924,8 @@ private fun AppearancePage(viewModel: MainViewModel, onBack: () -> Unit) {
             }
         }
         Caption(s.design.subtitle + when (s.design) {
-            Design.Neon, Design.Terminal, Design.Steampunk, Design.Synthwave -> ". Всегда тёмный."
-            Design.Pastel -> ". Всегда светлый."
+            Design.Neon, Design.Terminal, Design.Steampunk, Design.Synthwave, Design.Cosmos -> ". Всегда тёмный."
+            Design.Pastel, Design.Japan -> ". Всегда светлый."
             Design.Expressive -> ". Цвет берётся из обоев (Android 12+)."
             else -> "."
         })
@@ -985,6 +1100,11 @@ private fun AppearancePage(viewModel: MainViewModel, onBack: () -> Unit) {
             ListRow("Анимированные флаги", "Флаги в списке серверов колышутся на ветру") {
                 ApexSwitch(s.animatedFlags, { v -> viewModel.change(reload = false) { copy(animatedFlags = v) } }, enabled = !s.smoothMode)
             }
+            GroupDivider()
+            // 429
+            ListRow("3D-щит", "Щит поворачивается, когда вы наклоняете телефон") {
+                ApexSwitch(s.shield3d, { v -> viewModel.change(reload = false) { copy(shield3d = v) } }, enabled = !s.smoothMode)
+            }
         }
 
         // 43. Живые обои
@@ -1150,6 +1270,8 @@ private fun DesignPreview(
                 .height(118.dp)
                 .background(
                     when (design) {
+                        Design.Cosmos -> androidx.compose.ui.graphics.Brush.radialGradient(listOf(Color(0xFF2A2470), Color(0xFF04050D)))
+                        Design.Japan -> androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xFFF7F2E8), Color(0xFFEFE8DA)))
                         Design.Steampunk -> androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xFF3A2614), p.base))
                         Design.Synthwave -> androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xFF3A0A5E), Color(0xFFB0186E), Color(0xFF1A0033)))
                         Design.Apex2 -> androidx.compose.ui.graphics.Brush.verticalGradient(listOf(p.brand1.copy(alpha = if (p.dark) 0.35f else 0.2f), p.base, p.base))

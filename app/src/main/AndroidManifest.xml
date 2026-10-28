@@ -51,6 +51,22 @@
         android:theme="@style/Theme.ApexVPN"
         tools:targetApi="35">
 
+        <!-- 426. Tasker / MacroDroid: включить, выключить, переключить VPN (только если разрешено в настройках) -->
+        <activity
+            android:name=".vpn.AutomationActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="com.apexvpn.client.CONNECT" />
+                <action android:name="com.apexvpn.client.DISCONNECT" />
+                <action android:name="com.apexvpn.client.TOGGLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
         <activity
             android:name=".ui.MainActivity"
             android:exported="true"

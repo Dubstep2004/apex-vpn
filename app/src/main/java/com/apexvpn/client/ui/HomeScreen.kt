@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -227,12 +229,16 @@ fun HomeScreen(
             }
             Spacer(Modifier.height(14.dp))
             Box(Modifier.fillMaxWidth().swipeServers(onSwipe), contentAlignment = Alignment.Center) {
+                // 430. Планеты вокруг щита в дизайне «Космос»
+                if (Apex.palette.design == com.apexvpn.client.data.Design.Cosmos) CosmosOrbit(Modifier.matchParentSize())
                 ShieldAmbient(settings.shieldBackdrop, status == VpnStatus.Started, Modifier.matchParentSize())
                 ShieldButton(status, onToggle, diameter = 150.dp)
             }
         } else {
             Spacer(Modifier.height(18.dp))
             Box(Modifier.fillMaxWidth().swipeServers(onSwipe), contentAlignment = Alignment.Center) {
+                // 430. Планеты вокруг щита в дизайне «Космос»
+                if (Apex.palette.design == com.apexvpn.client.data.Design.Cosmos) CosmosOrbit(Modifier.matchParentSize())
                 ShieldAmbient(settings.shieldBackdrop, status == VpnStatus.Started, Modifier.matchParentSize())
                 ShieldButton(status, onToggle)
             }
@@ -638,6 +644,25 @@ private fun SubscriptionCard(
 
         // Объявление от сервиса (заголовок announce из Remnawave)
         if (sub.announce.isNotBlank()) {
+            // 434. Картинка над текстом
+            if (sub.announceImage.isNotBlank()) {
+                val ctx = LocalContext.current
+                val bmp by androidx.compose.runtime.produceState<android.graphics.Bitmap?>(null, sub.announceImage) {
+                    value = com.apexvpn.client.data.AnnounceParser.image(ctx, sub.announceImage)
+                }
+                bmp?.let { b ->
+                    Spacer(Modifier.height(12.dp))
+                    androidx.compose.foundation.Image(
+                        remember(b) { b.asImageBitmap() }, null,
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 220.dp)
+                            .aspectRatio((b.width.toFloat() / b.height).coerceIn(1f, 3f))
+                            .clip(RoundedCornerShape(16.dp)),
+                    )
+                }
+            }
             Spacer(Modifier.height(12.dp))
             Text(
                 sub.announce,
@@ -647,6 +672,16 @@ private fun SubscriptionCard(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
+            // 434. Кнопка из объявления
+            if (sub.announceUrl.isNotBlank()) {
+                Spacer(Modifier.height(10.dp))
+                androidx.compose.material3.Button(
+                    onClick = { onOpen(sub.announceUrl) },
+                    modifier = Modifier.fillMaxWidth().height(46.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = Apex.Accent, contentColor = Apex.OnAccent),
+                ) { Text(sub.announceButton.ifBlank { "Подробнее" }, fontWeight = FontWeight.SemiBold) }
+            }
         }
 
     }

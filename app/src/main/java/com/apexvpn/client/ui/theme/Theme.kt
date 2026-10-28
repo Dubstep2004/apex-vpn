@@ -22,7 +22,7 @@ import com.apexvpn.client.data.Design
 import com.apexvpn.client.data.ThemeMode
 
 /** Чем закрашен фон экранов. */
-enum class Backdrop { Solid, Glass, Aurora, Neon, Terminal, Pastel, Apex2, Steampunk, Synthwave }
+enum class Backdrop { Solid, Glass, Aurora, Neon, Terminal, Pastel, Apex2, Steampunk, Synthwave, Cosmos, Japan }
 
 /** Всё, что определяет внешний вид: цвета, форма карточек, фон, шрифт, раскладка главного экрана. */
 data class Palette(
@@ -58,6 +58,8 @@ data class Palette(
     val design: Design = Design.Classic,
     /** 212. Крупные карточки и строки (APEX 2.0) */
     val roomy: Boolean = false,
+    /** 431. Шрифт с засечками (Японский минимализм) */
+    val serif: Boolean = false,
 )
 
 private fun darkPalette(accent: Color, amoled: Boolean) = Palette(
@@ -244,6 +246,61 @@ private fun steampunkPalette(): Palette {
     )
 }
 
+/** 430. Космос — глубокий космос, звёзды и туманность; вокруг щита летают планеты. */
+private fun cosmosPalette(): Palette {
+    val accent = Color(0xFF8B9CFF)
+    return Palette(
+        dark = true,
+        bg = Color.Transparent,
+        base = Color(0xFF04050D),
+        surface = Color(0xFF0E1124).copy(alpha = 0.78f),
+        surfaceHigh = Color(0xFF1A1F3D),
+        outline = Color(0xFF2A3060),
+        divider = Color(0xFF1C2147),
+        text = Color(0xFFEFF1FF),
+        textDim = Color(0xFF9AA0C8),
+        accent = accent,
+        accentSoft = accent.copy(alpha = 0.2f),
+        accentText = Color(0xFFC2CBFF),
+        selectedCard = Color(0xFF161A38),
+        heroCard = Color(0xFF12152E),
+        brand1 = Color(0xFF6D5BFF),
+        brand2 = Color(0xFFFF9E57),
+        radius = 24.dp,
+        cardBorder = Color.White.copy(alpha = 0.08f),
+        backdrop = Backdrop.Cosmos,
+        design = Design.Cosmos,
+    )
+}
+
+/** 431. Японский минимализм — бумага, чёрная тушь, красный акцент, шрифт с засечками. */
+private fun japanPalette(): Palette {
+    val red = Color(0xFFC8102E)
+    return Palette(
+        dark = false,
+        bg = Color.Transparent,
+        base = Color(0xFFF3EEE3),
+        surface = Color(0xFFFBF8F2),
+        surfaceHigh = Color(0xFFEDE6D8),
+        outline = Color(0xFFD9CFBE),
+        divider = Color(0xFFE6DDCC),
+        text = Color(0xFF1B1B1B),
+        textDim = Color(0xFF6E6658),
+        accent = red,
+        accentSoft = Color(0xFFF3D6D2),
+        accentText = Color(0xFFA30D25),
+        selectedCard = Color(0xFFF6E7E1),
+        heroCard = Color(0xFFFBF3EC),
+        brand1 = red,
+        brand2 = Color(0xFFE25A3C),
+        radius = 6.dp,
+        cardBorder = Color(0xFFD9CFBE),
+        backdrop = Backdrop.Japan,
+        design = Design.Japan,
+        serif = true,
+    )
+}
+
 /** 387. Синтвейв — секретная тема: неоновый закат, розовый и бирюзовый. */
 private fun synthwavePalette(): Palette {
     val pink = Color(0xFFFF2E97)
@@ -367,8 +424,8 @@ object Apex {
     val accent get() = Brush.linearGradient(listOf(Violet, Cyan))
 }
 
-private fun typography(mono: Boolean): Typography {
-    val family = if (mono) FontFamily.Monospace else FontFamily.Default
+private fun typography(mono: Boolean, serif: Boolean = false): Typography {
+    val family = if (mono) FontFamily.Monospace else if (serif) FontFamily.Serif else FontFamily.Default
     val body = TextStyle(fontFamily = family)
     return Typography(
         displaySmall = body.copy(fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.5).sp),
@@ -423,6 +480,8 @@ fun paletteFor(
         Design.Pastel -> pastelPalette()
         Design.Steampunk -> steampunkPalette()
         Design.Synthwave -> synthwavePalette()
+        Design.Cosmos -> cosmosPalette()
+        Design.Japan -> japanPalette()
     }
 }
 
@@ -478,6 +537,8 @@ data class Feel(
     val smooth: Boolean = false,
     val blur: Boolean = true,
     val liveMap: Boolean = true,
+    /** 429. 3D-щит от наклона */
+    val shield3d: Boolean = false,
 )
 
 fun applyFeel(f: Feel) {
@@ -511,5 +572,5 @@ fun ApexTheme(content: @Composable () -> Unit) {
         outlineVariant = p.divider,
         error = Apex.Bad,
     )
-    MaterialTheme(colorScheme = scheme, typography = typography(p.mono), content = content)
+    MaterialTheme(colorScheme = scheme, typography = typography(p.mono, p.serif), content = content)
 }

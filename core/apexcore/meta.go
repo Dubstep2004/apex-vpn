@@ -11,6 +11,7 @@ import (
 var metaKeys = map[string]bool{
 	"profile-title": true, "announce": true, "support-url": true, "profile-web-page-url": true,
 	"profile-update-interval": true, "subscription-userinfo": true,
+	"announce-image": true, "announce-button": true, "announce-url": true,
 }
 
 var metaRe = regexp.MustCompile(`^#\s*([A-Za-z-]+)\s*:\s*(.*)$`)

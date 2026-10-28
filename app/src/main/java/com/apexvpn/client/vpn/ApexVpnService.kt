@@ -568,8 +568,21 @@ class ApexVpnService : VpnService(), PlatformInterface, CommandServerHandler {
         destinationAddress: String,
         destinationPort: Int,
     ): ConnectionOwner {
-        // Правила по приложениям реализованы через VpnService, ядру это не нужно
-        error("not supported")
+        // 413. Чьё соединение — для «Трафика по приложениям» (Android 10+)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) error("not supported")
+        val cm = getSystemService<android.net.ConnectivityManager>() ?: error("no connectivity")
+        val uid = cm.getConnectionOwnerUid(
+            ipProtocol,
+            java.net.InetSocketAddress(sourceAddress, sourcePort),
+            java.net.InetSocketAddress(destinationAddress, destinationPort),
+        )
+        if (uid == android.os.Process.INVALID_UID) error("owner not found")
+        val packages = packageManager.getPackagesForUid(uid)?.toList().orEmpty()
+        return ConnectionOwner().apply {
+            userId = uid
+            userName = ""
+            setAndroidPackageNames(StringArray(packages))
+        }
     }
 
     override fun startDefaultInterfaceMonitor(listener: InterfaceUpdateListener) {

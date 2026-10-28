@@ -37,6 +37,9 @@ import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material.icons.rounded.QrCode2
 import androidx.compose.material.icons.rounded.DeleteSweep
+import androidx.compose.material.icons.rounded.DataUsage
+import androidx.compose.material.icons.rounded.SmartToy
+import androidx.compose.material.icons.automirrored.rounded.HelpOutline
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.ui.graphics.graphicsLayer
@@ -254,6 +257,17 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
         Group {
             ListRow("Тест скорости", "Пинг, загрузка и отдача", leading = { tile(Icons.Rounded.Speed) }, onClick = { onOpenPage(Page.SpeedTest) }) { Chevron() }
             GroupDivider()
+            // 413
+            ListRow("Трафик по приложениям", "Кто сколько потратил через VPN", leading = { tile(Icons.Rounded.DataUsage) }, onClick = { onOpenPage(Page.AppTraffic) }) { Chevron() }
+            GroupDivider()
+            // 426
+            ListRow(
+                "Автоматизация",
+                if (s.automation) "Tasker и MacroDroid могут включать VPN — инструкция в «Справке»" else "Разрешить Tasker и MacroDroid управлять VPN",
+                leading = { tile(Icons.Rounded.SmartToy) },
+                onClick = { viewModel.change(reload = false) { copy(automation = !automation) } },
+            ) { ApexSwitch(s.automation, { v -> viewModel.change(reload = false) { copy(automation = v) } }) }
+            GroupDivider()
             ListRow("Проверить сайт", "Через VPN или напрямую", leading = { tile(Icons.Rounded.Search) }, onClick = { onOpenPage(Page.SiteCheck) }) { Chevron() }
             GroupDivider()
             val at = viewModel.rulesUpdatedAt()
@@ -447,6 +461,13 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
                 Spacer(Modifier.weight(1f))
                 Chevron()
             }
+            GroupDivider()
+            ListRow(
+                "Справка",
+                "Инструкции с картинками",
+                leading = { tile(Icons.AutoMirrored.Rounded.HelpOutline) },
+                onClick = { onOpenPage(Page.Help) },
+            ) { Chevron() }
             GroupDivider()
             ListRow(
                 "Что нового",

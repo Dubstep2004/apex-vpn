@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -132,6 +133,19 @@ fun Globe(
             launch { lon.animateTo(target, spec) }
         }
     }
+    // 433. Самолётик: при смене сервера летит от старой страны к новой
+    var lastTo by remember { androidx.compose.runtime.mutableStateOf(to) }
+    var flyFrom by remember { androidx.compose.runtime.mutableStateOf<Pair<Float, Float>?>(null) }
+    val fly = remember { Animatable(1f) }
+    LaunchedEffect(to) {
+        val prev = lastTo
+        lastTo = to
+        if (prev != null && to != null && prev != to && !Apex.feel.smooth) {
+            flyFrom = prev
+            fly.snapTo(0f)
+            fly.animateTo(1f, tween(2000, easing = FastOutSlowInEasing))
+        }
+    }
     val t = rememberInfiniteTransition(label = "globe")
     val drift by t.animateFloat(0f, 360f, infiniteRepeatable(tween(90000, easing = LinearEasing)), label = "drift")
     val phase by t.animateFloat(0f, 1f, infiniteRepeatable(tween(2400, easing = LinearEasing), RepeatMode.Restart), label = "phase")
@@ -212,6 +226,31 @@ fun Globe(
             globePin(p, b, c, r, if (connected) accent2 else dot.copy(alpha = 0.7f), connected && live, phase)
         }
         if (a != null) globePin(p, a, c, r, accent, false, phase)
+
+        // 433. Полёт самолётика
+        val ff = flyFrom
+        val f = fly.value
+        if (ff != null && b != null && f < 1f) {
+            val va = vec(ff.first, ff.second)
+            fun at(tt: Float): Offset? {
+                p.project(slerp(va, b, tt), o)
+                if (o[2] < -0.1f) return null
+                val lift = 1f + 0.28f * sin(tt * PI.toFloat())
+                return Offset(c.x + o[0] * r * lift, c.y - o[1] * r * lift)
+            }
+            // Пунктирный след
+            var k = 0f
+            while (k < f) {
+                at(k)?.let { drawCircle(Color.White.copy(alpha = 0.55f), 1.6.dp.toPx(), it) }
+                k += 0.04f
+            }
+            val now = at(f)
+            val next = at((f + 0.02f).coerceAtMost(1f)) ?: now
+            if (now != null && next != null) {
+                val ang = Math.toDegrees(kotlin.math.atan2((next.y - now.y).toDouble(), (next.x - now.x).toDouble())).toFloat()
+                drawPlane(now, ang, 11.dp.toPx(), Color.White, accent2)
+            }
+        }
     }
 }
 
@@ -235,6 +274,34 @@ private class PointBuffers {
         }
         System.arraycopy(layers[layer], 0, v, 0, len)
         return v
+    }
+}
+
+/** 433. Силуэт самолётика носом по направлению [angle] (градусы). */
+fun DrawScope.drawPlane(at: Offset, angle: Float, size: Float, color: Color, glow: Color) {
+    drawCircle(Brush.radialGradient(listOf(glow.copy(alpha = 0.55f), Color.Transparent), at, size * 1.8f), size * 1.8f, at)
+    androidx.compose.ui.graphics.drawscope.rotate(angle, at) {
+        val s = size / 10f
+        val path = androidx.compose.ui.graphics.Path().apply {
+            moveTo(at.x + 10 * s, at.y)                 // нос
+            lineTo(at.x + 2 * s, at.y - 1.6f * s)
+            lineTo(at.x - 1 * s, at.y - 8 * s)         // левое крыло
+            lineTo(at.x - 3.5f * s, at.y - 8 * s)
+            lineTo(at.x - 2 * s, at.y - 1.6f * s)
+            lineTo(at.x - 7 * s, at.y - 1.4f * s)
+            lineTo(at.x - 9 * s, at.y - 4.5f * s)      // хвост
+            lineTo(at.x - 10.5f * s, at.y - 4.5f * s)
+            lineTo(at.x - 9.5f * s, at.y)
+            lineTo(at.x - 10.5f * s, at.y + 4.5f * s)
+            lineTo(at.x - 9 * s, at.y + 4.5f * s)
+            lineTo(at.x - 7 * s, at.y + 1.4f * s)
+            lineTo(at.x - 2 * s, at.y + 1.6f * s)
+            lineTo(at.x - 3.5f * s, at.y + 8 * s)      // правое крыло
+            lineTo(at.x - 1 * s, at.y + 8 * s)
+            lineTo(at.x + 2 * s, at.y + 1.6f * s)
+            close()
+        }
+        drawPath(path, color)
     }
 }
 

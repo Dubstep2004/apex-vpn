@@ -92,6 +92,8 @@ type routeOptions struct {
 	// 197. AdsDNSPort — локальный DNS приложения, который отвечает «нет такого адреса»
 	// рекламным доменам и считает блокировки (0 — просто отказ в ядре)
 	AdsDNSPort int `json:"adsDnsPort"`
+	// 413. Определять приложение для каждого соединения (трафик по приложениям)
+	FindProcess bool `json:"findProcess"`
 }
 
 // профиль подключения: как часто проверять серверы и рвать ли соединения при смене
@@ -526,6 +528,9 @@ func buildAll(nodesJSON string, selectedTag string, optionsJSON string) (string,
 		"final":                   final,
 		"auto_detect_interface":   true,
 		"default_domain_resolver": "local",
+	}
+	if opts.FindProcess {
+		route["find_process"] = true
 	}
 	if len(ruleSets) > 0 {
 		route["rule_set"] = ruleSets
