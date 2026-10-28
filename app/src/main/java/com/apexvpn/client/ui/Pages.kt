@@ -968,7 +968,7 @@ private fun AppearancePage(viewModel: MainViewModel, onBack: () -> Unit) {
         designs.chunked(3).forEach { row ->
             Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 row.forEach { d ->
-                    DesignPreview(d, s.theme, s.accent, s.customAccent, selected = s.design == d, modifier = Modifier.weight(1f)) {
+                    DesignPreview(d, s.theme, s.accent, s.customAccent, s.customAccent2, selected = s.design == d, modifier = Modifier.weight(1f)) {
                         ThemeReveal.run { viewModel.change(reload = false) { copy(design = d) } }
                     }
                 }
@@ -1389,13 +1389,14 @@ private fun DesignPreview(
     theme: ThemeMode,
     accent: AccentColor,
     customAccent: Long,
+    customAccent2: Long,
     selected: Boolean,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
-    val p = remember(design, theme, accent, customAccent, systemDark) {
-        com.apexvpn.client.ui.theme.paletteFor(design, theme, accent, systemDark, customArgb = customAccent)
+    val p = remember(design, theme, accent, customAccent, customAccent2, systemDark) {
+        com.apexvpn.client.ui.theme.paletteFor(design, theme, accent, systemDark, customArgb = customAccent, customArgb2 = customAccent2)
     }
     val shape = RoundedCornerShape(18.dp)
     Column(

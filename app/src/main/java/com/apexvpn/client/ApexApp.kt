@@ -141,9 +141,13 @@ class ApexApp : Application() {
         // DNS «Авто» (499/516) и белые списки (491): после подключения и при каждой смене сети
         appScope.launch {
             var job: kotlinx.coroutines.Job? = null
-            combine(VpnState.status, com.apexvpn.client.vpn.NetworkMonitor.transport) { st, tr -> st to tr }
+            combine(
+                VpnState.status,
+                com.apexvpn.client.vpn.NetworkMonitor.transport,
+                AppSettings.state.map { it.autoWhitelist to it.dns },
+            ) { st, tr, set -> Triple(st, tr, set) }
                 .distinctUntilChanged()
-                .collect { (st, tr) ->
+                .collect { (st, tr, _) ->
                     job?.cancel()
                     if (st != com.apexvpn.client.vpn.VpnStatus.Started) return@collect
                     job = appScope.launch {

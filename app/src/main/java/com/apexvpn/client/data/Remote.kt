@@ -8,6 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -185,7 +186,9 @@ object RulesUpdater {
      * Проверка раз в день (с rules.json) или раз в неделю (источник без него).
      * [force] — сразу, даже если автообновление выключено.
      */
-    suspend fun update(context: Context, force: Boolean = false): Result = withContext(Dispatchers.IO) {
+    private val lock = kotlinx.coroutines.sync.Mutex()
+
+    suspend fun update(context: Context, force: Boolean = false): Result = lock.withLock { withContext(Dispatchers.IO) {
         val p = sp(context)
         if (!force) {
             if (!AppSettings.value.rulesAuto) return@withContext Result.Skipped
@@ -219,7 +222,7 @@ object RulesUpdater {
         p.edit { putString("error", lastError) }
         load(context)
         Result.Failed(lastError)
-    }
+    } }
 
     /** Обновление из одного источника. Ошибка — исключение, чтобы перейти к следующему. */
     private fun updateFrom(context: Context, base: String): Pair<Result, JSONObject?> {
@@ -254,7 +257,12 @@ object RulesUpdater {
                 val local = File(dir, name)
                 !local.exists() || sha256(local) != sha256(File(tmp, name))
             }
-            for (name in changed) File(tmp, name).copyTo(File(dir, name), overwrite = true)
+            // Сначала копия рядом, потом переименование: ядро никогда не прочитает файл наполовину
+            for (name in changed) {
+                val part = File(dir, "$name.part")
+                File(tmp, name).copyTo(part, overwrite = true)
+                check(part.renameTo(File(dir, name))) { "не удалось записать $name" }
+            }
             // Неизменённые файлы тоже должны быть на месте — иначе ядро возьмёт встроенные
             if (!FILES.all { File(dir, it).length() > 0 }) error("скачаны не все базы")
             return (if (changed.isEmpty()) Result.Fresh else Result.Updated(changed.size)) to manifest

@@ -96,6 +96,7 @@ object NetworkMonitor {
         runCatching { ApexApp.connectivity.unregisterNetworkCallback(callback) }
         registered = false
         defaultNetwork = null
+        transport.value = ""
     }
 
     fun setListener(l: InterfaceUpdateListener?) {

@@ -103,7 +103,8 @@ object DnsAuto {
             val o = saved().put(key, win.variant.key).put("any", win.variant.key)
             Prefs.autoDnsBest = o.toString()
         }
-        change
+        // Перезагрузка нужна, если в ядре сейчас не тот DNS, что лучший для этой сети
+        bestVariant(key).key != applied
     }
 
     private fun probe(v: Variant): Int = when (v.proto) {
