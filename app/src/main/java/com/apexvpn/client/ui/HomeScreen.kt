@@ -132,22 +132,6 @@ fun HomeScreen(
             StatusPill(status)
         }
 
-        // Объявление из Remnawave (заголовок announce) — баннером наверху, закрывается до нового текста
-        var closedAnnounce by remember { mutableStateOf(com.apexvpn.client.data.Prefs.dismissedAnnounce) }
-        if (sub.announce.isNotBlank() && sub.announce != closedAnnounce) {
-            Spacer(Modifier.height(14.dp))
-            Banner(
-                icon = Icons.Rounded.Campaign,
-                color = Apex.Accent,
-                title = sub.title.ifBlank { null },
-                text = sub.announce,
-                onClick = null,
-                onClose = {
-                    com.apexvpn.client.data.Prefs.dismissedAnnounce = sub.announce
-                    closedAnnounce = sub.announce
-                },
-            )
-        }
         // 13. Подписка заканчивается
         ExpiryAlerts.warning(sub)?.let { w ->
             Spacer(Modifier.height(10.dp))
@@ -586,6 +570,19 @@ private fun SubscriptionCard(
         expire?.let {
             Spacer(Modifier.height(6.dp))
             Text(it, color = Apex.TextDim, fontSize = 13.sp)
+        }
+
+        // Объявление от сервиса (заголовок announce из Remnawave)
+        if (sub.announce.isNotBlank()) {
+            Spacer(Modifier.height(12.dp))
+            Text(
+                sub.announce,
+                color = Apex.Text,
+                fontSize = 15.sp,
+                lineHeight = 22.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
 
     }
