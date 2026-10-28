@@ -99,6 +99,13 @@ class ApexApp : Application() {
                     (last == com.apexvpn.client.vpn.VpnStatus.Starting || last == com.apexvpn.client.vpn.VpnStatus.Stopped)
                 ) {
                     com.apexvpn.client.data.ConnectFeedback.onConnected(this@ApexApp)
+                    // Авто-выбор DNS: замер после подключения; сменился лучший — применяем
+                    if (AppSettings.value.dns == com.apexvpn.client.data.DnsChoice.Auto) {
+                        appScope.launch {
+                            kotlinx.coroutines.delay(2000)
+                            if (com.apexvpn.client.data.DnsAuto.measure()) com.apexvpn.client.vpn.ApexVpnService.reload(this@ApexApp)
+                        }
+                    }
                     // 382. Конфетти на первом и юбилейных подключениях
                     com.apexvpn.client.data.Celebrate.onConnected()
                     // 220. Задача «Видео»: на автопилоте сами подбираем самый быстрый сервер

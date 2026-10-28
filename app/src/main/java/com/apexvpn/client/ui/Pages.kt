@@ -85,6 +85,7 @@ import com.apexvpn.client.vpn.WifiInfoReader
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 /** Дополнительные страницы, открываются поверх вкладок. */
 enum class Page { Apps, SpeedTest, SiteCheck, Wifi, Share, Dns, Profile, Appearance, Changelog, Advanced, HideApps, AppTraffic, Help }
@@ -836,6 +837,39 @@ private fun DnsPage(viewModel: MainViewModel, onBack: () -> Unit) {
                     },
                 ) { if (d == s.dns) Icon(Icons.Rounded.Check, "Выбрано", tint = Apex.Accent) }
             }
+        }
+        // Авто-выбор: результаты замера и кнопка «Проверить»
+        if (s.dns == DnsChoice.Auto) {
+            val results by com.apexvpn.client.data.DnsAuto.results.collectAsStateWithLifecycle()
+            val scope = androidx.compose.runtime.rememberCoroutineScope()
+            var busy by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) {
+                if (results.isEmpty()) {
+                    busy = true
+                    if (com.apexvpn.client.data.DnsAuto.measure()) viewModel.change { this }
+                    busy = false
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            Column(Modifier.fillMaxWidth().apexCard().padding(16.dp)) {
+                Text("Сейчас: " + DnsChoice.of(com.apexvpn.client.data.DnsAuto.best).title, color = Apex.Text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(6.dp))
+                results.forEach { r ->
+                    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+                        Text(DnsChoice.of(r.id).title, color = if (r.id == com.apexvpn.client.data.DnsAuto.best) Apex.AccentText else Apex.TextDim, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                        Text(if (r.ms >= 0) "${r.ms} мс" else "нет ответа", color = if (r.ms >= 0) pingColor(r.ms) else Apex.Bad, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                androidx.compose.material3.TextButton(onClick = {
+                    if (!busy) scope.launch {
+                        busy = true
+                        if (com.apexvpn.client.data.DnsAuto.measure()) viewModel.change { this }
+                        busy = false
+                    }
+                }) { Text(if (busy) "Проверяю…" else "Проверить сейчас", color = Apex.Accent) }
+            }
+            Caption("Авто сравнивает Cloudflare, Google и Quad9 после каждого подключения и берёт самый быстрый. Меняет DNS, только если другой заметно быстрее.")
         }
         if (s.kids) Caption("Семейный режим закрывает сайты 18+, казино и букмекеров, а DNS — семейный AdGuard (выбор DNS не действует).")
         SectionLabel("Свой DNS-over-HTTPS")

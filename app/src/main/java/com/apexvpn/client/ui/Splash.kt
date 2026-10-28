@@ -138,7 +138,7 @@ fun SplashScreen(onFinished: () -> Unit) {
                 }
                 Spacer(Modifier.width(10.dp))
                 Text(
-                    "2.0",
+                    com.apexvpn.client.BuildConfig.VERSION_NAME.split('.').take(2).joinToString("."),
                     color = Color.White,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,

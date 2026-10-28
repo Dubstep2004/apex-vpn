@@ -26,7 +26,7 @@ data class Settings(
     val appsMode: AppsMode = AppsMode.AllApps,
     val apps: Set<String> = emptySet(),
     // DNS
-    val dns: DnsChoice = DnsChoice.Cloudflare,
+    val dns: DnsChoice = DnsChoice.Auto,
     val customDns: String = "",
     val kids: Boolean = false,
     // Подключение
@@ -189,7 +189,7 @@ object AppSettings {
         put("customDomains", JSONArray(s.customDomains))
         put("directDomains", JSONArray(s.directDomains))
         put("rulesDir", rulesDir ?: "")
-        put("dns", s.dns.id)
+        put("dns", if (s.dns == DnsChoice.Auto) DnsAuto.best else s.dns.id)
         put("customDns", s.customDns)
         put("kids", s.kids)
         put("adBlock", s.adBlock)

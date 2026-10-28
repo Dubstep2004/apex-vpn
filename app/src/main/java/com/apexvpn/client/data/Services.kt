@@ -84,6 +84,8 @@ object BankApps {
 
 /** Публичный DNS для зарубежных запросов (идёт через VPN). */
 enum class DnsChoice(val id: String, val title: String, val subtitle: String) {
+    /** Сам выбирает самый быстрый: Cloudflare, Google или Quad9 */
+    Auto("auto", "Авто", "Самый быстрый DNS — проверяется при подключении"),
     Cloudflare("cloudflare", "Cloudflare", "1.1.1.1 — быстрый"),
     Google("google", "Google", "8.8.8.8"),
     Quad9("quad9", "Quad9", "9.9.9.9 — защита от вредоносных сайтов"),
@@ -156,7 +158,8 @@ enum class CoreMode(val id: String, val title: String, val subtitle: String) {
 
 /** Дизайн приложения (2026). Меняет цвета, форму карточек, фон, шрифт и главный экран. */
 enum class Design(val id: String, val title: String, val subtitle: String) {
-    Apex2("apex2", "APEX 2.0", "Новый облик 2026: крупные карточки и мягкое свечение"),
+    /** Название идёт за версией приложения: «APEX 2.3», «APEX 2.4»… */
+    Apex2("apex2", "APEX " + com.apexvpn.client.BuildConfig.VERSION_NAME.split('.').take(2).joinToString("."), "Фирменный облик 2026: крупные карточки и мягкое свечение"),
     Classic("classic", "Классика", "Строгий тёмный APEX"),
     Glass("glass", "Liquid Glass 2.0", "Настоящее стекло: блики двигаются при наклоне телефона"),
     Expressive("expressive", "Material Expressive", "Цвета от обоев, крупные формы"),

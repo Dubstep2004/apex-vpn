@@ -129,6 +129,11 @@ object Prefs {
         sp.edit { putString("last_pings", org.json.JSONObject(map.filterValues { it > 0 }).toString()) }
     }
 
+    /** Авто-выбор DNS: последний победитель (cloudflare | google | quad9) */
+    var autoDnsBest: String
+        get() = sp.getString("auto_dns", "") ?: ""
+        set(v) = sp.edit { putString("auto_dns", v) }
+
     /** 320. Знакомство с приложением уже показано */
     var onboarded: Boolean
         get() = sp.getBoolean("onboarded", false)
