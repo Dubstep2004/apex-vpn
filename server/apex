@@ -1,0 +1,189 @@
+#!/usr/bin/env bash
+# Управление сервером обновлений APEX VPN.
+#
+#   apex publish 1.4.2              скачать версию с GitHub, подписать ключом сервера, выпустить
+#   apex publish 1.4.2 --mandatory  то же, но обновление обязательное
+#   apex publish ./app.apk --code 9 --name 1.4.2   выпустить свой файл APK
+#   apex unpublish                  снять обновление (приложения перестанут его предлагать)
+#   apex news "Текст" [--title "Заголовок"] [--warning] [--url https://…]
+#   apex news off                   убрать объявление
+#   apex crashes [N]                последние N отчётов о сбоях (по умолчанию 5)
+#   apex crashes clear              удалить все отчёты
+#   apex status                     что сейчас выпущено
+set -euo pipefail
+
+CONFIG="${APEX_CONFIG:-/etc/apexvpn/config}"
+# shellcheck disable=SC1090
+[[ -f "$CONFIG" ]] && source "$CONFIG"
+: "${BASE_URL:?нет BASE_URL в $CONFIG — запустите install.sh}"
+WEB_DIR="${WEB_DIR:-/var/www/apexvpn}"
+CRASH_DIR="${CRASH_DIR:-/var/lib/apexvpn/crashes}"
+KEYSTORE="${KEYSTORE:-/etc/apexvpn/apex.jks}"
+KEYPASS_FILE="${KEYPASS_FILE:-/etc/apexvpn/keypass}"
+REPO="${REPO:-Dubstep2004/apex-vpn}"
+KEEP_APKS="${KEEP_APKS:-3}"
+
+die() { echo "Ошибка: $*" >&2; exit 1; }
+need() { command -v "$1" >/dev/null || die "не найдено $1 (запустите install.sh)"; }
+
+write_json() { # атомарная запись: приложения никогда не увидят половину файла
+  local target="$1" tmp
+  tmp="$(mktemp "$WEB_DIR/.tmp.XXXXXX")"
+  cat > "$tmp"
+  chmod 644 "$tmp"
+  mv -f "$tmp" "$target"
+}
+
+download_release() { # <версия> <папка>
+  local ver="$1" dir="$2" name
+  for name in "apex-vpn-$ver.apk" "apex-vpn-$ver.json"; do
+    if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+      # приватный репозиторий: через API с токеном
+      local id
+      id=$(curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" \
+        "https://api.github.com/repos/$REPO/releases/tags/v$ver" | jq -r --arg n "$name" '.assets[] | select(.name==$n) | .id')
+      [[ -n "$id" ]] || die "в релизе v$ver нет файла $name"
+      curl -fSL --progress-bar -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/octet-stream" \
+        -o "$dir/$name" "https://api.github.com/repos/$REPO/releases/assets/$id"
+    else
+      curl -fSL --progress-bar -o "$dir/$name" "https://github.com/$REPO/releases/download/v$ver/$name" \
+        || die "не удалось скачать $name (нет такой версии? приватный репозиторий — добавьте GITHUB_TOKEN в $CONFIG)"
+    fi
+  done
+}
+
+cmd_publish() {
+  need jq; need apksigner; need sha256sum
+  local src="" code="" name="" mandatory=false
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --mandatory) mandatory=true ;;
+      --code) code="$2"; shift ;;
+      --name) name="$2"; shift ;;
+      *) src="$1" ;;
+    esac
+    shift
+  done
+  [[ -n "$src" ]] || die "укажите версию (apex publish 1.4.2) или файл APK"
+
+  local tmp; tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' RETURN
+  local apk changelog=""
+  if [[ -f "$src" ]]; then
+    apk="$src"
+    local meta="${src%.apk}.json"
+    if [[ -f "$meta" ]]; then
+      code="${code:-$(jq -r .versionCode "$meta")}"; name="${name:-$(jq -r .versionName "$meta")}"
+      changelog="$(jq -r '.changelog // ""' "$meta")"
+    fi
+    [[ -n "$code" && -n "$name" ]] || die "для своего файла укажите --code <номер сборки> и --name <версия>"
+  else
+    echo "==> скачиваю версию $src с GitHub"
+    download_release "$src" "$tmp"
+    apk="$tmp/apex-vpn-$src.apk"
+    code="$(jq -r .versionCode "$tmp/apex-vpn-$src.json")"
+    name="$(jq -r .versionName "$tmp/apex-vpn-$src.json")"
+    changelog="$(jq -r '.changelog // ""' "$tmp/apex-vpn-$src.json")"
+  fi
+  [[ "$code" =~ ^[0-9]+$ ]] || die "неверный номер сборки: $code"
+
+  echo "==> подписываю ключом сервера"
+  local out="$WEB_DIR/apex-vpn-$name.apk"
+  apksigner sign --ks "$KEYSTORE" --ks-pass "file:$KEYPASS_FILE" --ks-key-alias apex \
+    --out "$tmp/signed.apk" "$apk"
+  apksigner verify "$tmp/signed.apk" >/dev/null || die "подпись не прошла проверку"
+  install -m 644 "$tmp/signed.apk" "$out"
+  rm -f "$tmp/signed.apk.idsig"
+  cp -f "$out" "$WEB_DIR/.latest.apk" && mv -f "$WEB_DIR/.latest.apk" "$WEB_DIR/apex-vpn-latest.apk"
+  local sha; sha="$(sha256sum "$out" | cut -d' ' -f1)"
+
+  jq -n --argjson code "$code" --arg name "$name" --arg url "$BASE_URL/apex-vpn-$name.apk" --arg sha "$sha" \
+    --arg notes "$changelog" --argjson mandatory "$mandatory" \
+    '{versionCode:$code, versionName:$name, apkUrl:$url, sha256:$sha, changelog:$notes,
+      mandatory:$mandatory, minSupportedVersionCode:(if $mandatory then $code else 0 end)}' \
+    | write_json "$WEB_DIR/update.json"
+  update_page "$name"
+
+  # старые APK удаляем, оставляем последние $KEEP_APKS
+  ls -1t "$WEB_DIR"/apex-vpn-[0-9]*.apk 2>/dev/null | tail -n +$((KEEP_APKS + 1)) | xargs -r rm -f
+  echo "✅ Выпущена версия $name (сборка $code)$([[ $mandatory == true ]] && echo ', обязательная')"
+  echo "   Приложения предложат обновиться при следующем запуске."
+  echo "   Ссылка для первой установки: $BASE_URL/apex-vpn-latest.apk"
+}
+
+update_page() { # простая страница для скачивания
+  cat <<EOF | write_json "$WEB_DIR/index.html"
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>APEX VPN</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0b0b10;color:#f2f2f7;font:16px system-ui,sans-serif;text-align:center}
+a{display:inline-block;margin-top:20px;padding:16px 28px;border-radius:16px;background:#7b6cff;color:#fff;text-decoration:none;font-weight:600}
+p{color:#9a9aa8}</style></head><body><main><h1>APEX VPN</h1><p>Версия $1 для Android 7.0+</p>
+<a href="apex-vpn-latest.apk">Скачать APK</a></main></body></html>
+EOF
+}
+
+cmd_unpublish() {
+  rm -f "$WEB_DIR/update.json"
+  echo "Обновление снято: приложения больше его не предлагают."
+}
+
+cmd_news() {
+  need jq
+  [[ $# -gt 0 ]] || die 'apex news "Текст" [--title "Заголовок"] [--warning] [--url https://…]  или  apex news off'
+  if [[ "$1" == "off" ]]; then
+    echo '[]' | write_json "$WEB_DIR/news.json"
+    echo "Объявление убрано."
+    return
+  fi
+  local text="" title="" level="info" url=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --title) title="$2"; shift ;;
+      --warning) level="warning" ;;
+      --url) url="$2"; shift ;;
+      *) text="$1" ;;
+    esac
+    shift
+  done
+  [[ -n "$text" ]] || die "нет текста объявления"
+  jq -n --arg id "n$(date +%s)" --arg title "$title" --arg text "$text" --arg level "$level" --arg url "$url" \
+    '[{id:$id, title:$title, text:$text, level:$level} + (if $url != "" then {url:$url} else {} end)]' \
+    | write_json "$WEB_DIR/news.json"
+  echo "📢 Объявление опубликовано — пользователи увидят его на главном экране."
+}
+
+cmd_crashes() {
+  if [[ "${1:-}" == "clear" ]]; then
+    rm -f "$CRASH_DIR"/*.txt
+    echo "Отчёты удалены."
+    return
+  fi
+  local n="${1:-5}"
+  local files
+  files=$(ls -1t "$CRASH_DIR"/*.txt 2>/dev/null | head -n "$n" || true)
+  if [[ -z "$files" ]]; then echo "Сбоев нет 🎉"; return; fi
+  echo "Всего отчётов: $(ls -1 "$CRASH_DIR"/*.txt | wc -l)"
+  for f in $files; do
+    echo "────────── $(basename "$f" .txt)"
+    head -c 3000 "$f"; echo
+  done
+}
+
+cmd_status() {
+  echo "Адрес: $BASE_URL"
+  if [[ -f "$WEB_DIR/update.json" ]]; then
+    echo "Выпущено: $(jq -r '"\(.versionName) (сборка \(.versionCode))\(if .mandatory then ", обязательное" else "" end)"' "$WEB_DIR/update.json")"
+  else
+    echo "Обновление не выпущено"
+  fi
+  echo "Объявление: $(jq -r 'if length > 0 then .[0].text else "нет" end' "$WEB_DIR/news.json" 2>/dev/null || echo нет)"
+  echo "APK на сервере: $(ls -1 "$WEB_DIR"/apex-vpn-[0-9]*.apk 2>/dev/null | xargs -r -n1 basename | tr '\n' ' ')"
+  echo "Отчётов о сбоях: $(ls -1 "$CRASH_DIR"/*.txt 2>/dev/null | wc -l)"
+}
+
+case "${1:-help}" in
+  publish) shift; cmd_publish "$@" ;;
+  unpublish) cmd_unpublish ;;
+  news) shift; cmd_news "$@" ;;
+  crashes) shift; cmd_crashes "$@" ;;
+  status) cmd_status ;;
+  *) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//' ;;
+esac

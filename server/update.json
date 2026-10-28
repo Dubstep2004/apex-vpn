@@ -1,9 +1,0 @@
-{
-  "versionCode": 2,
-  "versionName": "1.0.1",
-  "apkUrl": "https://example.com/apexvpn/apex-vpn-1.0.1.apk",
-  "sha256": "вставьте sha256 файла APK (sha256sum apex-vpn-1.0.1.apk)",
-  "changelog": "• Исправления и улучшения стабильности",
-  "mandatory": false,
-  "minSupportedVersionCode": 1
-}

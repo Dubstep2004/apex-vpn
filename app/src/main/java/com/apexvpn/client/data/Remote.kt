@@ -188,7 +188,9 @@ object CrashReporter {
                     c.requestMethod = "POST"
                     c.doOutput = true
                     c.setRequestProperty("Content-Type", "text/plain; charset=utf-8")
-                    c.outputStream.use { it.write(f.readBytes()) }
+                    val body = f.readBytes().let { if (it.size > 60_000) it.copyOf(60_000) else it }
+                    c.setFixedLengthStreamingMode(body.size) // сервер ждёт Content-Length
+                    c.outputStream.use { it.write(body) }
                     if (c.responseCode in 200..299) f.delete()
                 } finally {
                     c.disconnect()

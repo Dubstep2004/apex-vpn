@@ -66,10 +66,6 @@ object Prefs {
         get() = sp.getInt("nodes_version", 0)
         set(v) = sp.edit { putInt("nodes_version", v) }
 
-    var lastPanelPing: Long
-        get() = sp.getLong("panel_ping", 0)
-        set(v) = sp.edit { putLong("panel_ping", v) }
-
     var announce: String
         get() = sp.getString("announce", "") ?: ""
         set(v) = sp.edit { putString("announce", v) }

@@ -11,37 +11,13 @@ permissions:
   contents: write
 
 jobs:
-  # ── Панель: Telegram-бот + сервер обновлений на Cloudflare Workers ───────
-  panel:
-    runs-on: ubuntu-latest
-    if: github.event_name != 'pull_request'
-    outputs:
-      url: ${{ steps.deploy.outputs.url }}
-      kv: ${{ steps.deploy.outputs.kv }}
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-      TELEGRAM_ADMIN_IDS: ${{ secrets.TELEGRAM_ADMIN_IDS }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Deploy panel
-        id: deploy
-        run: |
-          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ] || [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_ADMIN_IDS" ]; then
-            echo "::warning title=Панель::не заданы секреты CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, TELEGRAM_BOT_TOKEN, TELEGRAM_ADMIN_IDS — панель и обновления в приложении выключены (см. docs/PANEL.md)"
-            exit 0
-          fi
-          ./panel/deploy.sh
-
   build:
     runs-on: ubuntu-latest
-    needs: panel
-    if: always() && (needs.panel.result == 'success' || needs.panel.result == 'skipped')
     timeout-minutes: 75
     env:
-      PANEL_URL: ${{ needs.panel.outputs.url }}
-      PANEL_KV: ${{ needs.panel.outputs.kv }}
+      # Адрес вашего сервера, например https://vpn.example.com/apexvpn
+      # (Settings → Secrets and variables → Actions → Variables → SERVER_URL)
+      SERVER_URL: ${{ vars.SERVER_URL }}
 
     steps:
       - uses: actions/checkout@v4
@@ -88,7 +64,7 @@ jobs:
             echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/apex.jks"
             echo "APEX_KEYSTORE_PATH=$RUNNER_TEMP/apex.jks" >> "$GITHUB_ENV"
           else
-            echo "::warning title=Подпись::Секрет APEX_KEYSTORE_BASE64 не задан — APK подписан временным ключом: поверх установленной версии он не встанет (удалите приложение и установите заново)."
+            echo "::notice title=Подпись::APK подписан временным ключом — команда «apex publish» на сервере переподпишет его постоянным ключом."
           fi
 
       - uses: gradle/actions/setup-gradle@v4
@@ -101,7 +77,7 @@ jobs:
           UPDATE_URL: ${{ vars.UPDATE_URL }}
         run: |
           set -o pipefail
-          echo "Панель: ${PANEL_URL:-нет}"
+          if [ -n "$SERVER_URL" ]; then echo "Сервер: $SERVER_URL"; else echo "::warning title=Сервер::переменная SERVER_URL не задана — обновления, новости и отчёты о сбоях в приложении выключены (см. server/README.md)"; fi
           if ! ./gradlew --no-daemon assembleRelease 2>&1 | tee gradle.log; then
             # Ошибки сборки — в аннотации, чтобы их было видно без полного лога
             grep -E "^e: |error:|What went wrong|Could not|> " gradle.log | sed 's/%/%25/g' | head -200 > errors.txt || true
@@ -131,6 +107,9 @@ jobs:
           awk '/^ +Release\(/{n++} n==1 && /^ +"[^"]*",$/ {gsub(/^ +"|",$/,""); print "• " $0}' \
             app/src/main/java/com/apexvpn/client/data/Changelog.kt > dist/changelog.txt || true
           cat dist/changelog.txt
+          # Описание версии для команды «apex publish» на сервере
+          jq -n --argjson code "$VERSION_CODE" --arg name "$VERSION_NAME" --rawfile notes dist/changelog.txt \
+            '{versionCode:$code, versionName:$name, changelog:$notes}' > "dist/apex-vpn-${VERSION_NAME}.json"
           {
             echo "name=$VERSION_NAME"
             echo "code=$VERSION_CODE"
@@ -150,14 +129,7 @@ jobs:
           tag_name: v${{ steps.apk.outputs.name }}
           name: APEX VPN ${{ steps.apk.outputs.name }}
           body_path: dist/changelog.txt
-          files: ${{ steps.apk.outputs.apk }}
+          files: |
+            ${{ steps.apk.outputs.apk }}
+            dist/apex-vpn-${{ steps.apk.outputs.name }}.json
           make_latest: true
-
-      - name: Send build to panel
-        if: github.event_name != 'pull_request' && env.PANEL_URL != ''
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: ./panel/upload-build.sh "${{ steps.apk.outputs.apk }}" "${{ steps.apk.outputs.code }}" "${{ steps.apk.outputs.name }}" dist/changelog.txt

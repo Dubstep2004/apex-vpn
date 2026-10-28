@@ -289,15 +289,6 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
                 leading = { tile(Icons.Rounded.NewReleases) },
                 onClick = { onOpenPage(Page.Changelog) },
             ) { Chevron() }
-            if (com.apexvpn.client.data.Panel.enabled) {
-                GroupDivider()
-                ListRow(
-                    "Сообщить о проблеме",
-                    "Сообщение получит поддержка в Telegram",
-                    leading = { tile(Icons.Rounded.BugReport) },
-                    onClick = { onOpenPage(Page.Feedback) },
-                ) { Chevron() }
-            }
         }
         Spacer(Modifier.height(24.dp))
     }

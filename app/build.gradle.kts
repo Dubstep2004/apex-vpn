@@ -7,14 +7,15 @@ plugins {
 }
 
 // ─── Настройки приложения ──────────────────────────────────────────────
-// Панель (Telegram-бот на Cloudflare Workers, папка panel/). CI подставляет её адрес сам.
-val panelUrl: String = ((project.findProperty("panelUrl") as String?) ?: System.getenv("PANEL_URL") ?: "").trimEnd('/')
+// Ваш сервер (VPS, папка server/): там лежат APK, update.json, news.json и принимаются отчёты о сбоях.
+// Например https://vpn.example.com/apexvpn — переменная SERVER_URL в GitHub (Settings → Variables).
+val serverUrl: String = ((project.findProperty("serverUrl") as String?) ?: System.getenv("SERVER_URL") ?: "").trim().trimEnd('/')
 
 // Адрес JSON-файла с информацией об обновлении: панель или свой сервер.
 // Можно переопределить при сборке: -PupdateUrl=https://...  или env UPDATE_URL
 val updateUrl: String = (project.findProperty("updateUrl") as String?)
     ?: System.getenv("UPDATE_URL")?.takeIf { it.isNotBlank() }
-    ?: if (panelUrl.isNotEmpty()) "$panelUrl/update.json" else "https://example.com/apexvpn/update.json"
+    ?: if (serverUrl.isNotEmpty()) "$serverUrl/update.json" else "https://example.com/apexvpn/update.json"
 
 // Новости и объявления (news.json). По умолчанию — рядом с update.json
 val newsUrl: String = (project.findProperty("newsUrl") as String?)
@@ -24,7 +25,7 @@ val newsUrl: String = (project.findProperty("newsUrl") as String?)
 // Куда отправлять анонимные отчёты о сбоях (POST, text/plain). Пусто — не отправлять
 val crashUrl: String = (project.findProperty("crashUrl") as String?)
     ?: System.getenv("CRASH_URL")?.takeIf { it.isNotBlank() }
-    ?: if (panelUrl.isNotEmpty()) "$panelUrl/crash" else ""
+    ?: if (serverUrl.isNotEmpty()) "$serverUrl/crash" else ""
 
 // Версия ядра Xray, которое кладётся в APK (core/xray-version)
 val xrayVersion: String = rootProject.file("core/xray-version").takeIf { it.exists() }?.readText()?.trim()?.removePrefix("v") ?: "?"
@@ -51,15 +52,14 @@ android {
         applicationId = "com.apexvpn.client"
         minSdk = 24
         targetSdk = 35
-        versionCode = 8
-        versionName = "1.4.1"
+        versionCode = 9
+        versionName = "1.4.2"
 
         buildConfigField("String", "UPDATE_URL", "\"$updateUrl\"")
         buildConfigField("String", "SUBSCRIPTION_HOST", "\"$subscriptionHost\"")
         buildConfigField("String", "NEWS_URL", "\"$newsUrl\"")
         buildConfigField("String", "CRASH_URL", "\"$crashUrl\"")
         buildConfigField("String", "RULES_BASE_URL", "\"$rulesBaseUrl\"")
-        buildConfigField("String", "PANEL_URL", "\"$panelUrl\"")
         buildConfigField("String", "XRAY_VERSION", "\"$xrayVersion\"")
 
         ndk {

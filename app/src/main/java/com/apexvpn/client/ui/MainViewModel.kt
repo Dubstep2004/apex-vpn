@@ -70,7 +70,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             val oldFormat = Subscription.state.value.nodes.isNotEmpty() && Prefs.nodesVersion < BuildConfig.VERSION_CODE
             if (Subscription.needsRefresh() || oldFormat) refresh(silent = true)
         }
-        viewModelScope.launch { com.apexvpn.client.data.Panel.ping() }
         if (AppSettings.value.autoCheckUpdates) {
             viewModelScope.launch { UpdateManager.check(silent = true) }
         }
