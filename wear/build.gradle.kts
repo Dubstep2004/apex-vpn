@@ -29,9 +29,10 @@ android {
             val storePath = System.getenv("APEX_KEYSTORE_PATH")
             if (storePath != null) {
                 storeFile = file(storePath)
-                storePassword = System.getenv("APEX_KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() } ?: "apexvpn"
+                val storePass = System.getenv("APEX_KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() } ?: "apexvpn"
+                storePassword = storePass
                 keyAlias = System.getenv("APEX_KEY_ALIAS")?.takeIf { it.isNotBlank() } ?: "apex"
-                keyPassword = System.getenv("APEX_KEY_PASSWORD")?.takeIf { it.isNotBlank() } ?: "apexvpn"
+                keyPassword = System.getenv("APEX_KEY_PASSWORD")?.takeIf { it.isNotBlank() } ?: storePass
             }
         }
     }

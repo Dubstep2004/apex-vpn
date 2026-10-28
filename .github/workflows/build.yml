@@ -58,6 +58,14 @@ jobs:
           ls -la app/libs/ app/src/main/jniLibs/*/ || true
           test -s app/libs/libbox.aar || { echo "::error title=Ядро::app/libs/libbox.aar не найден после сборки ядра"; exit 1; }
 
+      # Без своего ключа сборки подписываются ключом отладки. Он хранится в кэше Actions,
+      # чтобы версии ставились поверх друг друга (раньше ключ был новый в каждой сборке).
+      - name: Restore build signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: apex-debug-keystore-v1
+
       - name: Prepare signing key
         env:
           KEYSTORE_BASE64: ${{ secrets.APEX_KEYSTORE_BASE64 }}
@@ -66,7 +74,13 @@ jobs:
             echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/apex.jks"
             echo "APEX_KEYSTORE_PATH=$RUNNER_TEMP/apex.jks" >> "$GITHUB_ENV"
           else
-            echo "::notice title=Подпись::APK подписан временным ключом — команда «apex publish» на сервере переподпишет его постоянным ключом."
+            if [ ! -s ~/.android/debug.keystore ]; then
+              mkdir -p ~/.android
+              keytool -genkeypair -keystore ~/.android/debug.keystore -storetype PKCS12 -alias androiddebugkey \
+                -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android \
+                -dname "CN=Android Debug,O=Android,C=US" >/dev/null 2>&1
+            fi
+            echo "::warning title=Подпись::Нет секрета APEX_KEYSTORE_BASE64 — APK подписан ключом сборки. Добавьте ключ с сервера (docs/GUIDE.md, шаг 3), чтобы версии с GitHub и с сервера ставились друг поверх друга."
           fi
 
       - uses: gradle/actions/setup-gradle@v4

@@ -52,8 +52,8 @@ android {
         applicationId = "com.apexvpn.client"
         minSdk = 24
         targetSdk = 35
-        versionCode = 14
-        versionName = "1.7.0"
+        versionCode = 15
+        versionName = "1.7.1"
 
         buildConfigField("String", "UPDATE_URL", "\"$updateUrl\"")
         buildConfigField("String", "SUBSCRIPTION_HOST", "\"$subscriptionHost\"")
@@ -73,9 +73,11 @@ android {
             if (storePath != null) {
                 storeFile = file(storePath)
                 // Если отдельные секреты не заданы — пароль и имя ключа по умолчанию (scripts/make-keystore.sh)
-                storePassword = signingValue("storePassword", "APEX_KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() } ?: "apexvpn"
+                val storePass = signingValue("storePassword", "APEX_KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() } ?: "apexvpn"
+                storePassword = storePass
                 keyAlias = signingValue("keyAlias", "APEX_KEY_ALIAS")?.takeIf { it.isNotBlank() } ?: "apex"
-                keyPassword = signingValue("keyPassword", "APEX_KEY_PASSWORD")?.takeIf { it.isNotBlank() } ?: "apexvpn"
+                // Ключ с сервера (PKCS12): пароль ключа совпадает с паролем хранилища
+                keyPassword = signingValue("keyPassword", "APEX_KEY_PASSWORD")?.takeIf { it.isNotBlank() } ?: storePass
             }
         }
     }

@@ -7,7 +7,7 @@
 <p>
 <a href="https://github.com/Dubstep2004/apex-vpn/releases/latest"><b>⬇️ Скачать APK</b></a>
 &nbsp;&nbsp;·&nbsp;&nbsp;
-<a href="#-что-нового"><b>🆕 Что нового в 1.7.0</b></a>
+<a href="#-что-нового"><b>🆕 Что нового в 1.7.1</b></a>
 &nbsp;&nbsp;·&nbsp;&nbsp;
 <a href="server/README.md"><b>🖥️ Свой сервер</b></a>
 </p>
@@ -162,13 +162,19 @@ curl -fsSL -o apex https://raw.githubusercontent.com/Dubstep2004/apex-vpn/main/s
 <details open>
 <summary><b>Через GitHub Actions (проще всего)</b></summary>
 
-1. Установите сервер на VPS (см. выше).
-2. В **Settings → Secrets and variables → Actions → Variables** добавьте `SERVER_URL`: это адрес, который напечатал скрипт.
-3. Запушьте в `main`. Примерно через 25 минут в **Releases** появится `apex-vpn-<версия>.apk`.
-4. На сервере выполните `apex publish <версия>`: APK подписывается ключом сервера и выпускается для всех.
+📘 **[Пошаговая инструкция с картинками →](docs/GUIDE.md)**
+
+<a href="docs/GUIDE.md"><img src="docs/guide/step2.webp" width="49%"></a> <a href="docs/GUIDE.md"><img src="docs/guide/step3.webp" width="49%"></a>
+
+1. **Сервер на VPS**: `sudo apex` → пункт 1, введите домен. Скопируйте адрес, который напечатает скрипт.
+2. **GitHub → Settings → Secrets and variables → Actions → Variables**: добавьте `SERVER_URL` с этим адресом.
+3. **Ключ подписи (один раз)**: на VPS `sudo apex` → пункт 22, затем в **Secrets** добавьте `APEX_KEYSTORE_PASSWORD` и `APEX_KEYSTORE_BASE64`. После этого все версии подписаны одним ключом и ставятся друг поверх друга.
+4. **Actions → Build APEX VPN → Run workflow** (или запушьте в `main`). Через ~25 минут в **Releases** появится `apex-vpn-<версия>.apk`.
+5. **На сервере**: `sudo apex publish <версия>` (или включите автопубликацию, пункт 17).
+6. **На телефоне**: один раз удалите старую версию, затем откройте `https://ваш-домен/apexvpn/` и установите.
 
 > [!IMPORTANT]
-> APK из Releases подписан временным ключом. Ставьте приложение со своего сервера: `…/apexvpn/apex-vpn-latest.apk`.
+> Ошибка **«конфликтует с другим пакетом»** значит, что старое и новое приложение подписаны разными ключами. Удалите APEX VPN один раз и поставьте заново. Шаг 3 делает так, чтобы это больше не повторялось.
 
 </details>
 
@@ -241,6 +247,10 @@ server/                 сервер обновлений для VPS (install.sh
 </details>
 
 ## 📝 Что нового
+
+**1.7.1**
+- Исправлена ошибка «конфликтует с другим пакетом»: постоянный ключ подписи сборок
+- Пошаговая инструкция с картинками: [docs/GUIDE.md](docs/GUIDE.md)
 
 **1.7.0**
 - Свайп по щиту меняет сервер

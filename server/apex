@@ -13,10 +13,10 @@
 #   apex                            меню (установка, резервные копии, сертификат, обновление скрипта…)
 #   apex backup | restore <файл> | update-script | uninstall
 #   apex auto on|off|run           автопубликация новых версий с GitHub
-#   apex stats [дней] | health | maintain
+#   apex stats [дней] | health | maintain | github-key
 set -euo pipefail
 
-APEX_SCRIPT_VERSION="1.7.0"
+APEX_SCRIPT_VERSION="1.7.1"
 CONFIG="${APEX_CONFIG:-/etc/apexvpn/config}"
 # shellcheck disable=SC1090
 [[ -f "$CONFIG" ]] && source "$CONFIG"
@@ -599,6 +599,23 @@ EOF
   ensure_access_log
 }
 
+cmd_github_key() { # ключ сервера для секретов GitHub — тогда все сборки подписаны одним ключом
+  need_root
+  [[ -f "$KEYSTORE" ]] || die "нет ключа $KEYSTORE — сначала установите сервер"
+  echo "Добавьте в GitHub два секрета: Settings → Secrets and variables → Actions → Secrets → New repository secret"
+  echo "⚠️  Это ключ подписи. Вставляйте только в секреты GitHub и никому не отправляйте."
+  echo
+  echo "Name:  APEX_KEYSTORE_PASSWORD"
+  echo "Value: $(cat "$KEYPASS_FILE")"
+  echo
+  echo "Name:  APEX_KEYSTORE_BASE64"
+  echo "Value (одна длинная строка ниже, копируйте целиком):"
+  echo
+  base64 -w0 "$KEYSTORE"; echo
+  echo
+  echo "После этого сборки на GitHub подписываются тем же ключом, что и apex publish."
+}
+
 # ─── Меню ────────────────────────────────────────────────────────────────
 
 if [[ -t 1 ]]; then B=$'\e[1m'; D=$'\e[2m'; V=$'\e[38;5;141m'; C=$'\e[38;5;80m'; G=$'\e[32m'; R=$'\e[31m'; N=$'\e[0m'
@@ -658,6 +675,7 @@ menu() {
     item 19 "Здоровье сервера"
     item 20 "Обслуживание сейчас"
     item 21 "Зеркала APK"
+    item 22 "Ключ подписи для GitHub"
     echo
     item 0  "Выход"
     echo
@@ -703,6 +721,7 @@ menu() {
             echo "  MIRROR_GITHUB=\"yes\"                                 — загрузить APK в релиз GitHub"
             echo; echo "Сейчас: SYNC=${MIRROR_SYNC:-—}  URLS=${MIRROR_URLS:-—}  GITHUB=${MIRROR_GITHUB:-нет}"
             echo "Если основной сервер недоступен, приложение скачает APK с зеркала и проверит его по sha256." ) ;;
+      22) ( cmd_github_key ) ;;
       0|q|exit) exit 0 ;;
       *) echo "Нет такого пункта" ;;
     esac
@@ -729,6 +748,7 @@ case "${1:-menu}" in
   health) cmd_health ;;
   maintain) cmd_maintain ;;
   setup-units) setup_units ;;
+  github-key) cmd_github_key ;;
   -v|--version|version) echo "apex $APEX_SCRIPT_VERSION" ;;
   *) awk 'NR>1 && /^#/ {sub(/^# ?/, ""); print; next} NR>1 {exit}' "$0" ;;
 esac
