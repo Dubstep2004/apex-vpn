@@ -156,7 +156,12 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
         // ── Подключение ──
         SectionLabel("Подключение")
         Group {
-            ListRow("Профиль", "${s.profile.title} — ${s.profile.subtitle}", leading = { tile(Icons.Rounded.SportsEsports) }, onClick = { onOpenPage(Page.Profile) }) { Chevron() }
+            ListRow("Профиль", when (s.task) {
+                "games" -> "🎮 Игры — минимальный пинг"
+                "video" -> "🎬 Видео — самый быстрый сервер"
+                "calls" -> "📞 Звонки — стабильная связь"
+                else -> "${s.profile.title} — ${s.profile.subtitle}"
+            }, leading = { tile(Icons.Rounded.SportsEsports) }, onClick = { onOpenPage(Page.Profile) }) { Chevron() }
             GroupDivider()
             ListRow(
                 "Автопереключение при сбое",
