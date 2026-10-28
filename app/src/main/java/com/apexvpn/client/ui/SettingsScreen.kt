@@ -191,7 +191,8 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
             GroupDivider()
             ListRow(
                 "DNS",
-                if (s.kids) "Семейный режим" else if (s.dns == DnsChoice.Custom) s.customDns else s.dns.title,
+                if (s.kids) "Семейный режим" else if (s.dns == DnsChoice.Custom) s.customDns
+                else if (s.dns == DnsChoice.Auto) "Авто · " + DnsChoice.of(com.apexvpn.client.data.DnsAuto.best).title else s.dns.title,
                 leading = { tile(Icons.Rounded.Dns) },
                 onClick = { onOpenPage(Page.Dns) },
             ) { Chevron() }

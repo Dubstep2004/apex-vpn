@@ -85,11 +85,17 @@ object BankApps {
 /** Публичный DNS для зарубежных запросов (идёт через VPN). */
 enum class DnsChoice(val id: String, val title: String, val subtitle: String) {
     /** Сам выбирает самый быстрый: Cloudflare, Google или Quad9 */
-    Auto("auto", "Авто", "Самый быстрый DNS — проверяется при подключении"),
+    Auto("auto", "Авто", "Самый быстрый из 6 DNS — проверяется при подключении"),
     Cloudflare("cloudflare", "Cloudflare", "1.1.1.1 — быстрый"),
     Google("google", "Google", "8.8.8.8"),
     Quad9("quad9", "Quad9", "9.9.9.9 — защита от вредоносных сайтов"),
     AdGuard("adguard", "AdGuard", "Блокирует рекламу на уровне DNS"),
+    Mullvad("mullvad", "Mullvad", "Без журналов, приватный"),
+    OpenDns("opendns", "OpenDNS", "Cisco — быстрый и надёжный"),
+    ControlD("controld", "Control D", "Быстрый, без фильтров"),
+    NextDns("nextdns", "NextDNS", "Приватный, без настройки"),
+    Yandex("yandex", "Яндекс DNS", "Базовый — для российских сетей"),
+    Comss("comss", "Comss.one", "Открывает ИИ-сервисы, недоступные в России"),
     Custom("custom", "Свой DNS", "Любой адрес DNS-over-HTTPS");
 
     companion object {

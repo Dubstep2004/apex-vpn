@@ -124,6 +124,8 @@ object Prefs {
         o.keys().asSequence().associateWith { o.getInt(it) }
     }.getOrDefault(emptyMap())
 
+    fun clearMeasurements() = sp.edit { remove("last_pings"); remove("auto_dns") }
+
     fun saveLastPings(map: Map<String, Int>) {
         if (map.values.none { it > 0 }) return
         sp.edit { putString("last_pings", org.json.JSONObject(map.filterValues { it > 0 }).toString()) }

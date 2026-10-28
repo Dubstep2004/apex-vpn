@@ -516,12 +516,21 @@ fun TiltSensor(enabled: Boolean) {
         val sensor = sm?.getDefaultSensor(android.hardware.Sensor.TYPE_GRAVITY)
             ?: sm?.getDefaultSensor(android.hardware.Sensor.TYPE_ACCELEROMETER)
         val listener = object : android.hardware.SensorEventListener {
+            // «Привычное» положение телефона медленно подстраивается: в покое щит и блик
+            // возвращаются в центр, а реагируют на наклон относительно него
+            var baseX = Float.NaN
+            var baseY = Float.NaN
             override fun onSensorChanged(e: android.hardware.SensorEvent) {
-                val tx = (-e.values[0] / 9.81f).coerceIn(-1f, 1f)
-                val ty = ((e.values[1] / 9.81f - 0.6f) * 2f).coerceIn(-1f, 1f)
-                // Сглаживание, чтобы блик плыл, а не дрожал
-                Tilt.x += (tx - Tilt.x) * 0.12f
-                Tilt.y += (ty - Tilt.y) * 0.12f
+                val rx = -e.values[0] / 9.81f
+                val ry = e.values[1] / 9.81f
+                if (baseX.isNaN()) { baseX = rx; baseY = ry }
+                baseX += (rx - baseX) * 0.01f
+                baseY += (ry - baseY) * 0.01f
+                val tx = ((rx - baseX) * 2.2f).coerceIn(-1f, 1f)
+                val ty = ((ry - baseY) * 2.2f).coerceIn(-1f, 1f)
+                // Сглаживание, чтобы движение было плавным, а не дрожало
+                Tilt.x += (tx - Tilt.x) * 0.15f
+                Tilt.y += (ty - Tilt.y) * 0.15f
             }
             override fun onAccuracyChanged(s: android.hardware.Sensor?, a: Int) = Unit
         }

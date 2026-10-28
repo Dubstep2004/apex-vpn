@@ -12,9 +12,9 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Авто-выбор DNS: меряем, как быстро отвечают Cloudflare, Google и Quad9 по DNS-over-HTTPS
+ * Авто-выбор DNS: меряем, как быстро отвечают Cloudflare, Google, Quad9, Mullvad, OpenDNS и Control D по DNS-over-HTTPS
  * (если VPN включён — через VPN, как ходит и сам DNS), и берём самый быстрый.
- * AdGuard в выбор не входит: он меняет поведение (режет рекламу), а не только скорость.
+ * AdGuard, Яндекс, Comss и NextDNS в выбор не входят: они меняют поведение (фильтры, геолокация), а не только скорость.
  */
 object DnsAuto {
     data class Result(val id: String, val ms: Int)
@@ -23,6 +23,9 @@ object DnsAuto {
         DnsChoice.Cloudflare to "https://1.1.1.1/dns-query",
         DnsChoice.Google to "https://dns.google/dns-query",
         DnsChoice.Quad9 to "https://dns.quad9.net/dns-query",
+        DnsChoice.Mullvad to "https://dns.mullvad.net/dns-query",
+        DnsChoice.OpenDns to "https://doh.opendns.com/dns-query",
+        DnsChoice.ControlD to "https://freedns.controld.com/p0",
     )
 
     private val _results = MutableStateFlow<List<Result>>(emptyList())

@@ -128,3 +128,14 @@ func TestStableAuto(t *testing.T) {
 		t.Fatalf("all excluded must keep original: %v", got)
 	}
 }
+
+func TestAllDNSProviders(t *testing.T) {
+	nodes := parseNodes(t, "vless://"+testUUID+"@1.2.3.4:443?type=tcp&security=tls&sni=a.example.com#A")
+	for id := range dnsServers {
+		opts, _ := json.Marshal(map[string]any{"dns": id, "findProcess": true})
+		cfg := checkAll(t, nodes, string(opts))
+		if !strings.Contains(cfg, dnsServers[id]["server"].(string)) {
+			t.Fatalf("%s: нет сервера DNS в конфиге", id)
+		}
+	}
+}

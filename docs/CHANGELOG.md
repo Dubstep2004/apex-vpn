@@ -2,6 +2,26 @@
 
 <img src="img/tags/new.svg" height="22"> <img src="img/tags/improved.svg" height="22"> <img src="img/tags/changed.svg" height="22"> <img src="img/tags/fixed.svg" height="22"> <img src="img/tags/removed.svg" height="22">
 
+## 2.3.1 · 28 октября 2026
+
+<img src="img/tags/new.svg" alt="Новое" height="22">
+
+- Ещё 6 DNS: Mullvad, OpenDNS, Control D, NextDNS, Яндекс DNS и Comss.one (открывает ИИ-сервисы)
+
+<img src="img/tags/improved.svg" alt="Улучшено" height="22">
+
+- DNS «Авто» выбирает из 6 серверов: Cloudflare, Google, Quad9, Mullvad, OpenDNS и Control D
+- В настройках видно, какой DNS сейчас выбрал «Авто»
+
+<img src="img/tags/fixed.svg" alt="Исправлено" height="22">
+
+- 3D-щит и блики стекла больше не «завалены» в покое — наклон считается от привычного положения телефона
+- Подбор самого быстрого сервера, как и автопилот, не выбирает серверы России и LTE-обхода
+- Объявление из панели только с картинкой или только с кнопкой теперь показывается
+- «Очистить данные» сбрасывает и сохранённые замеры пинга и выбор DNS
+- APEX Watch: кнопка «Назад» в списке серверов возвращает на главный экран, а не закрывает приложение
+- APEX Watch: плитка использует стабильный способ ответа системе
+
 ## 2.3.0 · 28 октября 2026
 
 <img src="img/tags/new.svg" alt="Новое" height="22">

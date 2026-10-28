@@ -21,6 +21,7 @@ object DataCleaner {
         runCatching { File(context.filesDir, "crashes").deleteRecursively() }
         runCatching { context.cacheDir.listFiles()?.forEach { it.deleteRecursively() } }
         Prefs.connectCount = 0
+        Prefs.clearMeasurements()
         Prefs.dismissedAnnounce = ""
     }
 }

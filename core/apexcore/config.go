@@ -121,6 +121,13 @@ var dnsServers = map[string]map[string]any{
 	"google":     {"type": "https", "server": "8.8.8.8"},
 	"quad9":      {"type": "https", "server": "9.9.9.9"},
 	"adguard":    {"type": "https", "server": "dns.adguard-dns.com", "domain_resolver": "local"},
+	// Ещё DNS (2.3.1)
+	"mullvad":  {"type": "https", "server": "dns.mullvad.net", "domain_resolver": "local"},
+	"opendns":  {"type": "https", "server": "doh.opendns.com", "domain_resolver": "local"},
+	"controld": {"type": "https", "server": "freedns.controld.com", "path": "/p0", "domain_resolver": "local"},
+	"nextdns":  {"type": "https", "server": "dns.nextdns.io", "path": "/", "domain_resolver": "local"},
+	"yandex":   {"type": "https", "server": "common.dot.dns.yandex.net", "domain_resolver": "local"},
+	"comss":    {"type": "https", "server": "dns.comss.one", "domain_resolver": "local"},
 }
 
 var familyDNS = map[string]any{"type": "https", "server": "family.adguard-dns.com", "domain_resolver": "local"}

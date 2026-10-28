@@ -269,7 +269,8 @@ object Subscription {
             Prefs.announceUrl = (header("announce-url")?.trim() ?: rich.url).takeIf { AnnounceParser.safeLink(it) } ?: ""
             Prefs.announceButton = if (Prefs.announceUrl.isEmpty()) "" else
                 (decodeTitle(header("announce-button"))?.trim()?.takeIf { it.isNotEmpty() } ?: rich.button.ifBlank { "Подробнее" }).take(40)
-            if (Prefs.announce.isEmpty()) { Prefs.announceImage = ""; Prefs.announceUrl = ""; Prefs.announceButton = "" }
+            // Объявление может быть только картинкой или кнопкой — без текста
+            if (Prefs.announce.isEmpty() && Prefs.announceImage.isEmpty() && Prefs.announceUrl.isEmpty()) Prefs.announceButton = ""
             Prefs.supportUrl = header("support-url")?.trim()?.takeIf { it.startsWith("http") || it.startsWith("tg:") } ?: ""
             Prefs.webPageUrl = header("profile-web-page-url")?.trim()?.takeIf { it.startsWith("http") } ?: ""
 

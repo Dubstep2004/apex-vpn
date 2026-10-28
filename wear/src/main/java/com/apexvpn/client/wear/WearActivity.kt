@@ -102,6 +102,7 @@ class WearActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         }
         setContent {
             MaterialTheme {
+                androidx.activity.compose.BackHandler(enabled = picking) { picking = false }
                 if (picking) {
                     ServerPicker(servers, onPick = { tag ->
                         send("/apex/select", tag.toByteArray())

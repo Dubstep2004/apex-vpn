@@ -869,7 +869,7 @@ private fun DnsPage(viewModel: MainViewModel, onBack: () -> Unit) {
                     }
                 }) { Text(if (busy) "Проверяю…" else "Проверить сейчас", color = Apex.Accent) }
             }
-            Caption("Авто сравнивает Cloudflare, Google и Quad9 после каждого подключения и берёт самый быстрый. Меняет DNS, только если другой заметно быстрее.")
+            Caption("Авто сравнивает Cloudflare, Google, Quad9, Mullvad, OpenDNS и Control D после каждого подключения и берёт самый быстрый. Меняет DNS, только если другой заметно быстрее.")
         }
         if (s.kids) Caption("Семейный режим закрывает сайты 18+, казино и букмекеров, а DNS — семейный AdGuard (выбор DNS не действует).")
         SectionLabel("Свой DNS-over-HTTPS")

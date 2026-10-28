@@ -1,6 +1,6 @@
 package com.apexvpn.client.wear
 
-import androidx.concurrent.futures.ResolvableFuture
+import androidx.concurrent.futures.CallbackToFutureAdapter
 import androidx.wear.protolayout.ActionBuilders
 import androidx.wear.protolayout.ColorBuilders.argb
 import androidx.wear.protolayout.DimensionBuilders.dp
@@ -78,11 +78,11 @@ class ApexTile : TileService() {
             .setFreshnessIntervalMillis(60_000)
             .setTileTimeline(TimelineBuilders.Timeline.fromLayoutElement(column))
             .build()
-        return ResolvableFuture.create<TileBuilders.Tile>().also { it.set(tile) }
+        return CallbackToFutureAdapter.getFuture { it.set(tile); "tile" }
     }
 
     override fun onTileResourcesRequest(requestParams: RequestBuilders.ResourcesRequest): ListenableFuture<ResourceBuilders.Resources> =
-        ResolvableFuture.create<ResourceBuilders.Resources>().also { it.set(ResourceBuilders.Resources.Builder().setVersion(RES).build()) }
+        CallbackToFutureAdapter.getFuture { it.set(ResourceBuilders.Resources.Builder().setVersion(RES).build()); "res" }
 
     private fun toggle() {
         val ctx = this

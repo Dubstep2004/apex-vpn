@@ -643,7 +643,7 @@ private fun SubscriptionCard(
         }
 
         // Объявление от сервиса (заголовок announce из Remnawave)
-        if (sub.announce.isNotBlank()) {
+        if (sub.announce.isNotBlank() || sub.announceImage.isNotBlank() || sub.announceUrl.isNotBlank()) {
             // 434. Картинка над текстом
             if (sub.announceImage.isNotBlank()) {
                 val ctx = LocalContext.current
@@ -663,8 +663,8 @@ private fun SubscriptionCard(
                     )
                 }
             }
-            Spacer(Modifier.height(12.dp))
-            Text(
+            if (sub.announce.isNotBlank()) Spacer(Modifier.height(12.dp))
+            if (sub.announce.isNotBlank()) Text(
                 sub.announce,
                 color = Apex.Text,
                 fontSize = 15.sp,
