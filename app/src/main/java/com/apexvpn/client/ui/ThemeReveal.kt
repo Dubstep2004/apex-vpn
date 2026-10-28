@@ -25,7 +25,6 @@ import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import com.apexvpn.client.ui.theme.Apex
-import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import kotlin.math.hypot
 
@@ -39,18 +38,23 @@ object ThemeReveal {
     internal var snapshot by mutableStateOf<ImageBitmap?>(null)
     internal var center by mutableStateOf(Offset.Zero)
     internal val progress = Animatable(0f)
-    private val scope = MainScope()
+    /**
+     * Корутины из композиции: у них есть часы кадров. В обычном MainScope анимация
+     * упала бы с ошибкой «MonotonicFrameClock is not available».
+     */
+    internal var scope: kotlinx.coroutines.CoroutineScope? = null
     private var running = false
 
     /** Применить смену оформления с волной (или сразу — в «Плавном режиме»). */
     fun run(apply: () -> Unit) {
         val l = layer
-        if (l == null || running || Apex.feel.smooth) {
+        val sc = scope
+        if (l == null || sc == null || running || Apex.feel.smooth) {
             apply()
             return
         }
         running = true
-        scope.launch {
+        sc.launch {
             try {
                 val bmp = runCatching { l.toImageBitmap() }.getOrNull()
                 if (bmp == null) {
@@ -75,6 +79,7 @@ object ThemeReveal {
 fun ThemeRevealHost(content: @Composable BoxScope.() -> Unit) {
     val layer = rememberGraphicsLayer()
     ThemeReveal.layer = layer
+    ThemeReveal.scope = androidx.compose.runtime.rememberCoroutineScope()
     Box(
         Modifier
             .fillMaxSize()

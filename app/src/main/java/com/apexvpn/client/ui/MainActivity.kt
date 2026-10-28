@@ -162,7 +162,6 @@ class MainActivity : ComponentActivity() {
         setContent {
             ApexTheme {
                 Surface(Modifier.fillMaxSize(), color = Apex.Base) {
-                    com.apexvpn.client.ui.theme.DesignBackground()
                     val sub by viewModel.subscription.collectAsStateWithLifecycle()
                     val message by viewModel.message.collectAsStateWithLifecycle()
                     val importLink by pendingImport.collectAsStateWithLifecycle()
@@ -186,6 +185,8 @@ class MainActivity : ComponentActivity() {
                     com.apexvpn.client.ui.theme.TiltSensor(st.design == com.apexvpn.client.data.Design.Glass && !st.smoothMode)
                     var onboarded by remember { mutableStateOf(com.apexvpn.client.data.Prefs.onboarded) }
                     ThemeRevealHost {
+                        // Фон рисуем внутри — чтобы «волна» меняла и его
+                        com.apexvpn.client.ui.theme.DesignBackground()
                         if (sub.url.isEmpty() && !onboarded) {
                             // 320. Знакомство при первом запуске
                             Onboarding {

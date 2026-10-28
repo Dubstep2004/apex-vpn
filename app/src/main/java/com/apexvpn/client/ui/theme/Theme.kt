@@ -436,8 +436,20 @@ object Tilt {
 @Composable
 fun TiltSensor(enabled: Boolean) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    androidx.compose.runtime.DisposableEffect(enabled) {
-        if (!enabled) {
+    // Только пока экран приложения виден — в фоне датчик не тратит батарею
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    var resumed by androidx.compose.runtime.remember {
+        androidx.compose.runtime.mutableStateOf(lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED))
+    }
+    androidx.compose.runtime.DisposableEffect(lifecycle) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, _ ->
+            resumed = lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+        }
+        lifecycle.addObserver(obs)
+        onDispose { lifecycle.removeObserver(obs) }
+    }
+    androidx.compose.runtime.DisposableEffect(enabled && resumed) {
+        if (!(enabled && resumed)) {
             Tilt.x = 0f; Tilt.y = 0f
             return@DisposableEffect onDispose { }
         }

@@ -117,6 +117,13 @@ object Prefs {
         get() = sp.getInt("connect_count", 0)
         set(v) = sp.edit { putInt("connect_count", v) }
 
+    /** Один раз: у тех, кто уже пользовался приложением до 2.1, подключения были. */
+    fun initConnectCount() {
+        if (sp.getBoolean("count_init", false)) return
+        if (subscriptionUrl.isNotEmpty() && lastSeenVersionCode in 1..31 && connectCount == 0) connectCount = 1
+        sp.edit { putBoolean("count_init", true) }
+    }
+
     fun clearSubscription() = sp.edit {
         remove("sub_url"); remove("nodes"); remove("selected"); remove("title")
         remove("used"); remove("total"); remove("expire"); remove("updated")

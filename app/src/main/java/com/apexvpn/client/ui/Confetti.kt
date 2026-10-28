@@ -16,7 +16,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.apexvpn.client.data.Celebrate
 import com.apexvpn.client.ui.theme.Apex
 import kotlin.random.Random
@@ -32,15 +31,17 @@ private class Piece(
  */
 @Composable
 fun ConfettiOverlay(onMessage: (String) -> Unit) {
-    val event by Celebrate.event.collectAsStateWithLifecycle()
     var pieces by remember { mutableStateOf<List<Piece>>(emptyList()) }
     val t = remember { Animatable(0f) }
     val colors = listOf(Apex.Accent, Apex.Cyan, Color(0xFFFFD166), Color(0xFFFF5D8F), Color(0xFF5BD69A), Color.White)
-    LaunchedEffect(event?.id) {
-        val e = event ?: return@LaunchedEffect
+    // Слушаем поток, а не ключ: иначе «съеденное» событие отменяло анимацию
+    // и конфетти застывало на экране
+    LaunchedEffect(Unit) {
+        Celebrate.event.collect { e ->
+        if (e == null) return@collect
         e.text?.let(onMessage)
         Celebrate.consume()
-        if (Apex.feel.smooth) return@LaunchedEffect
+        if (Apex.feel.smooth) return@collect
         val r = Random(e.id)
         pieces = List(140) { i ->
             val left = i % 2 == 0
@@ -56,9 +57,13 @@ fun ConfettiOverlay(onMessage: (String) -> Unit) {
                 round = r.nextFloat() < 0.25f,
             )
         }
-        t.snapTo(0f)
-        t.animateTo(1f, tween(2800, easing = LinearEasing))
-        pieces = emptyList()
+        try {
+            t.snapTo(0f)
+            t.animateTo(1f, tween(2800, easing = LinearEasing))
+        } finally {
+            pieces = emptyList()
+        }
+        }
     }
     if (pieces.isEmpty()) return
     Canvas(Modifier.fillMaxSize()) {

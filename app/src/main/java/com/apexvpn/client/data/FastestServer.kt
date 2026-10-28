@@ -33,6 +33,13 @@ object FastestServer {
     private val _state = MutableStateFlow(State())
     val state = _state.asStateFlow()
 
+    @Volatile private var stopRequested = false
+
+    /** Остановить подбор (в том числе запущенный автоматически после подключения). */
+    fun cancel() {
+        stopRequested = true
+    }
+
     private const val CANDIDATES = 5
     private const val BYTES = 6_000_000
     private const val LIMIT_NS = 5_000_000_000L
@@ -51,6 +58,7 @@ object FastestServer {
         }
         val before = Prefs.selectedTag
         var switched = false
+        stopRequested = false
         _state.value = State(running = true, step = "Пинг всех серверов…")
         try {
             val pings = Pinger.pingAll(nodes)
@@ -63,6 +71,7 @@ object FastestServer {
             val probes = top.map { (n, p) -> Probe(n.tag, ServerInfo.title(n.name), ServerInfo.flag(n.name), p) }.toMutableList()
             _state.value = _state.value.copy(probes = probes.toList())
             for (i in probes.indices) {
+                if (stopRequested) error("Подбор остановлен")
                 val pr = probes[i]
                 _state.value = _state.value.copy(step = "Скорость: ${pr.title} (${i + 1} из ${probes.size})")
                 switched = true
@@ -73,6 +82,7 @@ object FastestServer {
                 probes[i] = pr.copy(mbps = mbps)
                 _state.value = _state.value.copy(probes = probes.toList())
             }
+            if (stopRequested) error("Подбор остановлен")
             val best = probes.filter { it.mbps > 0 }.maxByOrNull { it.mbps } ?: error("Не удалось измерить скорость")
             // Закрепляем: выбор сохраняется и ядро перезагружается с этим сервером
             Subscription.select(best.tag)

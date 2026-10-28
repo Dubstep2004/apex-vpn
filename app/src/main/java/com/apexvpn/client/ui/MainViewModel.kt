@@ -156,6 +156,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 showMessage(err ?: "$done вместе с подпиской")
             }
         } else {
+            // Подписка та же: выбранный сервер из копии нужно применить и в состоянии, и в ядре
+            if (restored.selected.isNotBlank()) Subscription.select(restored.selected)
             change { this }
             showMessage(done)
         }
@@ -261,6 +263,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun cancelFastest() {
+        com.apexvpn.client.data.FastestServer.cancel()
         fastestJob?.cancel()
     }
 

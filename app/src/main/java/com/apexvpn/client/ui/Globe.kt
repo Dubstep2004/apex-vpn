@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.PointMode
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -135,6 +136,7 @@ fun Globe(
     val drift by t.animateFloat(0f, 360f, infiniteRepeatable(tween(90000, easing = LinearEasing)), label = "drift")
     val phase by t.animateFloat(0f, 1f, infiniteRepeatable(tween(2400, easing = LinearEasing), RepeatMode.Restart), label = "phase")
 
+    val buf = remember { PointBuffers() }
     val dot = Apex.Text
     val accent = Apex.Accent
     val accent2 = Apex.Cyan
@@ -150,18 +152,28 @@ fun Globe(
             Brush.radialGradient(listOf(ocean, ocean.copy(alpha = 0.6f), Color.Black.copy(alpha = if (dark) 0.6f else 0.15f)), c - Offset(r * 0.3f, r * 0.3f), r * 1.5f),
             r, c,
         )
-        // Суша: точки разной яркости по глубине (три слоя за один вызов каждый)
-        val buckets = arrayOf(ArrayList<Offset>(), ArrayList<Offset>(), ArrayList<Offset>())
+        // Суша: точки разной яркости по глубине (три слоя за один вызов каждый).
+        // Координаты пишем в готовые массивы — без тысяч объектов на каждый кадр.
         val o = FloatArray(3)
+        val counts = IntArray(3)
         for (v in GlobeLand.points) {
             p.project(v, o)
             if (o[2] <= 0.02f) continue
             val b = if (o[2] > 0.6f) 2 else if (o[2] > 0.3f) 1 else 0
-            buckets[b] += Offset(c.x + o[0] * r, c.y - o[1] * r)
+            val arr = buf.layers[b]
+            val k = counts[b] * 2
+            arr[k] = c.x + o[0] * r
+            arr[k + 1] = c.y - o[1] * r
+            counts[b]++
         }
         val base = if (dark) 0.75f else 0.6f
-        buckets.forEachIndexed { i, pts ->
-            drawPoints(pts, PointMode.Points, dot.copy(alpha = base * (0.35f + i * 0.3f)), strokeWidth = r * 0.024f, cap = StrokeCap.Round)
+        drawIntoCanvas { canvas ->
+            for (i in 0..2) {
+                if (counts[i] == 0) continue
+                buf.paint.color = dot.copy(alpha = base * (0.35f + i * 0.3f))
+                buf.paint.strokeWidth = r * 0.024f
+                canvas.drawRawPoints(PointMode.Points, buf.slice(i, counts[i]), buf.paint)
+            }
         }
         // Блик
         drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha = 0.10f), Color.Transparent), c - Offset(r * 0.45f, r * 0.45f), r * 0.9f), r, c)
@@ -200,6 +212,29 @@ fun Globe(
             globePin(p, b, c, r, if (connected) accent2 else dot.copy(alpha = 0.7f), connected && live, phase)
         }
         if (a != null) globePin(p, a, c, r, accent, false, phase)
+    }
+}
+
+/** Переиспользуемые массивы точек глобуса (по слою на глубину). */
+private class PointBuffers {
+    private val n = GlobeLand.points.size * 2
+    val layers = arrayOf(FloatArray(n), FloatArray(n), FloatArray(n))
+    private val views = arrayOfNulls<FloatArray>(3)
+    val paint = androidx.compose.ui.graphics.Paint().apply {
+        strokeCap = StrokeCap.Round
+        isAntiAlias = true
+    }
+
+    /** drawRawPoints рисует весь массив — отдаём копию нужной длины, переиспользуя её между кадрами. */
+    fun slice(layer: Int, count: Int): FloatArray {
+        val len = count * 2
+        var v = views[layer]
+        if (v == null || v.size != len) {
+            v = FloatArray(len)
+            views[layer] = v
+        }
+        System.arraycopy(layers[layer], 0, v, 0, len)
+        return v
     }
 }
 

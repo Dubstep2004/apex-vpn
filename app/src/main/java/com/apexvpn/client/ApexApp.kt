@@ -125,6 +125,7 @@ class ApexApp : Application() {
                 .collect { com.apexvpn.client.vpn.Shortcuts.refresh(this@ApexApp) }
         }
 
+        Prefs.initConnectCount()
         BackgroundWork.schedule(this)
         // 259. Точные напоминания о конце подписки — при каждой новой дате окончания
         appScope.launch {
