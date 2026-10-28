@@ -68,3 +68,18 @@ func TestDescriptionAdsMetaCore(t *testing.T) {
 	}
 	checkAll(t, n, `{"clashApi":9095,"xrayAuth":"sec"}`)
 }
+
+func TestMentionsAds(t *testing.T) {
+	yes := []string{"⚠️ РЕКЛАМА НА YOUTUBE ЕСТЬ! 📢", "Финляндия (есть реклама)", "YouTube with ads"}
+	no := []string{"Россия | Ютуб без рекламы", "YouTube без рекламы", "Нидерланды • Wi-Fi", "Реклама: нет", "no ads", "ad-free", "Германия | Ютуб для роутера", "Loading"}
+	for _, s := range yes {
+		if !mentionsAds(s) {
+			t.Errorf("want ads: %q", s)
+		}
+	}
+	for _, s := range no {
+		if mentionsAds(s) {
+			t.Errorf("want NO ads: %q", s)
+		}
+	}
+}

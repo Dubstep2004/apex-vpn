@@ -6,6 +6,13 @@ data class Release(val version: String, val code: Int, val date: String, val cha
 object Changelog {
     val releases = listOf(
         Release(
+            "1.4.3", 10, "28 октября 2026",
+            listOf(
+                "Исправлено: серверы «без рекламы» больше не попадают в категорию «Реклама на YouTube есть»",
+                "Пометка о рекламе берётся из описания сервера в панели",
+            ),
+        ),
+        Release(
             "1.4.2", 9, "28 октября 2026",
             listOf(
                 "Обновления, новости и отчёты о сбоях — с собственного сервера",

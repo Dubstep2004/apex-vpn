@@ -39,8 +39,18 @@ func splitDescription(n *Node) {
 		n.Description = decodeDescription(raw)
 	}
 	n.Description = strings.TrimSpace(n.Description)
-	low := strings.ToLower(n.Name + " " + n.Description)
-	n.Ads = strings.Contains(low, "реклам") || strings.Contains(low, "advert")
+	// Пометка о рекламе — прежде всего в описании (как «⚠️ РЕКЛАМА НА YOUTUBE ЕСТЬ!»).
+	// «Ютуб без рекламы», «no ads» — наоборот, сервер без рекламы.
+	n.Ads = mentionsAds(n.Description) || mentionsAds(n.Name)
+}
+
+var (
+	adsRe   = regexp.MustCompile(`(?i)реклам|\bads?\b|advert`)
+	noAdsRe = regexp.MustCompile(`(?i)(без|нет|no|without|free)\s*(\p{L}+\s+)?(реклам|ads?\b|advert)|(реклам\p{L}*|ads?)[\s:\-—]*(нет|free)`)
+)
+
+func mentionsAds(s string) bool {
+	return adsRe.MatchString(s) && !noAdsRe.MatchString(s)
 }
 
 func decodeDescription(raw string) string {
