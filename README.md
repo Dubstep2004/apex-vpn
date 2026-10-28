@@ -1,104 +1,257 @@
-# APEX VPN
+<div align="center">
 
-VPN-клиент для Android, работающий только с подпиской `https://sub.knownhosts.ru/…`.
+<img src="docs/img/hero.webp" alt="APEX VPN" width="100%">
 
-- **Ядро** — sing-box 1.13.21. Протоколы: VLESS (Reality, Vision, WS, gRPC, HTTP/2, HTTPUpgrade, QUIC), VMess, Trojan, Shadowsocks (в т. ч. 2022, плагины obfs-local и v2ray-plugin), ShadowTLS, Hysteria, Hysteria 2 (со сменой портов), TUIC, WireGuard, AnyTLS, NaiveProxy, SOCKS 4/5, HTTP(S), SSH. Цепочки серверов (detour) из JSON-подписок.
-- **Два ядра** — sing-box и Xray (как в Happ). «Настройки → Ядро»: Авто (Xray только для XHTTP, mKCP, VLESS Encryption), Только Xray, Только sing-box. Xray — официальная сборка XTLS (`core/xray-version`), скачивается при сборке (`core/fetch-xray.sh`).
-- **Пинг** — при включённом VPN настоящая задержка через сервер (Clash API ядра); без VPN — время TCP-соединения, а для Hysteria/TUIC — QUIC-рукопожатия.
-- **Подписи серверов** — `#Имя?serverDescription=<base64>` (формат Happ); серверы с пометкой о рекламе — отдельная категория, автопилот их не выбирает. Shadowsocks в приложении скрыт.
-- **Карточка подписки** — заголовки `profile-title`, `announce`, `support-url`, `profile-web-page-url`, `subscription-userinfo`, `profile-update-interval` (или строки `#имя: значение` в теле подписки).
-- **Свой сервер (VPS)** — APK, `update.json`, `news.json` и отчёты о сбоях на вашем VPS; ключ подписи хранится там же. Установка и команды — [server/README.md](server/README.md).
-- **Категории протоколов** — в выборе сервера фильтр по протоколу с числом серверов; автопилот выбирает только среди выбранного протокола. У каждого сервера видно способ подключения (Reality · Vision · TCP и т. п.).
-- **Подписка** — только хост `sub.knownhosts.ru` (проверяется при вводе и после редиректов). Понимает base64-список ссылок, обычный список и JSON sing-box. Показывает трафик и срок действия из заголовка `subscription-userinfo`, автообновляется раз в 12 ч (или как задаст заголовок `profile-update-interval`).
-- **Серверы** — режим «Авто» (самый быстрый по замеру) или ручной выбор, замер задержки, смена сервера без разрыва VPN.
-- **Режимы** — «Умный» (российские сайты и IP напрямую по встроенным базам), «Всё через VPN», «Только выбранные».
-- **Сервисы через VPN** — YouTube, Instagram, Telegram, WhatsApp, TikTok, Discord, ChatGPT, Gemini, Claude, X, Twitch, Cloudflare. **Свои сайты** — списки «всегда через VPN» и «всегда напрямую».
-- **Блокировка рекламы и трекеров**, **детский режим** (семейный DNS), **свой DNS-over-HTTPS**.
-- **Банки не увидят VPN** и **выбор приложений** (все / кроме выбранных / только выбранные).
-- **Серверы** — шторка с автопилотом, избранным, сортировкой по пингу, вкладкой «Только LTE», разделом «Особые» и выбором протокола, если у сервера их несколько. Флаги стран — картинки (flag-icons, MIT).
-- **Профили подключения** — Обычный, Игры, Звонки, Экономия батареи. **Автопереключение**, если выбранный сервер перестал отвечать.
-- **Удобство** — плитка в шторке, виджет, скорость в уведомлении, таймер отключения, правила Wi-Fi (пауза в доверенных сетях), раздача VPN на компьютер (HTTP/SOCKS5 с паролем).
-- **Инструменты** — тест скорости, живой график пинга, проверка сайта («через VPN / напрямую / блок»).
-- **Подписка** — импорт по QR-коду и ссылкой `apexvpn://import?url=…`, напоминание о конце подписки и трафика.
-- **Сервер владельца** — новости (`news.json`), отчёты о сбоях, обновление баз сайтов раз в неделю (`RULES_BASE_URL` или официальные базы sing-box).
-- **Оформление** — 9 дизайнов (Классика, Liquid Glass, Material Expressive, Neon Cyber, Минимализм, Aurora, Бенто, Ретро-терминал, Пастель), тёмная/светлая/AMOLED/системная тема, 4 цвета акцента, 5 иконок приложения.
-- **Ярлыки и голос** — ярлыки серверов, «включи VPN в APEX VPN» для Ассистента (`res/xml/shortcuts.xml`), круглый и информационный виджеты.
-- **Wear OS** — модуль `wear`: кнопка VPN, сервер и пинг на часах (тот же ключ подписи; `apex publish` подписывает и его).
-- **Аварийный выключатель** и **семейный режим** (18+, казино, букмекеры).
-- WireGuard в подписке поддерживается; AmneziaWG — нет (ограничение ядра sing-box).
-- **Обновление приложения** — с вашего сервера: проверка при запуске и вручную в настройках, загрузка с прогрессом, проверка SHA-256, установка. Поддерживаются обязательные обновления.
-- Android 7.0+ (minSdk 24), APK для arm64-v8a и armeabi-v7a.
+<br>
 
-## Структура
+<a href="https://github.com/Dubstep2004/apex-vpn/releases/latest"><img src="https://img.shields.io/github/v/release/Dubstep2004/apex-vpn?style=for-the-badge&label=версия&color=7B6CFF&labelColor=16161B" alt="Версия"></a>
+<a href="https://github.com/Dubstep2004/apex-vpn/actions"><img src="https://img.shields.io/github/actions/workflow/status/Dubstep2004/apex-vpn/build.yml?style=for-the-badge&label=сборка&labelColor=16161B" alt="Сборка"></a>
+<img src="https://img.shields.io/badge/Android-7.0%2B-34D399?style=for-the-badge&logo=android&logoColor=white&labelColor=16161B" alt="Android 7+">
+<img src="https://img.shields.io/badge/sing--box-1.13-22D3EE?style=for-the-badge&labelColor=16161B" alt="sing-box">
+<img src="https://img.shields.io/badge/Xray-26-F472B6?style=for-the-badge&labelColor=16161B" alt="Xray">
 
+<h3>Быстрый и умный VPN-клиент для Android</h3>
+
+<p>Два ядра · все популярные протоколы · 9 дизайнов 2026 · карта подключения · свой сервер обновлений</p>
+
+<p>
+<a href="#-возможности">Возможности</a> ·
+<a href="#-дизайны-2026">Дизайны</a> ·
+<a href="#-протоколы">Протоколы</a> ·
+<a href="#-свой-сервер-vps">Свой сервер</a> ·
+<a href="#-сборка">Сборка</a> ·
+<a href="#-что-нового">Что нового</a>
+</p>
+
+</div>
+
+---
+
+> [!NOTE]
+> APEX VPN работает только с подпиской `https://sub.knownhosts.ru/…`. Ссылку можно вставить, отсканировать по QR-коду или открыть через `apexvpn://import?url=…`.
+
+## ✨ Возможности
+
+<div align="center">
+<img src="docs/img/screens.webp" alt="Экраны APEX VPN" width="100%">
+<br><sub>Иллюстрации интерфейса</sub>
+</div>
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+### 🛡️ Подключение
+- **Автопилот** выбирает самый быстрый сервер и переключается, если сервер перестал отвечать
+- **Смена сервера без разрыва** VPN
+- **Аварийный выключатель**: если VPN упал, интернет закрыт до переподключения
+- **Профили**: Обычный, Игры, Звонки, Экономия батареи
+
+</td>
+<td width="50%" valign="top">
+
+### 🧭 Маршрутизация
+- **Умный режим**: российские сайты и IP идут напрямую
+- **Сервисы через VPN**: YouTube, Instagram, Telegram, ChatGPT, Discord и другие
+- **Для опытных**: свои правила, FakeDNS, стратегия доменов, DoH / DoT / DoQ
+- **Банки не увидят VPN**, выбор приложений
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+### 🗺️ Главный экран
+- **Кнопка** или **Карта** с дугой от вас до сервера
+- **Живая карта**: дышащие кольца и бегущий по дуге свет
+- Живой график пинга, скорость, таймер отключения
+- Карточка подписки: трафик, срок, объявления, поддержка
+
+</td>
+<td valign="top">
+
+### 🎨 Оформление и ощущения
+- **9 дизайнов**, 4 темы, 5 цветов, 5 иконок
+- **Звук подключения**: Сигнал, Кристалл, Сфера, Звон (на беззвучном телефон молчит)
+- **Вибрация**, **плавный режим**, **размытие стекла**
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+### 📡 Серверы
+- Фильтр по протоколу с числом серверов
+- Настоящий пинг через VPN, а без VPN проверка по TCP / QUIC
+- Описания серверов в формате Happ; серверы с рекламой собраны в отдельный раздел
+- Избранное, вкладка «Только LTE», ярлыки серверов
+
+</td>
+<td valign="top">
+
+### 🧩 Удобство
+- Плитка в шторке, 3 виджета, **Wear OS**
+- Голос: «включи VPN в APEX VPN»
+- Правила Wi-Fi, раздача VPN на компьютер
+- Блокировка рекламы, **семейный режим** (18+, казино)
+
+</td>
+</tr>
+</table>
+
+## 🎨 Дизайны 2026
+
+<div align="center">
+<img src="docs/img/designs.webp" alt="9 дизайнов" width="100%">
+</div>
+
+| Дизайн | Характер |
+|---|---|
+| **Классика** | спокойный тёмный или светлый |
+| **Liquid Glass** | стекло и цветные пятна за ним |
+| **Material Expressive** | цвет берётся из обоев (Android 12+) |
+| **Neon Cyber** | неоновая сетка, розовый и голубой |
+| **Минимализм** | только чёрное и белое |
+| **Aurora** | плывущее северное сияние |
+| **Бенто** | главный экран из плиток |
+| **Ретро-терминал** | зелёный моноширинный шрифт |
+| **Пастель** | светлый и мягкий |
+
+Выбирается здесь: **Настройки → Дизайн, тема и иконка**.
+
+## 🔌 Протоколы
+
+Два ядра, как в Happ: **sing-box 1.13.21** и **Xray 26**. Выбор в **Настройки → Ядро**:
+- **Авто**: Xray включается только для того, что не умеет sing-box;
+- **Только Xray**;
+- **Только sing-box**.
+
+| | |
+|---|---|
+| **VLESS** | Reality, Vision, WS, gRPC, HTTP/2, HTTPUpgrade, QUIC, **XHTTP**, **VLESS Encryption** |
+| **VMess · Trojan** | все транспорты, **mKCP** через Xray |
+| **Hysteria · Hysteria 2** | со сменой портов и Salamander |
+| **TUIC · WireGuard · AnyTLS** | |
+| **NaiveProxy · ShadowTLS · SSH** | |
+| **SOCKS 4/5 · HTTP(S)** | цепочки серверов (detour) из JSON-подписок |
+
+<details>
+<summary>Не поддерживается</summary>
+
+- ShadowsocksR и AmneziaWG: их нет в ядрах.
+- Shadowsocks скрыт в приложении.
+
+</details>
+
+## 🖥️ Свой сервер (VPS)
+
+На вашем VPS лежат APK, `update.json` и `news.json`, туда же приходят отчёты о сбоях. Ключ подписи хранится только там.
+
+```bash
+curl -fsSL -o apex https://raw.githubusercontent.com/Dubstep2004/apex-vpn/main/server/apex && sudo bash apex
 ```
-app/                    Android-приложение (Kotlin, Jetpack Compose)
-  src/main/java/com/apexvpn/client/
-    vpn/                VpnService + связка с ядром sing-box
-    data/               подписка, настройки, замер задержки
-    update/             обновление приложения
-    ui/                 экраны
-core/apexcore/          Go: разбор подписки → конфиг sing-box (+ тесты)
-core/build-core.sh      сборка ядра в app/libs/libbox.aar
-design/icon.svg         исходник иконки
-server/update.json      пример файла обновления для вашего сервера
-.github/workflows/      сборка APK в GitHub Actions
-```
 
-## Сборка через GitHub Actions (проще всего)
+Откроется меню с номерами: установка, выпуск версии, объявления, отчёты о сбоях, резервная копия, сертификат, обновление скрипта. Потом меню открывается командой **`sudo apex`**.
 
-1. Установите сервер на VPS: `sudo bash server/install.sh ваш-домен` (подробно — [server/README.md](server/README.md)).
-2. В **Settings → Secrets and variables → Actions → Variables** добавьте `SERVER_URL` — адрес, который напечатал скрипт.
-3. Запушьте в `main` или запустите workflow вручную. Через ~25 минут на странице **Releases** появится `apex-vpn-<версия>.apk`.
-4. На сервере: `apex publish <версия>` — APK подписывается ключом сервера и выпускается для всех.
+Подробно: **[server/README.md](server/README.md)**
 
-APK из Releases подписан временным ключом — ставьте приложение со своего сервера (`…/apexvpn/apex-vpn-latest.apk`).
+## 🛠️ Сборка
 
-## Локальная сборка
+<details open>
+<summary><b>Через GitHub Actions (проще всего)</b></summary>
+
+1. Установите сервер на VPS (см. выше).
+2. В **Settings → Secrets and variables → Actions → Variables** добавьте `SERVER_URL`: это адрес, который напечатал скрипт.
+3. Запушьте в `main`. Примерно через 25 минут в **Releases** появится `apex-vpn-<версия>.apk`.
+4. На сервере выполните `apex publish <версия>`: APK подписывается ключом сервера и выпускается для всех.
+
+> [!IMPORTANT]
+> APK из Releases подписан временным ключом. Ставьте приложение со своего сервера: `…/apexvpn/apex-vpn-latest.apk`.
+
+</details>
+
+<details>
+<summary><b>Локально</b></summary>
 
 Нужны JDK 17, Go 1.25+, Android SDK и NDK `28.0.13004108`.
 
 ```bash
 export ANDROID_HOME=~/Android/Sdk
 ./core/build-core.sh                      # ядро → app/libs/libbox.aar
-./gradlew assembleRelease -PupdateUrl=https://ваш-сайт/apexvpn/update.json
-# APK: app/build/outputs/apk/release/app-release.apk
+./core/fetch-xray.sh                      # Xray → jniLibs
+./gradlew assembleRelease
 ```
 
-## Версии
+</details>
 
-Текущая версия — `versionName` в `app/build.gradle.kts` (сейчас **1.6.0**, сборка 13). Версия видна в приложении: рядом с логотипом на главном экране, на первом экране и в «Настройки → О приложении». После обновления приложение один раз показывает окно «Что нового»; история версий — в `data/Changelog.kt` (добавляйте туда запись при каждом выпуске).
+<details>
+<summary><b>Структура проекта</b></summary>
 
-## Как выпустить обновление
+```
+app/                    Android-приложение (Kotlin, Jetpack Compose)
+  …/vpn/                VpnService, ядра sing-box и Xray, виджеты, ярлыки
+  …/data/               подписка, настройки, пинг, звуки, обновление баз
+  …/update/             обновление приложения
+  …/ui/                 экраны, темы, карта
+wear/                   приложение для часов Wear OS
+core/apexcore/          Go: разбор подписки → конфиги sing-box и Xray (+ тесты)
+server/                 сервер обновлений для VPS (install.sh, меню apex)
+.github/workflows/      сборка APK
+```
+
+</details>
+
+<details>
+<summary><b>Как выпустить обновление</b></summary>
 
 1. В `app/build.gradle.kts` увеличьте `versionCode` и `versionName`, добавьте запись в `data/Changelog.kt`.
 2. Дождитесь сборки на GitHub.
-3. На сервере: `apex publish <версия>` (или `--mandatory` — обязательное).
-4. Приложения у пользователей увидят обновление при следующем запуске.
+3. На сервере выполните `apex publish <версия>` (с `--mandatory` обновление станет обязательным).
+4. Пользователи увидят обновление при следующем запуске. По Wi-Fi файл скачивается заранее, а установщик открывается сам.
 
-Поля `update.json`:
-
-| поле | смысл |
+| поле `update.json` | смысл |
 |---|---|
 | `versionCode` | номер сборки; обновление показывается, если он больше установленного |
 | `versionName` | версия для пользователя |
 | `apkUrl` | прямая https-ссылка на APK |
-| `sha256` | контрольная сумма APK (рекомендуется) |
+| `sha256` | контрольная сумма APK |
 | `changelog` | что нового |
-| `mandatory` | `true` — обновление нельзя отложить |
+| `mandatory` | `true`: обновление нельзя отложить |
 | `minSupportedVersionCode` | версии ниже этого номера обязаны обновиться |
 
-## Новости и объявления
+</details>
 
-На сервере: `apex news "Текст" --title "Заголовок"` (`--warning` — жёлтый баннер), `apex news off` — убрать. Баннер показывается на главном экране, пока пользователь его не закроет.
+<details>
+<summary><b>Подписка и Remnawave</b></summary>
 
-## Отчёты о сбоях
+- Приложение понимает base64-список ссылок, обычный список и JSON sing-box.
+- Заголовки ответа: `profile-title`, `announce`, `support-url`, `profile-web-page-url`, `subscription-userinfo`, `profile-update-interval`. Их можно передать и строками `#имя: значение` в теле подписки.
+- User-Agent: `APEX VPN/<версия>`.
+- Remnawave отдаёт «Описание сервера» только Happ и INCY. Чтобы его видел APEX, добавьте правило ответа (Response Rule) с `additionalExtendedClientsRegex: ["^APEX VPN/"]`.
 
-Приложение отправляет на `SERVER_URL/crash` текст ошибки, модель телефона и версию Android — без ссылки подписки, IP и списков сайтов. Пользователь может отключить отправку в настройках. Смотреть: `apex crashes` на сервере.
+</details>
 
-## Заметки
+<details>
+<summary><b>Отчёты о сбоях и приватность</b></summary>
 
-- Ядро sing-box распространяется по лицензии GPL-3.0, поэтому и приложение с ним должно распространяться на условиях GPL-3.0 (с открытым исходным кодом).
-- Не поддерживаются ядром sing-box и пропускаются: XHTTP/SplitHTTP, ShadowsocksR, AmneziaWG, плагины Shadowsocks кроме obfs-local и v2ray-plugin.
-- NaiveProxy собирается вместе с Chromium cronet (как в официальном клиенте sing-box) и увеличивает APK. Если на сборочной машине он не соберётся, ядро соберётся без него (предупреждение в Actions); `NAIVE=0 ./core/build-core.sh` — собрать без него сразу.
-- Подписка запрашивается с User-Agent `APEX VPN/<версия>` и заголовками устройства (`x-hwid` и др.). Remnawave отдаёт «Описание сервера» только Happ и INCY — добавьте правило ответа (Response Rule) с `additionalExtendedClientsRegex: ["^APEX VPN/"]`.
+Приложение отправляет на ваш сервер текст ошибки, модель телефона и версию Android. Ссылка подписки, IP и списки сайтов в отчёт не попадают. Отправку можно отключить в настройках. Посмотреть отчёты на сервере: `apex crashes`.
+
+</details>
+
+## 📝 Что нового
+
+**1.6.0**
+- Главный экран «Карта»
+- Розовый цвет
+- Звуки подключения и вибрация
+- Плавный режим, размытие стекла, живая карта
+- Маршрутизация для опытных
+- Меню на VPS
+
+Полная история: [`data/Changelog.kt`](app/src/main/java/com/apexvpn/client/data/Changelog.kt) и [Releases](https://github.com/Dubstep2004/apex-vpn/releases).
+
+---
+
+<div align="center">
+<sub>Ядро sing-box распространяется по GPL-3.0, поэтому и приложение распространяется на условиях GPL-3.0. Флаги стран: flag-icons (MIT). Карта мира: world.geo.json (Unlicense).</sub>
+</div>
