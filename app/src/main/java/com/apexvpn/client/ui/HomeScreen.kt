@@ -8,6 +8,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -149,6 +151,32 @@ fun HomeScreen(
             Banner(Icons.Rounded.WarningAmber, Apex.Warn, null, w, onClick = null, onClose = null)
         }
 
+        val selected = sub.nodes.find { it.tag == sub.selectedTag }
+        val auto = sub.selectedTag == AUTO_TAG || selected == null
+        if (Apex.palette.bento) {
+            // Д6. Бенто: главный экран из плиток
+            Spacer(Modifier.height(16.dp))
+            BentoGrid(
+                status = status,
+                connectedAt = connectedAt,
+                speed = speed,
+                livePing = livePing,
+                serverTitle = if (auto) "Автопилот" else ServerInfo.title(selected!!.name),
+                serverFlag = if (auto) null else ServerInfo.flag(selected!!.name),
+                modeTitle = settings.mode.title,
+                timerText = if (autoOffAt > 0) timerLeft(autoOffAt) else "Таймер",
+                timerOn = autoOffAt > 0,
+                onToggle = onToggle,
+                onServers = onOpenServers,
+                onMode = onOpenMode,
+                onTimer = { timerDialog = true },
+                onSpeedTest = { onOpenPage(Page.SpeedTest) },
+            )
+            error?.let {
+                Spacer(Modifier.height(12.dp))
+                Text(it, color = Apex.Bad, fontSize = 14.sp, modifier = Modifier.apexCard(Apex.Bad.copy(alpha = 0.12f)).padding(horizontal = 14.dp, vertical = 9.dp))
+            }
+        } else {
         Spacer(Modifier.height(18.dp))
         ShieldButton(status, onToggle)
 
@@ -157,6 +185,7 @@ fun HomeScreen(
             VpnStatus.Starting -> "Подключение…"
             VpnStatus.Stopping -> "Отключение…"
             VpnStatus.Paused -> "Пауза"
+            VpnStatus.Blocked -> "Интернет заблокирован"
             VpnStatus.Stopped -> "Не подключено"
         }
         Text(label, color = Apex.Text, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
@@ -164,6 +193,7 @@ fun HomeScreen(
         when {
             status == VpnStatus.Started && connectedAt > 0 -> ConnectionTimer(connectedAt)
             status == VpnStatus.Paused -> Text("Доверенная сеть Wi-Fi — VPN не нужен", color = Apex.TextDim, fontSize = 15.sp)
+            status == VpnStatus.Blocked -> Text("VPN переподключается, без него интернет закрыт", color = Apex.Warn, fontSize = 15.sp)
             else -> Text(
                 if (status == VpnStatus.Stopped) "Нажмите на щит, чтобы подключиться" else " ",
                 color = Apex.TextDim,
@@ -210,8 +240,6 @@ fun HomeScreen(
         Spacer(Modifier.height(16.dp))
 
         // Сервер и режим
-        val selected = sub.nodes.find { it.tag == sub.selectedTag }
-        val auto = sub.selectedTag == AUTO_TAG || selected == null
         Group {
             ListRow(
                 title = if (auto) "Автопилот" else ServerInfo.title(selected!!.name),
@@ -234,6 +262,7 @@ fun HomeScreen(
             ) { Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = Apex.TextDim) }
         }
 
+        }
         Spacer(Modifier.height(12.dp))
         SubscriptionCard(
             sub = sub,
@@ -248,7 +277,7 @@ fun HomeScreen(
     if (timerDialog) {
         AlertDialog(
             onDismissRequest = { timerDialog = false },
-            containerColor = Apex.Surface,
+            containerColor = Apex.Dialog,
             title = { Text("Выключить VPN через…", color = Apex.Text) },
             text = {
                 Column {
@@ -345,8 +374,7 @@ private fun PingGraph(values: List<Int>) {
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
-            .background(Apex.Surface)
+            .apexCard()
             .padding(horizontal = 18.dp, vertical = 14.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -395,7 +423,7 @@ private fun PingGraph(values: List<Int>) {
 @Composable
 private fun StatusPill(status: VpnStatus) {
     val on = status == VpnStatus.Started
-    val paused = status == VpnStatus.Paused
+    val paused = status == VpnStatus.Paused || status == VpnStatus.Blocked
     val color = when {
         on -> Apex.Good
         paused -> Apex.Warn
@@ -413,6 +441,7 @@ private fun StatusPill(status: VpnStatus) {
         Text(
             when {
                 on -> "VPN включён"
+                status == VpnStatus.Blocked -> "Блокировка"
                 paused -> "Пауза"
                 else -> "VPN выключен"
             },
@@ -435,8 +464,7 @@ private fun SubscriptionCard(
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
-            .background(Brush.verticalGradient(listOf(Apex.HeroCard, Apex.Surface)))
+            .apexCard(Apex.HeroCard)
             .padding(horizontal = 16.dp, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -529,6 +557,94 @@ private fun SubscriptionCard(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+    }
+}
+
+/** Д6. Плитки главного экрана: щит, скорость, пинг, сервер, режим, таймер. */
+@Composable
+private fun BentoGrid(
+    status: VpnStatus,
+    connectedAt: Long,
+    speed: Pair<Long, Long>,
+    livePing: List<Int>,
+    serverTitle: String,
+    serverFlag: String?,
+    modeTitle: String,
+    timerText: String,
+    timerOn: Boolean,
+    onToggle: () -> Unit,
+    onServers: () -> Unit,
+    onMode: () -> Unit,
+    onTimer: () -> Unit,
+    onSpeedTest: () -> Unit,
+) {
+    val gap = 10.dp
+    val label = when (status) {
+        VpnStatus.Started -> "Защищено"
+        VpnStatus.Starting -> "Подключение…"
+        VpnStatus.Stopping -> "Отключение…"
+        VpnStatus.Paused -> "Пауза"
+        VpnStatus.Blocked -> "Интернет заблокирован"
+        VpnStatus.Stopped -> "Не подключено"
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(gap)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(gap), modifier = Modifier.height(IntrinsicSize.Min)) {
+            // Большая плитка: щит и состояние
+            Column(
+                Modifier.weight(1.25f).fillMaxHeight().apexCard(Apex.HeroCard).padding(vertical = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                ShieldButton(status, onToggle, 150.dp)
+                Text(label, color = Apex.Text, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
+                if (status == VpnStatus.Started && connectedAt > 0) ConnectionTimer(connectedAt)
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(gap)) {
+                BentoTile("Скорость", Modifier.weight(1f)) {
+                    Text("↓ ${formatSpeed(speed.first)}", color = Apex.Good, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text("↑ ${formatSpeed(speed.second)}", color = Apex.AccentText, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+                BentoTile("Пинг", Modifier.weight(1f)) {
+                    val last = livePing.lastOrNull { it >= 0 }
+                    Text(if (status == VpnStatus.Started && last != null) "$last мс" else "—", color = pingColor(last ?: -1), fontSize = 26.sp, fontWeight = FontWeight.ExtraBold)
+                }
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+            BentoTile("Сервер", Modifier.weight(1.4f), onClick = onServers) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (serverFlag != null) {
+                        FlagCircle(serverFlag, 26.dp)
+                        Spacer(Modifier.width(8.dp))
+                    }
+                    Text(serverTitle, color = Apex.Text, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+            }
+            BentoTile("Режим", Modifier.weight(1f), onClick = onMode) {
+                Text(modeTitle, color = Apex.Text, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 2)
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+            BentoTile("Таймер", Modifier.weight(1f), onClick = onTimer) {
+                Text(timerText, color = if (timerOn) Apex.AccentText else Apex.Text, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            }
+            BentoTile("Тест", Modifier.weight(1f), onClick = onSpeedTest) {
+                Text("Скорость сети", color = Apex.Text, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun BentoTile(title: String, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier
+            .apexCard()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(14.dp),
+    ) {
+        Text(title, color = Apex.TextDim, fontSize = 13.sp)
+        Spacer(Modifier.height(6.dp))
+        content()
     }
 }
 

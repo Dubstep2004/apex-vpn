@@ -97,6 +97,12 @@ jobs:
           mkdir -p dist
           APK="dist/apex-vpn-${VERSION_NAME}.apk"
           cp app/build/outputs/apk/release/app-release.apk "$APK"
+          # 11. Приложение для часов Wear OS
+          WEAR="dist/apex-vpn-wear-${VERSION_NAME}.apk"
+          if [ -f wear/build/outputs/apk/release/wear-release.apk ]; then
+            cp wear/build/outputs/apk/release/wear-release.apk "$WEAR"
+            echo "::notice title=Wear OS::$(du -h "$WEAR" | cut -f1)"
+          fi
           # Проверка: APK целый и подписан
           APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner
           "$APKSIGNER" verify --print-certs "$APK" > signer.txt; head -3 signer.txt
@@ -132,4 +138,5 @@ jobs:
           files: |
             ${{ steps.apk.outputs.apk }}
             dist/apex-vpn-${{ steps.apk.outputs.name }}.json
+            dist/apex-vpn-wear-${{ steps.apk.outputs.name }}.apk
           make_latest: true

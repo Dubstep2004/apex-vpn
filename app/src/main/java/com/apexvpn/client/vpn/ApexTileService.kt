@@ -50,7 +50,7 @@ class ApexTileService : TileService() {
         tile.icon = Icon.createWithResource(this, R.drawable.ic_stat_apex)
         tile.label = getString(R.string.app_name)
         tile.state = when (status) {
-            VpnStatus.Started, VpnStatus.Paused -> Tile.STATE_ACTIVE
+            VpnStatus.Started, VpnStatus.Paused, VpnStatus.Blocked -> Tile.STATE_ACTIVE
             VpnStatus.Starting, VpnStatus.Stopping -> Tile.STATE_ACTIVE
             VpnStatus.Stopped -> Tile.STATE_INACTIVE
         }
@@ -60,6 +60,7 @@ class ApexTileService : TileService() {
                 VpnStatus.Paused -> "Пауза"
                 VpnStatus.Starting -> "Подключение…"
                 VpnStatus.Stopping -> "Отключение…"
+                VpnStatus.Blocked -> "Переподключение…"
                 VpnStatus.Stopped -> "Выключен"
             }
         }

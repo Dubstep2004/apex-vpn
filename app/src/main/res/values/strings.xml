@@ -7,4 +7,6 @@
     <string name="notification_disconnect">Отключить</string>
     <string name="widget_description">Включение VPN одним нажатием</string>
     <string name="notification_channel_alerts">Сообщения</string>
+    <string name="widget_round_description">Круглая кнопка VPN с пингом</string>
+    <string name="widget_info_description">Сервер, скорость и пинг</string>
 </resources>

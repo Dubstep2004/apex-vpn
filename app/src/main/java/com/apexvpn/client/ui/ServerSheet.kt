@@ -2,6 +2,7 @@ package com.apexvpn.client.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -74,6 +75,7 @@ fun ServerSheet(viewModel: MainViewModel, onDismiss: () -> Unit) {
     var tab by rememberSaveable { mutableStateOf(ServerTab.Fast) }
     var expanded by rememberSaveable { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     LaunchedEffect(Unit) { viewModel.pingAll() }
 
@@ -104,7 +106,7 @@ fun ServerSheet(viewModel: MainViewModel, onDismiss: () -> Unit) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = Apex.Bg,
+        containerColor = Apex.Base,
         dragHandle = { BottomSheetDefaults.DragHandle(color = Apex.SurfaceHigh) },
         shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
     ) {
@@ -186,6 +188,14 @@ fun ServerSheet(viewModel: MainViewModel, onDismiss: () -> Unit) {
                     favorite = g.title in settings.favorites || g.nodes.any { it.name in settings.favorites },
                     onPick = pick,
                     onFavorite = { viewModel.toggleFavorite(g.title) },
+                    onPin = {
+                        // 9. Ярлык «Подключить <сервер>» на рабочий стол
+                        if (com.apexvpn.client.vpn.Shortcuts.pin(context, g.title)) {
+                            viewModel.showMessage("Ярлык «${g.title}» добавлен на рабочий стол")
+                        } else {
+                            viewModel.showMessage("Рабочий стол не поддерживает ярлыки")
+                        }
+                    },
                 )
             }
 
@@ -247,7 +257,7 @@ fun ServerSheet(viewModel: MainViewModel, onDismiss: () -> Unit) {
                     }
                 }
             }
-            Caption("★ — добавить в избранное. Метки протоколов выбирают конкретное подключение. Пинг — время соединения с сервером; при включённом VPN — задержка через сервер.")
+            Caption("★ — добавить в избранное. Долгое нажатие на сервер — ярлык на рабочий стол. Метки протоколов выбирают конкретное подключение. Пинг — время соединения с сервером; при включённом VPN — задержка через сервер.")
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -261,6 +271,7 @@ private fun toggleAutopilot(viewModel: MainViewModel, autopilotOn: Boolean, fall
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun GroupRow(
     group: ServerGroup,
@@ -270,6 +281,7 @@ private fun GroupRow(
     favorite: Boolean,
     onPick: (Node) -> Unit,
     onFavorite: () -> Unit,
+    onPin: () -> Unit,
 ) {
     val best = group.nodes.first()
     val selectedNode = group.nodes.firstOrNull { it.tag == selectedTag }
@@ -278,7 +290,7 @@ private fun GroupRow(
         Modifier
             .fillMaxWidth()
             .background(if (selectedNode != null) Apex.SurfaceHigh else Apex.Surface)
-            .clickable { onPick(best) }
+            .combinedClickable(onClick = { onPick(best) }, onLongClick = onPin)
             .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
     ) {
         Row(verticalAlignment = Alignment.Top) {
@@ -352,7 +364,7 @@ private fun GroupRow(
                     val on = n.tag == selectedTag
                     Text(
                         label,
-                        color = if (on) androidx.compose.ui.graphics.Color.White else Apex.AccentText,
+                        color = if (on) Apex.OnAccent else Apex.AccentText,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier
@@ -379,14 +391,14 @@ private fun ProtocolChip(title: String, count: Int, selected: Boolean, onClick: 
     ) {
         Text(
             title,
-            color = if (selected) androidx.compose.ui.graphics.Color.White else Apex.Text,
+            color = if (selected) Apex.OnAccent else Apex.Text,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
         )
         Spacer(Modifier.width(6.dp))
         Text(
             count.toString(),
-            color = if (selected) androidx.compose.ui.graphics.Color.White.copy(alpha = 0.75f) else Apex.TextDim,
+            color = if (selected) Apex.OnAccent.copy(alpha = 0.75f) else Apex.TextDim,
             fontSize = 13.sp,
         )
     }

@@ -58,6 +58,7 @@ class ApexWidget : AppWidgetProvider() {
                         VpnStatus.Paused -> "Пауза"
                         VpnStatus.Starting -> "Подключение…"
                         VpnStatus.Stopping -> "Отключение…"
+                        VpnStatus.Blocked -> "Переподключение…"
                         VpnStatus.Stopped -> "Выключен"
                     },
                 )

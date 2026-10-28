@@ -134,10 +134,10 @@ fun SubscriptionInput(viewModel: MainViewModel, buttonText: String, onSuccess: (
         enabled = !refreshing && url.isNotBlank(),
         modifier = Modifier.fillMaxWidth().height(54.dp),
         shape = RoundedCornerShape(14.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Apex.Accent, contentColor = androidx.compose.ui.graphics.Color.White),
+        colors = ButtonDefaults.buttonColors(containerColor = Apex.Accent, contentColor = Apex.OnAccent),
     ) {
         if (refreshing) {
-            CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp, color = androidx.compose.ui.graphics.Color.White)
+            CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp, color = Apex.OnAccent)
         } else {
             Text(buttonText, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
         }

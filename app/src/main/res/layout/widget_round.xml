@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 10. Круглый виджет 1×1: кнопка питания цвета состояния -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/round_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="4dp">
+
+    <ImageView
+        android:id="@+id/round_button"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:adjustViewBounds="true"
+        android:contentDescription="Включить или выключить VPN"
+        android:scaleType="fitCenter"
+        android:src="@drawable/widget_power_off" />
+
+    <TextView
+        android:id="@+id/round_ping"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="6dp"
+        android:background="@drawable/widget_pill"
+        android:paddingStart="6dp"
+        android:paddingEnd="6dp"
+        android:text=""
+        android:textColor="#FFFFFFFF"
+        android:textSize="10sp"
+        android:textStyle="bold" />
+</FrameLayout>

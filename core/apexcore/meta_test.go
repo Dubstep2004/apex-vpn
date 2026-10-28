@@ -83,3 +83,21 @@ func TestMentionsAds(t *testing.T) {
 		}
 	}
 }
+
+func TestFamilyMode(t *testing.T) {
+	dir := rulesDirForTest()
+	nodes := parseNodes(t, "vless://"+testUUID+"@1.2.3.4:443?type=tcp&security=tls&sni=a.example.com#A")
+	opts := `{"kids":true,"rulesDir":"` + dir + `"}`
+	cfg := checkAll(t, nodes, opts)
+	if !strings.Contains(cfg, `"porn"`) || !strings.Contains(cfg, `"1xbet.com"`) {
+		t.Fatalf("family rules missing")
+	}
+	for domain, want := range map[string]string{"pornhub.com": "block", "1xbet.com": "block", "joycasino.com": "block", "wikipedia.org": "proxy"} {
+		out, _ := MatchRoute(`{"kids":true,"mode":"all","rulesDir":"`+dir+`"}`, domain)
+		var r matchResult
+		json.Unmarshal([]byte(out), &r)
+		if r.Outbound != want {
+			t.Errorf("%s: %s (%s), want %s", domain, r.Outbound, r.Reason, want)
+		}
+	}
+}

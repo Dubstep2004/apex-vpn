@@ -287,7 +287,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun downloadUpdate(info: UpdateInfo) {
-        viewModelScope.launch { UpdateManager.download(getApplication<Application>(), info) }
+        // Нажали «Обновить» — после загрузки сразу откроется установщик
+        viewModelScope.launch { UpdateManager.download(getApplication<Application>(), info, autoInstall = true) }
     }
 
     fun dismissNews() = News.dismiss()

@@ -120,7 +120,7 @@ class ApexVpnService : VpnService(), PlatformInterface, CommandServerHandler {
 
     private suspend fun startVpn() = lock.withLock {
         val s = VpnState.status.value
-        if (s == VpnStatus.Started || s == VpnStatus.Starting || s == VpnStatus.Paused) return@withLock
+        if (s == VpnStatus.Started || s == VpnStatus.Starting || s == VpnStatus.Paused || s == VpnStatus.Blocked) return@withLock
         VpnState.set(VpnStatus.Starting)
         try {
             if (prepare(this) != null) error("Нет разрешения на VPN")
@@ -145,6 +145,12 @@ class ApexVpnService : VpnService(), PlatformInterface, CommandServerHandler {
 
     private suspend fun reloadVpn() = lock.withLock {
         val server = commandServer ?: return@withLock
+        if (VpnState.status.value == VpnStatus.Blocked) {
+            // настройки поменялись во время блокировки — сразу пробуем переподключиться
+            runCatching { server.startOrReloadService(prepareConfig(), overrideOptions()) }
+                .onSuccess { VpnState.set(VpnStatus.Started); showNotification() }
+            return@withLock
+        }
         if (VpnState.status.value != VpnStatus.Started) return@withLock
         try {
             server.startOrReloadService(prepareConfig(), overrideOptions())
@@ -152,7 +158,7 @@ class ApexVpnService : VpnService(), PlatformInterface, CommandServerHandler {
         } catch (e: Throwable) {
             Log.e(TAG, "reload failed", e)
             VpnState.fail(e.message)
-            shutdown()
+            failOrBlock()
         }
     }
 
@@ -184,7 +190,61 @@ class ApexVpnService : VpnService(), PlatformInterface, CommandServerHandler {
             showNotification()
         } catch (e: Throwable) {
             VpnState.fail(e.message)
+            failOrBlock()
+        }
+    }
+
+    // ─── 7. Аварийный выключатель ────────────────────────────────────────
+
+    /** VPN упал после подключения: с аварийным выключателем закрываем интернет, иначе выключаемся. */
+    private fun failOrBlock() {
+        if (AppSettings.value.killSwitch) enterBlocked() else shutdown()
+    }
+
+    /**
+     * Интернет закрыт: вместо туннеля ядра поднимаем «пустой» интерфейс, который забирает
+     * весь трафик и никуда его не отправляет. Каждые 10 секунд пробуем переподключиться.
+     */
+    private fun enterBlocked() {
+        runCatching { commandServer?.closeService() }
+        XrayCore.stop()
+        closeTun()
+        try {
+            val builder = Builder()
+                .setSession(getString(R.string.app_name) + " — блокировка")
+                .setMtu(1500)
+                .addAddress("172.19.0.1", 30)
+                .addRoute("0.0.0.0", 0)
+            runCatching { builder.addAddress("fdfe:dcba:9876::1", 126).addRoute("::", 0) }
+            // Исключения те же, что у VPN: банки и «кроме выбранных» работают как обычно
+            val o = overrideOptions()
+            val ex = o.excludePackage
+            while (ex.hasNext()) runCatching { builder.addDisallowedApplication(ex.next()) }
+            val inc = o.includePackage
+            while (inc.hasNext()) runCatching { builder.addAllowedApplication(inc.next()) }
+            tunFd = builder.establish() ?: error("нет разрешения")
+            VpnState.set(VpnStatus.Blocked)
+            showNotification()
+            alert("VPN упал — интернет закрыт, пока он не переподключится")
+            if (monitor?.isActive != true) startMonitor()
+        } catch (e: Throwable) {
+            Log.e(TAG, "kill switch failed", e)
             shutdown()
+        }
+    }
+
+    /** Попытка вернуться из блокировки. */
+    private suspend fun recover() = lock.withLock {
+        val server = commandServer ?: return@withLock
+        if (VpnState.status.value != VpnStatus.Blocked) return@withLock
+        try {
+            server.startOrReloadService(prepareConfig(), overrideOptions())
+            VpnState.set(VpnStatus.Started)
+            VpnState.clearError()
+            showNotification()
+            alert("VPN снова работает")
+        } catch (e: Throwable) {
+            Log.w(TAG, "recover failed: ${e.message}")
         }
     }
 
@@ -262,11 +322,24 @@ class ApexVpnService : VpnService(), PlatformInterface, CommandServerHandler {
                 }
                 if (settings.speedInNotification && tick % 2 == 0L && status == VpnStatus.Started) showNotification()
 
+                // 10/11. Виджеты со скоростью и пингом, часы — обновляем, только если они есть
+                if (tick % 3 == 0L) {
+                    val live = NewWidgets.anyLive(this@ApexVpnService) || WearBridge.connected
+                    if (live && status == VpnStatus.Started && tick % 15 == 0L) {
+                        VpnState.setPing(com.apexvpn.client.data.LivePing.measure().coerceAtLeast(0))
+                    }
+                    if (NewWidgets.anyLive(this@ApexVpnService)) NewWidgets.update(this@ApexVpnService)
+                    if (WearBridge.connected) WearBridge.publish(this@ApexVpnService)
+                }
+
                 // Xray упал — перезапускаем
                 if (tick % 5 == 0L && status == VpnStatus.Started && XrayCore.crashed()) {
                     Log.w(TAG, "xray exited: ${XrayCore.lastError()}")
                     reloadVpn()
                 }
+
+                // Аварийный выключатель: пробуем переподключиться
+                if (status == VpnStatus.Blocked && tick % 10 == 0L && NetworkMonitor.defaultNetwork != null) recover()
 
                 // Таймер отключения
                 val offAt = VpnState.autoOffAt.value
@@ -337,10 +410,12 @@ class ApexVpnService : VpnService(), PlatformInterface, CommandServerHandler {
         val title = when (status) {
             VpnStatus.Started -> getString(R.string.notification_connected) + " · " + serverName
             VpnStatus.Paused -> "Пауза — доверенная сеть Wi-Fi"
+            VpnStatus.Blocked -> "Интернет закрыт — переподключаемся"
             else -> getString(R.string.notification_connecting)
         }
         val text = when {
             status == VpnStatus.Paused -> "VPN включится сам, когда вы выйдете из этой сети"
+            status == VpnStatus.Blocked -> "Аварийный выключатель: без VPN интернет не работает"
             status == VpnStatus.Started && AppSettings.value.speedInNotification -> {
                 val sp = VpnState.speed.value
                 "↓ ${formatSpeed(sp.first)}   ↑ ${formatSpeed(sp.second)}"

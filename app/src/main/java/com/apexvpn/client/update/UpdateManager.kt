@@ -12,6 +12,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
@@ -73,7 +74,8 @@ object UpdateManager {
                 return
             }
             _state.value = if (info.versionCode > BuildConfig.VERSION_CODE) {
-                UpdateState.Available(info)
+                // Уже скачано заранее (по Wi-Fi в фоне) — сразу «Установить»
+                downloadedFile(info)?.let { UpdateState.ReadyToInstall(info, it) } ?: UpdateState.Available(info)
             } else {
                 UpdateState.UpToDate
             }
@@ -88,9 +90,48 @@ object UpdateManager {
         _state.value = UpdateState.Idle
     }
 
-    suspend fun download(context: Context, info: UpdateInfo) = withContext(Dispatchers.IO) {
+    private lateinit var appContext: Context
+
+    fun init(context: Context) {
+        appContext = context.applicationContext
+    }
+
+    private fun updatesDir() = File(appContext.cacheDir, "updates").apply { mkdirs() }
+
+    /** Файл этой версии, если он уже скачан целиком и контрольная сумма совпадает. */
+    private fun downloadedFile(info: UpdateInfo): File? {
+        if (!::appContext.isInitialized) return null
+        val f = File(updatesDir(), "apex-vpn-${info.versionName}.apk")
+        if (!f.exists() || f.length() == 0L) return null
+        val expected = info.sha256?.lowercase() ?: return f
+        val actual = runCatching {
+            val d = MessageDigest.getInstance("SHA-256")
+            f.inputStream().use { input ->
+                val buf = ByteArray(64 * 1024)
+                while (true) {
+                    val n = input.read(buf)
+                    if (n < 0) break
+                    d.update(buf, 0, n)
+                }
+            }
+            d.digest().joinToString("") { "%02x".format(it) }
+        }.getOrNull()
+        return if (actual == expected) f else null.also { f.delete() }
+    }
+
+    /**
+     * Скачать обновление. [autoInstall] — сразу открыть установщик (когда пользователь
+     * сам нажал «Обновить»). Фоновая загрузка по Wi-Fi вызывает с false.
+     */
+    suspend fun download(context: Context, info: UpdateInfo, autoInstall: Boolean = false) = withContext(Dispatchers.IO) {
+        if (!::appContext.isInitialized) init(context)
+        downloadedFile(info)?.let { ready ->
+            _state.value = UpdateState.ReadyToInstall(info, ready)
+            if (autoInstall) launchInstaller(context, ready)
+            return@withContext
+        }
         _state.value = UpdateState.Downloading(info, 0f)
-        val dir = File(context.cacheDir, "updates").apply { mkdirs() }
+        val dir = updatesDir()
         dir.listFiles()?.forEach { it.delete() }
         val target = File(dir, "apex-vpn-${info.versionName}.apk")
         try {
@@ -135,6 +176,7 @@ object UpdateManager {
                 conn.disconnect()
             }
             _state.value = UpdateState.ReadyToInstall(info, target)
+            if (autoInstall) launchInstaller(context, target)
         } catch (e: Exception) {
             target.delete()
             _state.value = UpdateState.Failed(e.message ?: "Ошибка загрузки", info)
@@ -155,6 +197,36 @@ object UpdateManager {
                 ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             )
         }
+    }
+
+    /** Открыть установщик; если Android ещё не разрешил установку из APEX VPN — экран разрешения. */
+    fun launchInstaller(context: Context, file: File) {
+        val ctx = context.applicationContext
+        kotlinx.coroutines.MainScope().launch {
+            runCatching {
+                if (needsInstallPermission(ctx)) openInstallPermissionSettings(ctx) else install(ctx, file)
+            }
+        }
+    }
+
+    /** Скачано и ждёт установки (для уведомления и кнопок). */
+    fun readyFile(): File? = (_state.value as? UpdateState.ReadyToInstall)?.file
+
+    /**
+     * Фоновая проверка (раз в 3 часа): если вышла новая версия и сеть без лимита (Wi-Fi) —
+     * скачиваем заранее. Возвращает версию, готовую к установке, или null.
+     */
+    suspend fun prefetch(context: Context): UpdateInfo? {
+        if (!configured) return null
+        if (!::appContext.isInitialized) init(context)
+        check(silent = true)
+        val s = _state.value
+        if (s is UpdateState.ReadyToInstall) return s.info
+        if (s !is UpdateState.Available) return null
+        val cm = context.getSystemService(android.net.ConnectivityManager::class.java)
+        if (cm?.isActiveNetworkMetered != false) return null // мобильный интернет — не тратим трафик
+        download(context, s.info, autoInstall = false)
+        return (_state.value as? UpdateState.ReadyToInstall)?.info
     }
 
     fun install(context: Context, file: File) {

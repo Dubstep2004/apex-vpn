@@ -4,6 +4,8 @@ import android.content.Context
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -88,10 +90,20 @@ fun Caption(text: String) {
 /** Скруглённая группа строк, как в настройках iOS/Android 16. */
 @Composable
 fun Group(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    Column(
-        modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Apex.Surface),
-        content = content,
-    )
+    Column(modifier.fillMaxWidth().apexCard(), content = content)
+}
+
+/** Карточка в стиле текущего дизайна: скругление, фон, рамка (стекло/неон), свечение. */
+@Composable
+fun Modifier.apexCard(color: Color = Apex.Surface, radius: Dp = Apex.Radius): Modifier {
+    val shape = RoundedCornerShape(radius)
+    val glow = Apex.palette.glow
+    val glowColor = Apex.Cyan
+    return this
+        .then(if (glow) Modifier.shadow(14.dp, shape, ambientColor = glowColor, spotColor = glowColor) else Modifier)
+        .clip(shape)
+        .background(color)
+        .then(if (Apex.CardBorder != Color.Transparent) Modifier.border(1.dp, Apex.CardBorder, shape) else Modifier)
 }
 
 @Composable
@@ -154,7 +166,7 @@ fun ApexSwitch(checked: Boolean, onChange: (Boolean) -> Unit, enabled: Boolean =
         onCheckedChange = onChange,
         enabled = enabled,
         colors = SwitchDefaults.colors(
-            checkedThumbColor = Color.White,
+            checkedThumbColor = Apex.OnAccent,
             checkedTrackColor = Apex.Accent,
             checkedBorderColor = Apex.Accent,
             uncheckedThumbColor = Apex.TextDim,

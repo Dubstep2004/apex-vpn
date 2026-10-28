@@ -58,7 +58,7 @@ fun SplashScreen(onFinished: () -> Unit) {
         onFinished()
     }
 
-    Box(Modifier.fillMaxSize().background(Apex.Bg), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize().background(Apex.Base), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Box(contentAlignment = Alignment.Center) {
                 Box(

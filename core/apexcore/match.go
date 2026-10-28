@@ -90,6 +90,9 @@ func MatchRoute(optionsJSON string, rawDomain string) (string, error) {
 		res.Outbound, res.Reason = "", "Введите адрес сайта, например youtube.com"
 	case opts.AdBlock && matchSet(opts.rulesFile(fileAds), domain):
 		res.Outbound, res.Reason = "block", "Реклама или трекер — заблокировано"
+	case opts.Kids && (matchSet(opts.rulesFile(filePorn), domain) || matchSet(opts.rulesFile(fileBetting), domain) ||
+		suffixMatch(domain, gamblingSuffixes) || containsAny(domain, gamblingKeywords)):
+		res.Outbound, res.Reason = "block", "Семейный режим: сайт для взрослых или азартные игры"
 	case suffixMatch(domain, cleanDomains(opts.CustomDomains)):
 		res.Outbound, res.Reason = "proxy", "В списке «Свои сайты»"
 	case suffixMatch(domain, cleanDomains(opts.DirectDomains)):
@@ -146,4 +149,13 @@ func serviceTitle(id string) string {
 		return t
 	}
 	return id
+}
+
+func containsAny(s string, words []string) bool {
+	for _, w := range words {
+		if strings.Contains(s, w) {
+			return true
+		}
+	}
+	return false
 }

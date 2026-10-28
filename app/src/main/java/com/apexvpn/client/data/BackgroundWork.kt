@@ -39,7 +39,34 @@ class BackgroundWork(context: Context, params: WorkerParameters) : CoroutineWork
         News.refresh()
         if (RulesUpdater.update(ctx)) ApexVpnService.reload(ctx)
         CrashReporter.uploadPending(ctx)
+        // 1. Обновление заранее по Wi-Fi: потом установка в одно касание
+        if (AppSettings.value.autoDownloadUpdates) {
+            runCatching { com.apexvpn.client.update.UpdateManager.prefetch(ctx) }.getOrNull()?.let { notifyUpdateReady(ctx, it.versionName) }
+        }
         return Result.success()
+    }
+
+    private fun notifyUpdateReady(context: Context, version: String) {
+        val sp = context.getSharedPreferences("alerts", Context.MODE_PRIVATE)
+        if (sp.getString("update_ready", "") == version) return // уже говорили про эту версию
+        sp.edit { putString("update_ready", version) }
+        val nm = context.getSystemService<NotificationManager>() ?: return
+        val pi = PendingIntent.getActivity(
+            context, 12,
+            Intent(context, MainActivity::class.java).putExtra(MainActivity.EXTRA_INSTALL_UPDATE, true)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        nm.notify(
+            5,
+            NotificationCompat.Builder(context, ApexApp.CHANNEL_ALERTS)
+                .setSmallIcon(R.drawable.ic_stat_apex)
+                .setContentTitle("APEX VPN $version готов к установке")
+                .setContentText("Нажмите, чтобы установить обновление")
+                .setContentIntent(pi)
+                .setAutoCancel(true)
+                .build(),
+        )
     }
 
     companion object {

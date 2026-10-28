@@ -73,6 +73,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.apexvpn.client.data.AccentColor
+import com.apexvpn.client.data.Design
 import com.apexvpn.client.data.AppsMode
 import com.apexvpn.client.data.ConnProfile
 import com.apexvpn.client.data.DnsChoice
@@ -103,7 +104,9 @@ fun PageHost(page: Page, viewModel: MainViewModel, onBack: () -> Unit) {
 
 @Composable
 private fun PageScaffold(title: String, onBack: () -> Unit, scroll: Boolean = true, content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxSize().background(Apex.Bg).statusBarsPadding()) {
+    Box(Modifier.fillMaxSize()) {
+    com.apexvpn.client.ui.theme.DesignBackground()
+    Column(Modifier.fillMaxSize().statusBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier.size(48.dp).clip(CircleShape).clickable(onClick = onBack),
@@ -119,6 +122,7 @@ private fun PageScaffold(title: String, onBack: () -> Unit, scroll: Boolean = tr
                 .padding(horizontal = 16.dp),
             content = content,
         )
+    }
     }
 }
 
@@ -253,7 +257,7 @@ private fun SpeedTestPage(viewModel: MainViewModel, onBack: () -> Unit) {
             onClick = { if (running) viewModel.cancelSpeedTest() else viewModel.runSpeedTest() },
             modifier = Modifier.fillMaxWidth().height(56.dp),
             shape = RoundedCornerShape(18.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = if (running) Apex.SurfaceHigh else Apex.Accent, contentColor = if (running) Apex.Text else Color.White),
+            colors = ButtonDefaults.buttonColors(containerColor = if (running) Apex.SurfaceHigh else Apex.Accent, contentColor = if (running) Apex.Text else Apex.OnAccent),
         ) {
             Text(if (running) "Остановить" else if (st.phase == SpeedPhase.Idle) "Начать тест" else "Повторить", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
         }
@@ -264,7 +268,7 @@ private fun SpeedTestPage(viewModel: MainViewModel, onBack: () -> Unit) {
 @Composable
 private fun Metric(title: String, value: String, modifier: Modifier) {
     Column(
-        modifier.clip(RoundedCornerShape(20.dp)).background(Apex.Surface).padding(14.dp),
+        modifier.apexCard().padding(14.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(title, color = Apex.TextDim, fontSize = 13.sp)
@@ -340,7 +344,7 @@ private fun InputWithButton(
         Box(
             Modifier.size(44.dp).clip(CircleShape).background(Apex.Accent).clickable(onClick = onSubmit),
             contentAlignment = Alignment.Center,
-        ) { Icon(icon, null, tint = Color.White) }
+        ) { Icon(icon, null, tint = Apex.OnAccent) }
     }
 }
 
@@ -375,7 +379,7 @@ private fun WifiPage(viewModel: MainViewModel, onBack: () -> Unit) {
                 Spacer(Modifier.height(10.dp))
                 Button(
                     onClick = { permission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)) },
-                    colors = ButtonDefaults.buttonColors(containerColor = Apex.Accent, contentColor = Color.White),
+                    colors = ButtonDefaults.buttonColors(containerColor = Apex.Accent, contentColor = Apex.OnAccent),
                     shape = RoundedCornerShape(14.dp),
                 ) { Text("Разрешить") }
             }
@@ -491,8 +495,8 @@ private fun DnsPage(viewModel: MainViewModel, onBack: () -> Unit) {
     PageScaffold("DNS", onBack) {
         Group {
             ListRow(
-                "Детский режим",
-                "Семейный DNS для всех сайтов: блокирует сайты для взрослых",
+                "Семейный режим",
+                "Закрывает сайты 18+, казино и букмекеров, семейный DNS",
                 leading = { IconTile(Color(0xFFF59E0B)) { Icon(Icons.Rounded.FamilyRestroom, null, tint = Color.White) } },
                 onClick = { viewModel.change { copy(kids = !kids) } },
             ) { ApexSwitch(s.kids, { v -> viewModel.change { copy(kids = v) } }) }
@@ -511,7 +515,7 @@ private fun DnsPage(viewModel: MainViewModel, onBack: () -> Unit) {
                 ) { if (d == s.dns) Icon(Icons.Rounded.Check, "Выбрано", tint = Apex.Accent) }
             }
         }
-        if (s.kids) Caption("В детском режиме выбор DNS не действует — используется семейный AdGuard.")
+        if (s.kids) Caption("Семейный режим закрывает сайты 18+, казино и букмекеров, а DNS — семейный AdGuard (выбор DNS не действует).")
         SectionLabel("Свой DNS-over-HTTPS")
         InputWithButton(custom, "https://dns.example.com/dns-query", Icons.Rounded.Check, { custom = it; error = null }) {
             error = viewModel.validateDns(custom)
@@ -547,7 +551,27 @@ private fun ProfilePage(viewModel: MainViewModel, onBack: () -> Unit) {
 @Composable
 private fun AppearancePage(viewModel: MainViewModel, onBack: () -> Unit) {
     val s by viewModel.settings.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
     PageScaffold("Оформление", onBack) {
+        SectionLabel("Дизайн 2026")
+        val designs = Design.entries
+        designs.chunked(3).forEach { row ->
+            Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                row.forEach { d ->
+                    DesignPreview(d, s.theme, s.accent, selected = s.design == d, modifier = Modifier.weight(1f)) {
+                        viewModel.change(reload = false) { copy(design = d) }
+                    }
+                }
+                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+        Caption(s.design.subtitle + when (s.design) {
+            Design.Neon, Design.Terminal -> ". Всегда тёмный."
+            Design.Pastel -> ". Всегда светлый."
+            Design.Expressive -> ". Цвет берётся из обоев (Android 12+)."
+            else -> "."
+        })
+
         SectionLabel("Тема")
         Group {
             ThemeMode.entries.forEachIndexed { i, t ->
@@ -576,11 +600,115 @@ private fun AppearancePage(viewModel: MainViewModel, onBack: () -> Unit) {
                 }
             }
         }
+
+        // 20. Иконка приложения
+        SectionLabel("Иконка приложения")
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+            com.apexvpn.client.data.AppIcons.all.forEach { icon ->
+                val on = s.appIcon == icon.id
+                Column(
+                    Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable {
+                            if (!on) {
+                                viewModel.change(reload = false) { copy(appIcon = icon.id) }
+                                com.apexvpn.client.data.AppIcons.apply(context, icon.id)
+                                viewModel.showMessage("Иконка сменится на рабочем столе через несколько секунд")
+                            }
+                        }
+                        .padding(6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Box(
+                        Modifier.size(58.dp).border(3.dp, if (on) Apex.Accent else Color.Transparent, RoundedCornerShape(18.dp)).padding(4.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Box(Modifier.size(50.dp).clip(RoundedCornerShape(14.dp))) {
+                            androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(icon.background), null, Modifier.size(50.dp))
+                            androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(icon.foreground), null, Modifier.size(50.dp))
+                        }
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Text(icon.title, color = if (on) Apex.Text else Apex.TextDim, fontSize = 12.sp)
+                }
+            }
+        }
+        Caption("Некоторые рабочие столы обновляют иконку не сразу. Ярлыки на рабочем столе после смены иконки, возможно, придётся добавить заново.")
         Spacer(Modifier.height(24.dp))
     }
 }
 
-/** Открыть системные настройки VPN (постоянный VPN, блокировка без VPN). */
+/** Мини-экран дизайна: фон, карточка и щит в его цветах. */
+@Composable
+private fun DesignPreview(
+    design: Design,
+    theme: ThemeMode,
+    accent: AccentColor,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
+    val p = remember(design, theme, accent, systemDark) {
+        com.apexvpn.client.ui.theme.paletteFor(design, theme, accent, systemDark)
+    }
+    val shape = RoundedCornerShape(18.dp)
+    Column(
+        modifier
+            .clip(shape)
+            .border(if (selected) 3.dp else 1.dp, if (selected) Apex.Accent else Apex.Outline, shape)
+            .clickable(onClick = onClick),
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(118.dp)
+                .background(
+                    when (design) {
+                        Design.Glass, Design.Aurora -> androidx.compose.ui.graphics.Brush.linearGradient(listOf(p.accent.copy(alpha = 0.7f), p.base, Color(0xFF22D3EE).copy(alpha = 0.6f)))
+                        Design.Pastel -> androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xFFFFF1E8), Color(0xFFF6EEFF)))
+                        Design.Neon -> androidx.compose.ui.graphics.Brush.linearGradient(listOf(p.brand1.copy(alpha = 0.35f), p.base, p.brand2.copy(alpha = 0.3f)))
+                        else -> androidx.compose.ui.graphics.Brush.verticalGradient(listOf(p.base, p.base))
+                    },
+                )
+                .padding(10.dp),
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                Box(
+                    Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(p.brand1, p.brand2))),
+                )
+                Spacer(Modifier.height(8.dp))
+                if (design == Design.Bento) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        repeat(2) {
+                            Box(Modifier.weight(1f).height(24.dp).clip(RoundedCornerShape(6.dp)).background(p.surface).border(1.dp, p.cardBorder, RoundedCornerShape(6.dp)))
+                        }
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Box(Modifier.fillMaxWidth().height(14.dp).clip(RoundedCornerShape(6.dp)).background(p.surfaceHigh))
+                } else {
+                    val r = RoundedCornerShape((p.radius.value / 3).dp)
+                    Box(Modifier.fillMaxWidth().height(22.dp).clip(r).background(p.surface).border(1.dp, p.cardBorder, r))
+                    Spacer(Modifier.height(4.dp))
+                    Box(Modifier.fillMaxWidth(0.7f).height(14.dp).clip(r).background(p.surfaceHigh).border(1.dp, p.cardBorder, r))
+                }
+            }
+        }
+        Text(
+            design.title,
+            color = if (selected) Apex.Text else Apex.TextDim,
+            fontSize = 12.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            fontFamily = if (design == Design.Terminal) androidx.compose.ui.text.font.FontFamily.Monospace else null,
+            maxLines = 1,
+            modifier = Modifier.fillMaxWidth().background(Apex.Surface).padding(horizontal = 8.dp, vertical = 7.dp),
+        )
+    }
+}
+
 fun openVpnSettings(context: android.content.Context) {
     runCatching { context.startActivity(Intent(AndroidSettings.ACTION_VPN_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
 }

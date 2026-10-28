@@ -5,7 +5,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-enum class VpnStatus { Stopped, Starting, Started, Paused, Stopping }
+/** Blocked — аварийный выключатель: VPN упал, интернет закрыт до переподключения. */
+enum class VpnStatus { Stopped, Starting, Started, Paused, Stopping, Blocked }
 
 /** Общее состояние VPN: сервис, интерфейс, виджет и плитка работают в одном процессе. */
 object VpnState {
@@ -27,11 +28,19 @@ object VpnState {
     private val _speed = MutableStateFlow(0L to 0L)
     val speed: StateFlow<Pair<Long, Long>> = _speed.asStateFlow()
 
+    /** Последний пинг через VPN, мс (для виджетов и часов); 0 — неизвестно */
+    private val _ping = MutableStateFlow(0)
+    val ping: StateFlow<Int> = _ping.asStateFlow()
+
+    internal fun setPing(ms: Int) {
+        _ping.value = ms
+    }
+
     /** Когда выключить VPN по таймеру (elapsedRealtime), 0 — таймер не задан */
     private val _autoOffAt = MutableStateFlow(0L)
     val autoOffAt: StateFlow<Long> = _autoOffAt.asStateFlow()
 
-    val isOn: Boolean get() = _status.value == VpnStatus.Started || _status.value == VpnStatus.Paused
+    val isOn: Boolean get() = _status.value == VpnStatus.Started || _status.value == VpnStatus.Paused || _status.value == VpnStatus.Blocked
 
     internal fun set(status: VpnStatus) {
         val wasOn = _status.value == VpnStatus.Started || _status.value == VpnStatus.Paused
@@ -42,6 +51,7 @@ object VpnState {
                 _error.value = null
             }
             VpnStatus.Stopped -> {
+                _ping.value = 0
                 _connectedAt.value = 0L
                 _speed.value = 0L to 0L
                 _autoOffAt.value = 0L

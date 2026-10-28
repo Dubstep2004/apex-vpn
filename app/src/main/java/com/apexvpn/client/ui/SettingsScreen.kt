@@ -29,6 +29,8 @@ import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.GppMaybe
+import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.Palette
@@ -146,7 +148,7 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
             GroupDivider()
             ListRow(
                 "DNS",
-                if (s.kids) "Детский режим" else if (s.dns == DnsChoice.Custom) s.customDns else s.dns.title,
+                if (s.kids) "Семейный режим" else if (s.dns == DnsChoice.Custom) s.customDns else s.dns.title,
                 leading = { tile(Icons.Rounded.Dns) },
                 onClick = { onOpenPage(Page.Dns) },
             ) { Chevron() }
@@ -172,7 +174,14 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
                 onClick = { viewModel.change { copy(ipv6 = !ipv6) } },
             ) { ApexSwitch(s.ipv6, { v -> viewModel.change { copy(ipv6 = v) } }) }
             GroupDivider()
-            ListRow("Постоянный VPN", "Включите «Постоянная VPN» в настройках Android", leading = { tile(Icons.Rounded.Lock) }, onClick = { openVpnSettings(context) }) { Chevron() }
+            ListRow(
+                "Аварийный выключатель",
+                if (s.killSwitch) "Если VPN упадёт — интернет закроется, пока он не вернётся" else "Выключен",
+                leading = { tile(Icons.Rounded.GppMaybe) },
+                onClick = { viewModel.change(reload = false) { copy(killSwitch = !killSwitch) } },
+            ) { ApexSwitch(s.killSwitch, { v -> viewModel.change(reload = false) { copy(killSwitch = v) } }) }
+            GroupDivider()
+            ListRow("Постоянный VPN", "Для полной защиты включите «Постоянная VPN» и «Блокировать соединения без VPN» в Android", leading = { tile(Icons.Rounded.Lock) }, onClick = { openVpnSettings(context) }) { Chevron() }
         }
 
         // ── Сеть ──
@@ -230,12 +239,19 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
         // ── Оформление ──
         SectionLabel("Оформление")
         Group {
-            ListRow("Тема и цвет", "${s.theme.title} · ${s.accent.title}", leading = { tile(Icons.Rounded.Palette) }, onClick = { onOpenPage(Page.Appearance) }) { Chevron() }
+            ListRow("Дизайн, тема и иконка", "${s.design.title} · ${s.theme.title}", leading = { tile(Icons.Rounded.Palette) }, onClick = { onOpenPage(Page.Appearance) }) { Chevron() }
         }
 
         // ── Обновления ──
         SectionLabel("Обновления приложения")
         Group {
+            ListRow(
+                "Скачивать заранее по Wi-Fi",
+                "Новая версия скачается в фоне — останется нажать «Установить»",
+                leading = { tile(Icons.Rounded.Download) },
+                onClick = { viewModel.change(reload = false) { copy(autoDownloadUpdates = !autoDownloadUpdates) } },
+            ) { ApexSwitch(s.autoDownloadUpdates, { v -> viewModel.change(reload = false) { copy(autoDownloadUpdates = v) } }) }
+            GroupDivider()
             ListRow(
                 "Проверять автоматически",
                 "При каждом запуске",
@@ -296,7 +312,7 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
     if (editing) {
         AlertDialog(
             onDismissRequest = { editing = false },
-            containerColor = Apex.Surface,
+            containerColor = Apex.Dialog,
             title = { Text("Новая ссылка", color = Apex.Text) },
             text = {
                 Column {
@@ -314,7 +330,7 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
     if (coreDialog) {
         AlertDialog(
             onDismissRequest = { coreDialog = false },
-            containerColor = Apex.Surface,
+            containerColor = Apex.Dialog,
             title = { Text("Ядро", color = Apex.Text) },
             text = {
                 Column {
@@ -356,7 +372,7 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
     if (confirmRemove) {
         AlertDialog(
             onDismissRequest = { confirmRemove = false },
-            containerColor = Apex.Surface,
+            containerColor = Apex.Dialog,
             title = { Text("Удалить подписку?", color = Apex.Text) },
             text = { Text("VPN будет отключён, список серверов очищен.", color = Apex.TextDim) },
             confirmButton = {

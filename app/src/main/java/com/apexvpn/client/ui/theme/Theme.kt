@@ -12,15 +12,25 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.apexvpn.client.data.AccentColor
+import com.apexvpn.client.data.Design
 import com.apexvpn.client.data.ThemeMode
 
-/** Набор цветов одной темы. */
+/** Чем закрашен фон экранов. */
+enum class Backdrop { Solid, Glass, Aurora, Neon, Terminal, Pastel }
+
+/** Всё, что определяет внешний вид: цвета, форма карточек, фон, шрифт, раскладка главного экрана. */
 data class Palette(
     val dark: Boolean,
+    /** Фон экрана; прозрачный, если фон рисует [backdrop] */
     val bg: Color,
+    /** Непрозрачная основа — для шторок, заставки и страниц */
+    val base: Color,
     val surface: Color,
     val surfaceHigh: Color,
     val outline: Color,
@@ -32,11 +42,26 @@ data class Palette(
     val accentText: Color,
     val selectedCard: Color,
     val heroCard: Color,
+    /** Градиент щита и фирменных элементов */
+    val brand1: Color = Color(0xFF7C3AED),
+    val brand2: Color = Color(0xFF22D3EE),
+    /** Скругление карточек */
+    val radius: Dp = 24.dp,
+    /** Рамка карточек (стекло, неон) */
+    val cardBorder: Color = Color.Transparent,
+    /** Неоновое свечение карточек */
+    val glow: Boolean = false,
+    val backdrop: Backdrop = Backdrop.Solid,
+    val mono: Boolean = false,
+    /** Главный экран из плиток */
+    val bento: Boolean = false,
+    val design: Design = Design.Classic,
 )
 
 private fun darkPalette(accent: Color, amoled: Boolean) = Palette(
     dark = true,
     bg = if (amoled) Color.Black else Color(0xFF0A0A0D),
+    base = if (amoled) Color.Black else Color(0xFF0A0A0D),
     surface = if (amoled) Color(0xFF0E0E11) else Color(0xFF16161B),
     surfaceHigh = if (amoled) Color(0xFF19191E) else Color(0xFF202027),
     outline = Color(0xFF26262E),
@@ -53,6 +78,7 @@ private fun darkPalette(accent: Color, amoled: Boolean) = Palette(
 private fun lightPalette(accent: Color) = Palette(
     dark = false,
     bg = Color(0xFFF4F4F7),
+    base = Color(0xFFF4F4F7),
     surface = Color.White,
     surfaceHigh = Color(0xFFEDEDF2),
     outline = Color(0xFFDDDDE4),
@@ -66,15 +92,153 @@ private fun lightPalette(accent: Color) = Palette(
     heroCard = lerp(Color.White, accent, 0.10f),
 )
 
+/** Д1. Liquid Glass — полупрозрачные карточки со светлой кромкой поверх цветных пятен. */
+private fun glassPalette(accent: Color, dark: Boolean): Palette {
+    val base = if (dark) darkPalette(accent, false) else lightPalette(accent)
+    return base.copy(
+        bg = Color.Transparent,
+        base = if (dark) Color(0xFF0B0B14) else Color(0xFFEFF1F8),
+        surface = if (dark) Color.White.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.55f),
+        surfaceHigh = if (dark) Color.White.copy(alpha = 0.14f) else Color.White.copy(alpha = 0.8f),
+        divider = if (dark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f),
+        heroCard = if (dark) Color.White.copy(alpha = 0.10f) else Color.White.copy(alpha = 0.6f),
+        accentSoft = accent.copy(alpha = 0.22f),
+        cardBorder = if (dark) Color.White.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.9f),
+        radius = 28.dp,
+        backdrop = Backdrop.Glass,
+        design = Design.Glass,
+    )
+}
+
+/** Д2. Material 3 Expressive — акцент из обоев (Android 12+), крупные скругления. */
+private fun expressivePalette(accent: Color, dark: Boolean): Palette {
+    val base = if (dark) darkPalette(accent, false) else lightPalette(accent)
+    return base.copy(
+        surface = lerp(base.surface, accent, if (dark) 0.10f else 0.06f),
+        surfaceHigh = lerp(base.surfaceHigh, accent, if (dark) 0.18f else 0.12f),
+        heroCard = lerp(base.surface, accent, if (dark) 0.28f else 0.18f),
+        brand1 = accent,
+        brand2 = lerp(accent, if (dark) Color.White else Color(0xFF22D3EE), 0.45f),
+        radius = 32.dp,
+        design = Design.Expressive,
+    )
+}
+
+/** Д3. Neon Cyber — чёрный, неоновая рамка и свечение. */
+private fun neonPalette(): Palette {
+    val pink = Color(0xFFFF2BD6)
+    val cyan = Color(0xFF00F0FF)
+    return darkPalette(cyan, amoled = true).copy(
+        bg = Color.Transparent,
+        base = Color(0xFF050509),
+        surface = Color(0xFF0B0B14),
+        surfaceHigh = Color(0xFF14142A),
+        textDim = Color(0xFF8C8CB8),
+        accentText = cyan,
+        accentSoft = cyan.copy(alpha = 0.16f),
+        heroCard = Color(0xFF10102A),
+        brand1 = pink,
+        brand2 = cyan,
+        cardBorder = cyan.copy(alpha = 0.45f),
+        glow = true,
+        radius = 18.dp,
+        backdrop = Backdrop.Neon,
+        design = Design.Neon,
+    )
+}
+
+/** Д4. Минимализм — чёрно-белый. */
+private fun minimalPalette(dark: Boolean): Palette {
+    val ink = if (dark) Color.White else Color.Black
+    val base = if (dark) darkPalette(ink, amoled = true) else lightPalette(ink)
+    return base.copy(
+        surface = if (dark) Color(0xFF0D0D0D) else Color.White,
+        surfaceHigh = if (dark) Color(0xFF1C1C1C) else Color(0xFFEFEFEF),
+        accentSoft = if (dark) Color(0xFF222222) else Color(0xFFE6E6E6),
+        accentText = ink,
+        heroCard = if (dark) Color(0xFF0D0D0D) else Color.White,
+        brand1 = if (dark) Color(0xFFBDBDBD) else Color(0xFF222222),
+        brand2 = ink,
+        cardBorder = if (dark) Color(0xFF262626) else Color(0xFFE2E2E2),
+        radius = 12.dp,
+        design = Design.Minimal,
+    )
+}
+
+/** Д5. Aurora — переливающийся фон, полупрозрачные карточки. */
+private fun auroraPalette(accent: Color, dark: Boolean): Palette =
+    glassPalette(accent, dark).copy(
+        surface = if (dark) Color(0xFF0B0B14).copy(alpha = 0.55f) else Color.White.copy(alpha = 0.6f),
+        surfaceHigh = if (dark) Color.White.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.85f),
+        cardBorder = Color.Transparent,
+        radius = 26.dp,
+        brand1 = Color(0xFF34D399),
+        brand2 = Color(0xFF818CF8),
+        backdrop = Backdrop.Aurora,
+        design = Design.Aurora,
+    )
+
+/** Д7. Ретро-терминал — зелёный моноширинный текст на чёрном. */
+private fun terminalPalette(): Palette {
+    val green = Color(0xFF39FF6A)
+    return Palette(
+        dark = true,
+        bg = Color.Transparent,
+        base = Color.Black,
+        surface = Color(0xFF020A04),
+        surfaceHigh = Color(0xFF07170B),
+        outline = Color(0xFF14501F),
+        divider = Color(0xFF0D2E14),
+        text = green,
+        textDim = Color(0xFF2DAE4C),
+        accent = green,
+        accentSoft = Color(0xFF0B2A12),
+        accentText = green,
+        selectedCard = Color(0xFF07170B),
+        heroCard = Color(0xFF041008),
+        brand1 = Color(0xFF0E7A2A),
+        brand2 = green,
+        radius = 4.dp,
+        cardBorder = Color(0xFF14501F),
+        backdrop = Backdrop.Terminal,
+        mono = true,
+        design = Design.Terminal,
+    )
+}
+
+/** Д8. Пастель — светлые тёплые цвета. */
+private fun pastelPalette(): Palette {
+    val peach = Color(0xFFFF8A65)
+    return lightPalette(peach).copy(
+        bg = Color.Transparent,
+        base = Color(0xFFFFF6EF),
+        surface = Color(0xFFFFFFFF).copy(alpha = 0.85f),
+        surfaceHigh = Color(0xFFFFEDE2),
+        outline = Color(0xFFF3D9CB),
+        divider = Color(0xFFF7E6DC),
+        text = Color(0xFF3B2A2A),
+        textDim = Color(0xFF9A7F78),
+        accentSoft = Color(0xFFFFE1D3),
+        accentText = Color(0xFFD9583A),
+        heroCard = Color(0xFFFFEFE6),
+        brand1 = Color(0xFFFFB199),
+        brand2 = Color(0xFFB8A6FF),
+        radius = 28.dp,
+        backdrop = Backdrop.Pastel,
+        design = Design.Pastel,
+    )
+}
+
 /**
- * Цвета APEX VPN. Свойства читают текущую палитру из состояния Compose,
- * поэтому смена темы мгновенно перерисовывает все экраны.
+ * Цвета и форма APEX VPN. Свойства читают текущую палитру из состояния Compose,
+ * поэтому смена дизайна мгновенно перерисовывает все экраны.
  */
 object Apex {
     var palette by mutableStateOf(darkPalette(Color(AccentColor.Violet.argb), amoled = false))
         internal set
 
     val Bg get() = palette.bg
+    val Base get() = palette.base
     val Surface get() = palette.surface
     val SurfaceHigh get() = palette.surfaceHigh
     val Outline get() = palette.outline
@@ -86,36 +250,76 @@ object Apex {
     val AccentText get() = palette.accentText
     val SelectedCard get() = palette.selectedCard
     val HeroCard get() = palette.heroCard
+    val CardBorder get() = palette.cardBorder
+    val Radius get() = palette.radius
     val isDark get() = palette.dark
+    /** Текст и значки поверх акцента (в чёрно-белом и терминале — тёмные) */
+    val OnAccent get() = if (palette.design == Design.Minimal && palette.dark || palette.design == Design.Terminal) Color.Black else Color.White
+    /** Непрозрачный фон диалогов */
+    val Dialog get() = if (palette.dark) lerp(palette.base, palette.text, 0.07f).copy(alpha = 1f) else Color.White
 
-    // Фирменные цвета логотипа — одинаковые во всех темах
-    val Cyan = Color(0xFF22D3EE)
+    // Фирменные цвета: градиент щита зависит от дизайна
+    val Cyan get() = palette.brand2
     val CyanLight = Color(0xFFA5F3FC)
-    val Violet = Color(0xFF7C3AED)
-    val Good get() = if (palette.dark) Color(0xFF5BD69A) else Color(0xFF16A35A)
+    val Violet get() = palette.brand1
+    val Good get() = if (palette.design == Design.Terminal) Color(0xFF39FF6A) else if (palette.dark) Color(0xFF5BD69A) else Color(0xFF16A35A)
     val Warn get() = if (palette.dark) Color(0xFFF2B75B) else Color(0xFFC77700)
     val Bad get() = if (palette.dark) Color(0xFFFF6B6B) else Color(0xFFDC2626)
 
-    val accent = Brush.linearGradient(listOf(Violet, Cyan))
+    val accent get() = Brush.linearGradient(listOf(Violet, Cyan))
 }
 
-private val typography = Typography(
-    displaySmall = TextStyle(fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.5).sp),
-    titleLarge = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold),
-    titleMedium = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.SemiBold),
-    bodyLarge = TextStyle(fontSize = 16.sp),
-    bodyMedium = TextStyle(fontSize = 14.sp),
-    labelLarge = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
-)
+private fun typography(mono: Boolean): Typography {
+    val family = if (mono) FontFamily.Monospace else FontFamily.Default
+    val body = TextStyle(fontFamily = family)
+    return Typography(
+        displaySmall = body.copy(fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.5).sp),
+        titleLarge = body.copy(fontSize = 22.sp, fontWeight = FontWeight.Bold),
+        titleMedium = body.copy(fontSize = 17.sp, fontWeight = FontWeight.SemiBold),
+        bodyLarge = body.copy(fontSize = 16.sp),
+        bodyMedium = body.copy(fontSize = 14.sp),
+        bodySmall = body.copy(fontSize = 12.sp),
+        labelLarge = body.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
+        labelMedium = body.copy(fontSize = 13.sp),
+        labelSmall = body.copy(fontSize = 11.sp),
+        headlineSmall = body.copy(fontSize = 24.sp, fontWeight = FontWeight.Bold),
+        titleSmall = body.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
+    )
+}
 
-/** Палитра для настроек темы; [systemDark] — включена ли тёмная тема в системе. */
-fun paletteFor(theme: ThemeMode, accent: AccentColor, systemDark: Boolean): Palette {
+/**
+ * Палитра для настроек. [systemDark] — тёмная тема в системе, [wallpaper] — акцент из обоев
+ * (Android 12+) для Material Expressive.
+ */
+fun paletteFor(
+    design: Design,
+    theme: ThemeMode,
+    accent: AccentColor,
+    systemDark: Boolean,
+    wallpaper: Color? = null,
+): Palette {
     val accentColor = Color(accent.argb)
-    return when (theme) {
-        ThemeMode.Light -> lightPalette(accentColor)
-        ThemeMode.Dark -> darkPalette(accentColor, amoled = false)
-        ThemeMode.Amoled -> darkPalette(accentColor, amoled = true)
-        ThemeMode.System -> if (systemDark) darkPalette(accentColor, false) else lightPalette(accentColor)
+    val dark = when (theme) {
+        ThemeMode.Light -> false
+        ThemeMode.Dark, ThemeMode.Amoled -> true
+        ThemeMode.System -> systemDark
+    }
+    return when (design) {
+        Design.Classic -> when (theme) {
+            ThemeMode.Light -> lightPalette(accentColor)
+            ThemeMode.Dark -> darkPalette(accentColor, amoled = false)
+            ThemeMode.Amoled -> darkPalette(accentColor, amoled = true)
+            ThemeMode.System -> if (systemDark) darkPalette(accentColor, false) else lightPalette(accentColor)
+        }
+        Design.Glass -> glassPalette(accentColor, dark)
+        Design.Expressive -> expressivePalette(wallpaper ?: accentColor, dark)
+        Design.Neon -> neonPalette()
+        Design.Minimal -> minimalPalette(dark)
+        Design.Aurora -> auroraPalette(accentColor, dark)
+        Design.Bento -> (if (dark) darkPalette(accentColor, theme == ThemeMode.Amoled) else lightPalette(accentColor))
+            .copy(radius = 26.dp, bento = true, design = Design.Bento)
+        Design.Terminal -> terminalPalette()
+        Design.Pastel -> pastelPalette()
     }
 }
 
@@ -130,21 +334,21 @@ fun ApexTheme(content: @Composable () -> Unit) {
     val base = if (p.dark) darkColorScheme() else lightColorScheme()
     val scheme = base.copy(
         primary = p.accent,
-        onPrimary = Color.White,
-        secondary = Apex.Cyan,
-        background = p.bg,
+        onPrimary = if (p.design == Design.Minimal || p.design == Design.Terminal) p.base else Color.White,
+        secondary = p.brand2,
+        background = p.base,
         onBackground = p.text,
-        surface = p.surface,
+        surface = p.base,
         onSurface = p.text,
         surfaceVariant = p.surfaceHigh,
         onSurfaceVariant = p.textDim,
-        surfaceContainer = p.surface,
-        surfaceContainerLow = p.surface,
-        surfaceContainerHigh = p.surfaceHigh,
-        surfaceContainerHighest = p.surfaceHigh,
+        surfaceContainer = p.base,
+        surfaceContainerLow = p.base,
+        surfaceContainerHigh = lerp(p.base, p.text, 0.06f),
+        surfaceContainerHighest = lerp(p.base, p.text, 0.10f),
         outline = p.outline,
         outlineVariant = p.divider,
         error = Apex.Bad,
     )
-    MaterialTheme(colorScheme = scheme, typography = typography, content = content)
+    MaterialTheme(colorScheme = scheme, typography = typography(p.mono), content = content)
 }

@@ -134,3 +134,20 @@ enum class CoreMode(val id: String, val title: String, val subtitle: String) {
         fun of(id: String) = entries.firstOrNull { it.id == id } ?: Auto
     }
 }
+
+/** Дизайн приложения (2026). Меняет цвета, форму карточек, фон, шрифт и главный экран. */
+enum class Design(val id: String, val title: String, val subtitle: String) {
+    Classic("classic", "Классика", "Строгий тёмный APEX"),
+    Glass("glass", "Liquid Glass", "Стеклянные карточки на цветном фоне"),
+    Expressive("expressive", "Material Expressive", "Цвета от обоев, крупные формы"),
+    Neon("neon", "Neon Cyber", "Неоновое свечение на чёрном"),
+    Minimal("minimal", "Минимализм", "Чёрно-белый, ничего лишнего"),
+    Aurora("aurora", "Aurora", "Живой переливающийся фон"),
+    Bento("bento", "Бенто", "Главный экран из плиток"),
+    Terminal("terminal", "Ретро-терминал", "Зелёный моноширинный текст"),
+    Pastel("pastel", "Пастель", "Мягкие тёплые цвета");
+
+    companion object {
+        fun of(id: String) = entries.firstOrNull { it.id == id } ?: Classic
+    }
+}

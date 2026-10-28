@@ -29,6 +29,9 @@ data class Settings(
     val ipv6: Boolean = false,
     val profile: ConnProfile = ConnProfile.Normal,
     val failover: Boolean = true,
+    val killSwitch: Boolean = false,                 // 7. аварийный выключатель
+    val autoDownloadUpdates: Boolean = true,         // 1. скачивать обновления заранее по Wi-Fi
+    val appIcon: String = "classic",                 // 20. иконка приложения
     val wifiRules: Boolean = false,
     val trustedWifi: Set<String> = emptySet(),
     val share: Boolean = false,
@@ -48,6 +51,7 @@ data class Settings(
     val refreshHours: Int = 12,
     // Внешний вид
     val theme: ThemeMode = ThemeMode.Dark,
+    val design: Design = Design.Classic,
     val accent: AccentColor = AccentColor.Violet,
 )
 
@@ -144,13 +148,13 @@ object AppSettings {
         put("banks", s.hideFromBanks); put("adBlock", s.adBlock)
         put("appsMode", s.appsMode.id); put("apps", list(s.apps))
         put("dns", s.dns.id); put("customDns", s.customDns); put("kids", s.kids)
-        put("ipv6", s.ipv6); put("profile", s.profile.id); put("failover", s.failover)
+        put("ipv6", s.ipv6); put("profile", s.profile.id); put("failover", s.failover); put("killSwitch", s.killSwitch); put("autoDl", s.autoDownloadUpdates); put("appIcon", s.appIcon)
         put("wifiRules", s.wifiRules); put("trustedWifi", list(s.trustedWifi))
         put("share", s.share); put("sharePort", s.sharePort); put("shareUser", s.shareUser); put("sharePass", s.sharePass)
         put("favorites", list(s.favorites)); put("protocol", s.protocol); put("core", s.core.id); put("excludeAds", s.excludeAds)
         put("speedNotif", s.speedInNotification); put("expiryAlerts", s.expiryAlerts)
         put("autoUpdates", s.autoCheckUpdates); put("crashReports", s.crashReports); put("refreshHours", s.refreshHours)
-        put("theme", s.theme.id); put("accent", s.accent.id)
+        put("theme", s.theme.id); put("design", s.design.id); put("accent", s.accent.id)
     }
 
     private fun fromJson(o: JSONObject): Settings {
@@ -171,6 +175,9 @@ object AppSettings {
             ipv6 = o.optBoolean("ipv6", d.ipv6),
             profile = ConnProfile.of(o.optString("profile", d.profile.id)),
             failover = o.optBoolean("failover", d.failover),
+            killSwitch = o.optBoolean("killSwitch", d.killSwitch),
+            autoDownloadUpdates = o.optBoolean("autoDl", d.autoDownloadUpdates),
+            appIcon = o.optString("appIcon", d.appIcon),
             wifiRules = o.optBoolean("wifiRules", d.wifiRules),
             trustedWifi = arr("trustedWifi", d.trustedWifi).toSet(),
             share = o.optBoolean("share", d.share),
@@ -187,6 +194,7 @@ object AppSettings {
             crashReports = o.optBoolean("crashReports", d.crashReports),
             refreshHours = o.optInt("refreshHours", d.refreshHours),
             theme = ThemeMode.of(o.optString("theme", d.theme.id)),
+            design = Design.of(o.optString("design", d.design.id)),
             accent = AccentColor.of(o.optString("accent", d.accent.id)),
         )
     }

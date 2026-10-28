@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "ApexVPN"
 include(":app")
+include(":wear")

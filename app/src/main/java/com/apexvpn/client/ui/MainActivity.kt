@@ -23,6 +23,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -92,6 +93,11 @@ enum class Tab(val title: String, val icon: ImageVector) {
 
 class MainActivity : ComponentActivity() {
 
+    companion object {
+        /** Из уведомления «обновление готово» — сразу открыть установщик */
+        const val EXTRA_INSTALL_UPDATE = "install_update"
+    }
+
     private val viewModel: MainViewModel by viewModels()
 
     /** Ссылка подписки из QR-кода, «Поделиться» или apexvpn:// — ждёт подтверждения. */
@@ -123,7 +129,11 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             AppSettings.state.collect { s ->
                 val systemDark = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
-                val p = paletteFor(s.theme, s.accent, systemDark)
+                // Material Expressive: акцент из обоев (Android 12+)
+                val wallpaper = if (Build.VERSION.SDK_INT >= 31) {
+                    runCatching { androidx.compose.ui.graphics.Color(getColor(android.R.color.system_accent1_400)) }.getOrNull()
+                } else null
+                val p = paletteFor(s.design, s.theme, s.accent, systemDark, wallpaper)
                 applyPalette(p)
                 val style = if (p.dark) {
                     SystemBarStyle.dark(AndroidColor.TRANSPARENT)
@@ -137,7 +147,8 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             ApexTheme {
-                Surface(Modifier.fillMaxSize(), color = Apex.Bg) {
+                Surface(Modifier.fillMaxSize(), color = Apex.Base) {
+                    com.apexvpn.client.ui.theme.DesignBackground()
                     val sub by viewModel.subscription.collectAsStateWithLifecycle()
                     val message by viewModel.message.collectAsStateWithLifecycle()
                     val importLink by pendingImport.collectAsStateWithLifecycle()
@@ -209,7 +220,7 @@ class MainActivity : ComponentActivity() {
                     importLink?.let { link ->
                         AlertDialog(
                             onDismissRequest = { pendingImport.value = null },
-                            containerColor = Apex.Surface,
+                            containerColor = Apex.Dialog,
                             title = { Text("Добавить подписку?", color = Apex.Text) },
                             text = { Text(maskLink(link), color = Apex.TextDim) },
                             confirmButton = {
@@ -226,7 +237,7 @@ class MainActivity : ComponentActivity() {
                     if (whatsNew.isNotEmpty() && !splash && sub.url.isNotEmpty()) {
                         AlertDialog(
                             onDismissRequest = { Changelog.markSeen(BuildConfig.VERSION_CODE); whatsNew = emptyList() },
-                            containerColor = Apex.Surface,
+                            containerColor = Apex.Dialog,
                             title = { Text("Обновлено до ${BuildConfig.VERSION_NAME}", color = Apex.Text) },
                             text = {
                                 Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
@@ -258,6 +269,15 @@ class MainActivity : ComponentActivity() {
     /** 32. apexvpn://import?url=…, «Поделиться» ссылкой, запуск из плитки/виджета. */
     private fun handleIntent(intent: Intent?) {
         intent ?: return
+        if (intent.getBooleanExtra(EXTRA_INSTALL_UPDATE, false)) {
+            intent.removeExtra(EXTRA_INSTALL_UPDATE)
+            lifecycleScope.launch {
+                com.apexvpn.client.update.UpdateManager.check(silent = true)
+                com.apexvpn.client.update.UpdateManager.readyFile()?.let {
+                    com.apexvpn.client.update.UpdateManager.launchInstaller(this@MainActivity, it)
+                }
+            }
+        }
         val text = when (intent.action) {
             Intent.ACTION_VIEW -> intent.dataString
             Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT)
@@ -269,12 +289,45 @@ class MainActivity : ComponentActivity() {
         } else if (text != null) {
             viewModel.showMessage("Поддерживаются только ссылки sub.knownhosts.ru")
         }
+        // 9/16. Ярлыки и голосовые команды
+        when (intent.action) {
+            com.apexvpn.client.vpn.Shortcuts.ACTION_CONNECT -> {
+                connectFromShortcut(intent.getStringExtra(com.apexvpn.client.vpn.Shortcuts.EXTRA_SERVER))
+                intent.action = null
+                return
+            }
+            com.apexvpn.client.vpn.Shortcuts.ACTION_DISCONNECT -> {
+                ApexVpnService.stop(this)
+                intent.action = null
+                return
+            }
+            com.apexvpn.client.vpn.Shortcuts.ACTION_FEATURE -> {
+                val feature = intent.getStringExtra("feature").orEmpty().lowercase()
+                if (listOf("выкл", "откл", "disconnect", "стоп").any { it in feature }) ApexVpnService.stop(this) else connectFromShortcut(null)
+                intent.action = null
+                return
+            }
+        }
         if (intent.getBooleanExtra(VpnToggle.EXTRA_CONNECT, false) && VpnState.status.value == VpnStatus.Stopped &&
             Subscription.state.value.nodes.isNotEmpty()
         ) {
             intent.removeExtra(VpnToggle.EXTRA_CONNECT)
             toggleVpn()
         }
+    }
+
+    /** Подключиться к серверу по названию из ярлыка ("auto" — автопилот, null — текущий). */
+    private fun connectFromShortcut(server: String?) {
+        val nodes = Subscription.state.value.nodes
+        if (nodes.isEmpty()) return
+        when {
+            server == null -> Unit
+            server == com.apexvpn.client.data.AUTO_TAG -> viewModel.select(com.apexvpn.client.data.AUTO_TAG)
+            else -> nodes.firstOrNull { com.apexvpn.client.data.ServerInfo.title(it.name) == server }
+                ?.let { viewModel.select(it.tag) }
+                ?: viewModel.showMessage("Сервера «$server» больше нет в подписке — подключаю автопилот")
+        }
+        if (VpnState.status.value == VpnStatus.Stopped) toggleVpn()
     }
 
     private fun scanQr() {
@@ -289,7 +342,7 @@ class MainActivity : ComponentActivity() {
 
     private fun toggleVpn() {
         when (VpnState.status.value) {
-            VpnStatus.Started, VpnStatus.Starting, VpnStatus.Paused -> ApexVpnService.stop(this)
+            VpnStatus.Started, VpnStatus.Starting, VpnStatus.Paused, VpnStatus.Blocked -> ApexVpnService.stop(this)
             VpnStatus.Stopping -> Unit
             VpnStatus.Stopped -> {
                 VpnState.clearError()
@@ -333,6 +386,7 @@ private fun BottomBar(current: Tab, onSelect: (Tab) -> Unit) {
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(28.dp))
                 .background(Apex.Surface)
+                .border(1.dp, Apex.CardBorder, RoundedCornerShape(28.dp))
                 .padding(6.dp),
         ) {
             Tab.entries.forEach { t ->

@@ -124,7 +124,7 @@ fun ModeScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit) {
 
 @Composable
 private fun ModeCard(mode: RouteMode, selected: Boolean, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(24.dp)
+    val shape = RoundedCornerShape(Apex.Radius)
     Row(
         Modifier
             .fillMaxWidth()
@@ -156,7 +156,7 @@ fun RadioDot(selected: Boolean) {
     ) {
         if (selected) {
             Box(Modifier.size(24.dp).clip(CircleShape).background(Apex.Accent), contentAlignment = Alignment.Center) {
-                Box(Modifier.size(9.dp).clip(CircleShape).background(Color.White))
+                Box(Modifier.size(9.dp).clip(CircleShape).background(Apex.OnAccent))
             }
         }
     }
@@ -203,7 +203,7 @@ private fun SiteLists(viaVpn: List<String>, direct: List<String>, viewModel: Mai
             Box(
                 Modifier.size(44.dp).clip(CircleShape).background(Apex.Accent).clickable { submit() },
                 contentAlignment = Alignment.Center,
-            ) { Icon(Icons.Rounded.Add, "Добавить", tint = Color.White) }
+            ) { Icon(Icons.Rounded.Add, "Добавить", tint = Apex.OnAccent) }
         }
         error?.let {
             Text(it, color = Apex.Bad, fontSize = 13.sp, modifier = Modifier.padding(start = 20.dp, bottom = 8.dp))

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shortcut_connect">Включить VPN</string>
+    <string name="shortcut_connect_long">Включить APEX VPN</string>
+    <string name="shortcut_disconnect">Выключить VPN</string>
+    <string name="shortcut_disconnect_long">Выключить APEX VPN</string>
+    <!-- Фразы для голосового Ассистента -->
+    <string-array name="voice_connect">
+        <item>включи VPN</item>
+        <item>подключи VPN</item>
+        <item>включить VPN</item>
+        <item>подключиться</item>
+        <item>connect</item>
+    </string-array>
+    <string-array name="voice_disconnect">
+        <item>выключи VPN</item>
+        <item>отключи VPN</item>
+        <item>выключить VPN</item>
+        <item>отключиться</item>
+        <item>disconnect</item>
+    </string-array>
+</resources>

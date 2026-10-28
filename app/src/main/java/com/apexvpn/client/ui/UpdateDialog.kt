@@ -56,7 +56,7 @@ fun UpdateDialog(viewModel: MainViewModel) {
             }
         },
         properties = DialogProperties(dismissOnBackPress = canDismiss, dismissOnClickOutside = canDismiss),
-        containerColor = Apex.Surface,
+        containerColor = Apex.Dialog,
         title = { Text("Обновление ${info.versionName}", color = Apex.Text) },
         text = {
             Column {
@@ -96,7 +96,7 @@ fun UpdateDialog(viewModel: MainViewModel) {
             }
         },
         confirmButton = {
-            val colors = ButtonDefaults.buttonColors(containerColor = Apex.Accent, contentColor = androidx.compose.ui.graphics.Color.White)
+            val colors = ButtonDefaults.buttonColors(containerColor = Apex.Accent, contentColor = Apex.OnAccent)
             when (val s = state) {
                 is UpdateState.Available, is UpdateState.Failed ->
                     Button(onClick = { viewModel.downloadUpdate(info) }, colors = colors) {

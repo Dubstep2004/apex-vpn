@@ -26,7 +26,20 @@ const (
 	fileGeoipRU   = "geoip-ru.srs"
 	fileGeositeRU = "geosite-category-ru.srs"
 	fileAds       = "geosite-category-ads-all.srs"
+	filePorn      = "geosite-category-porn.srs"
+	fileBetting   = "geosite-category-betting-ru.srs"
 )
+
+// 15. Семейный режим: казино и букмекеры (дополнение к базе geosite-category-betting-ru)
+var gamblingSuffixes = []string{
+	"1xbet.com", "1xbet.ru", "1win.com", "1win.pro", "fonbet.ru", "fon.bet", "ligastavok.ru", "winline.ru",
+	"marathonbet.ru", "marathonbet.com", "melbet.com", "melbet.ru", "mostbet.com", "parimatch.com", "parimatch.ru",
+	"betcity.ru", "olimp.bet", "olimpbet.kz", "leon.ru", "leonbets.com", "pin-up.casino", "pinup.ru", "betboom.ru",
+	"bet365.com", "betway.com", "unibet.com", "williamhill.com", "888casino.com", "888.com", "pokerstars.com",
+	"ggpoker.com", "stake.com", "vavada.com", "joycasino.com", "azino777.ru", "casino-x.com", "baltbet.ru",
+	"tennisi.bet", "zenit.win", "bingo-boom.ru", "pari.ru",
+}
+var gamblingKeywords = []string{"casino", "kazino", "azino", "vulkan-", "slots-"}
 
 type shareOptions struct {
 	Enabled  bool   `json:"enabled"`
@@ -260,6 +273,10 @@ func buildAll(nodesJSON string, selectedTag string, optionsJSON string) (string,
 	if opts.AdBlock {
 		ads = opts.rulesFile(fileAds)
 	}
+	porn, betting := "", ""
+	if opts.Kids {
+		porn, betting = opts.rulesFile(filePorn), opts.rulesFile(fileBetting)
+	}
 	addSet := func(tag, path string) {
 		if path != "" {
 			ruleSets = append(ruleSets, map[string]any{"type": "local", "tag": tag, "format": "binary", "path": path})
@@ -268,6 +285,8 @@ func buildAll(nodesJSON string, selectedTag string, optionsJSON string) (string,
 	addSet("geosite-ru", geositeRU)
 	addSet("geoip-ru", geoipRU)
 	addSet("ads", ads)
+	addSet("porn", porn)
+	addSet("betting", betting)
 
 	// ── правила маршрутизации (сверху вниз, первое совпадение) ───────────
 	rules := []any{
@@ -279,6 +298,20 @@ func buildAll(nodesJSON string, selectedTag string, optionsJSON string) (string,
 	rules = append(rules, xray.singBoxRules()...)
 	if ads != "" {
 		rules = append(rules, map[string]any{"rule_set": "ads", "action": "reject"})
+	}
+	// 15. Семейный режим: сайты 18+ и азартные игры закрыты (плюс семейный DNS)
+	if opts.Kids {
+		var sets []string
+		if porn != "" {
+			sets = append(sets, "porn")
+		}
+		if betting != "" {
+			sets = append(sets, "betting")
+		}
+		if len(sets) > 0 {
+			rules = append(rules, map[string]any{"rule_set": sets, "action": "reject"})
+		}
+		rules = append(rules, map[string]any{"domain_suffix": gamblingSuffixes, "domain_keyword": gamblingKeywords, "action": "reject"})
 	}
 	if len(custom) > 0 {
 		rules = append(rules, map[string]any{"domain_suffix": custom, "outbound": "proxy"})

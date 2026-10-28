@@ -37,6 +37,7 @@ class ApexApp : Application() {
         Prefs.init(this)
         AppSettings.init(this)
         News.init(this)
+        com.apexvpn.client.update.UpdateManager.init(this)
 
         val workingDir = File(filesDir, "work").apply { mkdirs() }
         val tempDir = File(cacheDir, "box").apply { mkdirs() }
@@ -74,8 +75,17 @@ class ApexApp : Application() {
                 .distinctUntilChanged()
                 .collect {
                     ApexWidget.refresh(this@ApexApp)
+                    com.apexvpn.client.vpn.NewWidgets.update(this@ApexApp)
+                    com.apexvpn.client.vpn.WearBridge.publish(this@ApexApp)
                     ApexTileService.refresh(this@ApexApp)
                 }
+        }
+
+        // Ярлыки избранных серверов (долгое нажатие на иконку)
+        appScope.launch {
+            combine(AppSettings.state, Subscription.state) { st, sub -> st.favorites to sub.nodes.map { it.name } }
+                .distinctUntilChanged()
+                .collect { com.apexvpn.client.vpn.Shortcuts.refresh(this@ApexApp) }
         }
 
         BackgroundWork.schedule(this)

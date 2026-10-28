@@ -36,6 +36,9 @@ write_json() { # атомарная запись: приложения нико�
 
 download_release() { # <версия> <папка>
   local ver="$1" dir="$2" name
+  # приложение для часов — по возможности (в старых версиях его нет)
+  curl -fsSL -o "$dir/apex-vpn-wear-$ver.apk" "https://github.com/$REPO/releases/download/v$ver/apex-vpn-wear-$ver.apk" 2>/dev/null \
+    || rm -f "$dir/apex-vpn-wear-$ver.apk"
   for name in "apex-vpn-$ver.apk" "apex-vpn-$ver.json"; do
     if [[ -n "${GITHUB_TOKEN:-}" ]]; then
       # приватный репозиторий: через API с токеном
@@ -103,6 +106,14 @@ cmd_publish() {
   rm -f "$tmp/signed.apk.idsig"
   cp -f "$out" "$WEB_DIR/.latest.apk" && mv -f "$WEB_DIR/.latest.apk" "$WEB_DIR/apex-vpn-latest.apk"
   local sha; sha="$(sha256sum "$out" | cut -d' ' -f1)"
+
+  # Часы Wear OS: тем же ключом, иначе часы и телефон не увидят друг друга
+  local wear="$(dirname "$apk")/apex-vpn-wear-$name.apk"
+  if [[ -f "$wear" ]]; then
+    apksigner sign --ks "$KEYSTORE" --ks-pass "file:$KEYPASS_FILE" --ks-key-alias apex --out "$tmp/wear.apk" "$wear" \
+      && install -m 644 "$tmp/wear.apk" "$WEB_DIR/apex-vpn-wear-latest.apk" \
+      && echo "   Часы Wear OS: $BASE_URL/apex-vpn-wear-latest.apk"
+  fi
 
   jq -n --argjson code "$code" --arg name "$name" --arg url "$BASE_URL/apex-vpn-$name.apk" --arg sha "$sha" \
     --arg notes "$changelog" --argjson mandatory "$mandatory" \

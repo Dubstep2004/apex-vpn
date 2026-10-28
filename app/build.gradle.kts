@@ -52,8 +52,8 @@ android {
         applicationId = "com.apexvpn.client"
         minSdk = 24
         targetSdk = 35
-        versionCode = 11
-        versionName = "1.4.4"
+        versionCode = 12
+        versionName = "1.5.0"
 
         buildConfigField("String", "UPDATE_URL", "\"$updateUrl\"")
         buildConfigField("String", "SUBSCRIPTION_HOST", "\"$subscriptionHost\"")
@@ -136,4 +136,6 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.10.0")
     // Сканер QR-кодов
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    // 11. Связь с часами Wear OS
+    implementation("com.google.android.gms:play-services-wearable:19.0.0")
 }

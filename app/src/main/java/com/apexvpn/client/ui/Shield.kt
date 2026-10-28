@@ -59,10 +59,10 @@ private fun checkPath(scale: Float) = Path().apply {
  * подключение — бегущий контур, подключено — щит с градиентом и галочкой.
  */
 @Composable
-fun ShieldButton(status: VpnStatus, onClick: () -> Unit) {
+fun ShieldButton(status: VpnStatus, onClick: () -> Unit, size: androidx.compose.ui.unit.Dp = 240.dp) {
     val haptics = LocalHapticFeedback.current
     val active = status == VpnStatus.Started
-    val paused = status == VpnStatus.Paused
+    val paused = status == VpnStatus.Paused || status == VpnStatus.Blocked
     val busy = status == VpnStatus.Starting || status == VpnStatus.Stopping
 
     val transition = rememberInfiniteTransition(label = "shield")
@@ -95,7 +95,7 @@ fun ShieldButton(status: VpnStatus, onClick: () -> Unit) {
 
     Box(
         Modifier
-            .size(240.dp)
+            .size(size)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -106,7 +106,7 @@ fun ShieldButton(status: VpnStatus, onClick: () -> Unit) {
             },
         contentAlignment = Alignment.Center,
     ) {
-        Canvas(Modifier.size(240.dp)) {
+        Canvas(Modifier.size(size)) {
             val s = size.minDimension / 100f
             val shield = shieldPath(s)
 

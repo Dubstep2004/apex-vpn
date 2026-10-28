@@ -93,7 +93,11 @@ object News {
 // ─── 59. Обновление баз российских сайтов и рекламы ─────────────────────
 
 object RulesUpdater {
-    val FILES = listOf("geoip-ru.srs", "geosite-category-ru.srs", "geosite-category-ads-all.srs")
+    val FILES = listOf(
+        "geoip-ru.srs", "geosite-category-ru.srs", "geosite-category-ads-all.srs",
+        // 15. Семейный режим
+        "geosite-category-porn.srs", "geosite-category-betting-ru.srs",
+    )
     private const val WEEK = 7L * 24 * 3600 * 1000
 
     /** Откуда качать: ваш сервер (RULES_BASE_URL) или зеркало официальных баз sing-box. */

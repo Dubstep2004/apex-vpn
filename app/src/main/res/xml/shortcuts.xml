@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ярлыки (долгое нажатие на иконку) и голосовые команды Ассистента:
+     «Окей Google, включи VPN в APEX VPN» / «выключи VPN в APEX VPN». -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <capability android:name="actions.intent.OPEN_APP_FEATURE">
+        <intent
+            android:action="com.apexvpn.client.FEATURE"
+            android:targetClass="com.apexvpn.client.ui.MainActivity"
+            android:targetPackage="com.apexvpn.client">
+            <parameter
+                android:name="feature"
+                android:key="feature" />
+        </intent>
+    </capability>
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/shortcut_connect"
+        android:shortcutId="connect"
+        android:shortcutLongLabel="@string/shortcut_connect_long"
+        android:shortcutShortLabel="@string/shortcut_connect">
+        <intent
+            android:action="com.apexvpn.client.CONNECT"
+            android:targetClass="com.apexvpn.client.ui.MainActivity"
+            android:targetPackage="com.apexvpn.client" />
+        <capability-binding android:key="actions.intent.OPEN_APP_FEATURE">
+            <parameter-binding
+                android:key="feature"
+                android:value="@array/voice_connect" />
+        </capability-binding>
+    </shortcut>
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/shortcut_disconnect"
+        android:shortcutId="disconnect"
+        android:shortcutLongLabel="@string/shortcut_disconnect_long"
+        android:shortcutShortLabel="@string/shortcut_disconnect">
+        <intent
+            android:action="com.apexvpn.client.DISCONNECT"
+            android:targetClass="com.apexvpn.client.ui.MainActivity"
+            android:targetPackage="com.apexvpn.client" />
+        <capability-binding android:key="actions.intent.OPEN_APP_FEATURE">
+            <parameter-binding
+                android:key="feature"
+                android:value="@array/voice_disconnect" />
+        </capability-binding>
+    </shortcut>
+</shortcuts>

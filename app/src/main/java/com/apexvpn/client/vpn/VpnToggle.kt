@@ -37,7 +37,13 @@ object VpnToggle {
             return
         }
         VpnState.clearError()
-        ApexVpnService.start(context)
+        try {
+            ApexVpnService.start(context)
+        } catch (e: Exception) {
+            // Android 12+ может не разрешить запуск из фона (например, команда с часов) —
+            // тогда просим открыть приложение одним касанием
+            askToOpen(context, appIntent(context))
+        }
     }
 
     private fun askToOpen(context: Context, intent: Intent) {
