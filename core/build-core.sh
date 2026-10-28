@@ -44,9 +44,9 @@ if [[ -x "$ROOT/core/.xray-host/xray" ]]; then
   APEX_XRAY_DUMP="$DUMP" APEX_RULES_DIR="$ROOT/app/src/main/assets/rules" go test -tags "$BUILD_TAGS" -ldflags "-checklinkname=0" -run XrayDump ./experimental/apexcore/
   BAD=0
   for f in "$DUMP"/*.json; do
-    if ! OUT=$("$ROOT/core/.xray-host/xray" run -test -c "$f" 2>&1); then
+    if ! XRAY_OUT=$("$ROOT/core/.xray-host/xray" run -test -c "$f" 2>&1); then
       BAD=1
-      echo "::error title=Xray $(basename "$f")::$(echo "$OUT" | tail -3 | tr '\n' ' ' | cut -c1-600)"
+      echo "::error title=Xray $(basename "$f")::$(echo "$XRAY_OUT" | tail -3 | tr '\n' ' ' | cut -c1-600)"
     fi
   done
   [[ "$BAD" == 0 ]] || { echo "Xray отклонил конфиги"; exit 1; }
