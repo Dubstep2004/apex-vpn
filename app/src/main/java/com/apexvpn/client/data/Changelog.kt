@@ -6,6 +6,13 @@ data class Release(val version: String, val code: Int, val date: String, val cha
 object Changelog {
     val releases = listOf(
         Release(
+            "1.8.2", 23, "28 октября 2026",
+            listOf(
+                "«Написать в поддержку»: скопировать отчёт, открыть чат поддержки из подписки или отправить файл",
+                "Живое название APEX VPN: блик по буквам, переливающееся «VPN» и «дышащий» логотип",
+            ),
+        ),
+        Release(
             "1.8.1", 22, "28 октября 2026",
             listOf(
                 "Объявление из Remnawave снова внизу — в карточке подписки, как раньше",

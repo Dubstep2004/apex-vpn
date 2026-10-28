@@ -83,6 +83,13 @@ object Diagnostics {
         return b.toString()
     }
 
+    /** Отчёт в буфер обмена — вставить в любой чат. Telegram принимает до 4096 символов — берём хвост. */
+    fun copy(context: Context) {
+        val text = build(context).let { if (it.length > 4000) it.take(1500) + "\n…\n" + it.takeLast(2400) else it }
+        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        cm.setPrimaryClip(android.content.ClipData.newPlainText("APEX VPN — отчёт", text))
+    }
+
     /** Окно «Поделиться» с файлом отчёта — например, в Telegram поддержки. */
     fun share(context: Context) {
         val dir = File(context.cacheDir, "support").apply { mkdirs() }
@@ -91,6 +98,7 @@ object Diagnostics {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.updates", file)
         val send = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
+            clipData = android.content.ClipData.newRawUri("report", uri)
             putExtra(Intent.EXTRA_STREAM, uri)
             putExtra(Intent.EXTRA_SUBJECT, "APEX VPN ${BuildConfig.VERSION_NAME}: отчёт")
             putExtra(Intent.EXTRA_TEXT, "Отчёт APEX VPN ${BuildConfig.VERSION_NAME}. Опишите проблему:")

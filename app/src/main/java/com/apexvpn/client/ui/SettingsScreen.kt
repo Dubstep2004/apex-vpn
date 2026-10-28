@@ -48,6 +48,9 @@ import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material.icons.rounded.Update
 import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -83,6 +86,7 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
     val rulesUpdating by viewModel.rulesUpdating.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf(false) }
+    var supportDialog by remember { mutableStateOf(false) }
     var confirmRemove by remember { mutableStateOf(false) }
     var coreDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -308,14 +312,70 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
                 "Написать в поддержку",
                 "Отчёт с журналом — без ссылки подписки и IP",
                 leading = { tile(Icons.Rounded.SupportAgent) },
-                onClick = {
-                    runCatching { com.apexvpn.client.data.Diagnostics.share(context) }
-                        .onFailure { viewModel.showMessage("Не удалось собрать отчёт") }
-                    if (sub.supportUrl.isNotBlank()) viewModel.showMessage("Отправьте файл в чат поддержки — кнопка «Поддержка» на карточке подписки")
-                },
+                onClick = { supportDialog = true },
             ) { Chevron() }
         }
         Spacer(Modifier.height(24.dp))
+    }
+
+    // 24. Поддержка: чат из подписки (support-url), копия отчёта или файл
+    if (supportDialog) {
+        AlertDialog(
+            onDismissRequest = { supportDialog = false },
+            containerColor = Apex.Dialog,
+            title = { Text("Написать в поддержку", color = Apex.Text) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "1. Скопируйте отчёт. 2. Откройте чат поддержки и вставьте его в сообщение. " +
+                            "В отчёте нет ссылки подписки, адресов серверов и IP.",
+                        color = Apex.TextDim,
+                        fontSize = 14.sp,
+                    )
+                    Button(
+                        onClick = {
+                            runCatching { com.apexvpn.client.data.Diagnostics.copy(context) }
+                                .onSuccess { viewModel.showMessage("Отчёт скопирован — вставьте его в чат поддержки") }
+                                .onFailure { viewModel.showMessage("Не удалось собрать отчёт") }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Apex.Accent, contentColor = Apex.OnAccent),
+                    ) { Text("Скопировать отчёт") }
+                    if (sub.supportUrl.isNotBlank()) {
+                        Button(
+                            onClick = {
+                                runCatching {
+                                    context.startActivity(
+                                        android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(sub.supportUrl))
+                                            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                                    )
+                                }.onFailure { viewModel.showMessage("Не удалось открыть ссылку поддержки") }
+                                supportDialog = false
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = Apex.SurfaceHigh, contentColor = Apex.Text),
+                        ) { Text("Открыть чат поддержки") }
+                    } else {
+                        Text(
+                            "Ссылка на чат поддержки не пришла с подпиской — её задаёт сервис (support-url в панели).",
+                            color = Apex.TextDim,
+                            fontSize = 13.sp,
+                        )
+                    }
+                    androidx.compose.material3.TextButton(
+                        onClick = {
+                            runCatching { com.apexvpn.client.data.Diagnostics.share(context) }
+                                .onFailure { viewModel.showMessage("Нет приложения, чтобы отправить файл") }
+                            supportDialog = false
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Поделиться файлом отчёта…", color = Apex.TextDim) }
+                }
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { supportDialog = false }) { Text("Закрыть", color = Apex.TextDim) }
+            },
+        )
     }
 
     if (editing) {

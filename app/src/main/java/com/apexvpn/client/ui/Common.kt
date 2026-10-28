@@ -29,6 +29,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -57,13 +62,78 @@ fun ApexLogo(size: Dp, modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * «Живое» название APEX VPN: по буквам пробегает блик, «VPN» переливается цветами бренда,
+ * логотип мягко «дышит». В плавном режиме — неподвижное.
+ */
 @Composable
 fun ApexWordmark(modifier: Modifier = Modifier) {
+    val live = !Apex.feel.smooth
+    val textColor = Apex.Text
+    val c1 = Apex.Cyan
+    val c2 = Apex.Accent
+    val t = androidx.compose.animation.core.rememberInfiniteTransition(label = "wordmark")
+    val sweep by t.animateFloat(
+        initialValue = -1f, targetValue = 2.5f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            androidx.compose.animation.core.tween(3600, easing = androidx.compose.animation.core.LinearEasing),
+        ),
+        label = "sweep",
+    )
+    val hue by t.animateFloat(
+        initialValue = 0f, targetValue = 1f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            androidx.compose.animation.core.tween(2800, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+            androidx.compose.animation.core.RepeatMode.Reverse,
+        ),
+        label = "hue",
+    )
+    val breath by t.animateFloat(
+        initialValue = 1f, targetValue = 1.07f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            androidx.compose.animation.core.tween(1800, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+            androidx.compose.animation.core.RepeatMode.Reverse,
+        ),
+        label = "breath",
+    )
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val width = with(density) { 70.dp.toPx() }
+    val apexBrush = if (live) {
+        val x = sweep * width
+        Brush.linearGradient(
+            listOf(textColor, textColor, Color.White, c1, textColor, textColor),
+            start = androidx.compose.ui.geometry.Offset(x - width * 0.6f, 0f),
+            end = androidx.compose.ui.geometry.Offset(x + width * 0.6f, 0f),
+        )
+    } else {
+        androidx.compose.ui.graphics.SolidColor(textColor)
+    }
+    val vpnBrush = if (live) {
+        Brush.horizontalGradient(listOf(androidx.compose.ui.graphics.lerp(c1, c2, hue), androidx.compose.ui.graphics.lerp(c2, c1, hue)))
+    } else {
+        androidx.compose.ui.graphics.SolidColor(c1)
+    }
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        ApexLogo(32.dp)
+        Box(contentAlignment = Alignment.Center) {
+            if (live) {
+                Box(
+                    Modifier
+                        .size(32.dp)
+                        .graphicsLayer { scaleX = breath * 1.15f; scaleY = breath * 1.15f; alpha = (breath - 1f) * 6f }
+                        .background(Brush.radialGradient(listOf(c2.copy(alpha = 0.55f), Color.Transparent)), CircleShape),
+                )
+            }
+            ApexLogo(32.dp, Modifier.graphicsLayer { if (live) { scaleX = breath; scaleY = breath } })
+        }
         Spacer(Modifier.width(10.dp))
-        Text("APEX", fontWeight = FontWeight.Black, fontSize = 19.sp, letterSpacing = 2.sp, color = Apex.Text)
-        Text(" VPN", fontWeight = FontWeight.Medium, fontSize = 19.sp, letterSpacing = 2.sp, color = Apex.Cyan)
+        Text(
+            "APEX",
+            style = TextStyle(brush = apexBrush, fontWeight = FontWeight.Black, fontSize = 19.sp, letterSpacing = 2.sp),
+        )
+        Text(
+            " VPN",
+            style = TextStyle(brush = vpnBrush, fontWeight = FontWeight.Medium, fontSize = 19.sp, letterSpacing = 2.sp),
+        )
     }
 }
 
