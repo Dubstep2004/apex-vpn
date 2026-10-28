@@ -80,7 +80,11 @@ jobs:
           if [ -n "$SERVER_URL" ]; then echo "Сервер: $SERVER_URL"; else echo "::warning title=Сервер::переменная SERVER_URL не задана — обновления, новости и отчёты о сбоях в приложении выключены (см. server/README.md)"; fi
           if ! ./gradlew --no-daemon assembleRelease 2>&1 | tee gradle.log; then
             # Ошибки сборки — в аннотации, чтобы их было видно без полного лога
-            grep -E "^e: |error:|What went wrong|Could not|> " gradle.log | sed 's/%/%25/g' | head -200 > errors.txt || true
+            grep -E "^e: |error:|Error:|What went wrong|Could not|^> [^T]" gradle.log | sed 's/%/%25/g' | head -200 > errors.txt || true
+            # Ошибки lint — из отчётов
+            for f in app/build/intermediates/lint_intermediate_text_report/*/*/lint-results*.txt wear/build/intermediates/lint_intermediate_text_report/*/*/lint-results*.txt app/build/reports/lint-results*.txt wear/build/reports/lint-results*.txt; do
+              [ -f "$f" ] && grep -E "Error:" -A3 "$f" | sed 's/%/%25/g' | head -60 >> errors.txt
+            done
             split -l 20 errors.txt err_ || true
             for f in err_*; do
               [ -s "$f" ] && echo "::error title=Gradle::$(sed ':a;N;$!ba;s/\n/%0A/g' "$f")"
