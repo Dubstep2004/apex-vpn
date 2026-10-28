@@ -9,7 +9,6 @@ import androidx.core.content.getSystemService
 import com.apexvpn.client.data.AppSettings
 import com.apexvpn.client.data.BackgroundWork
 import com.apexvpn.client.data.CrashReporter
-import com.apexvpn.client.data.News
 import com.apexvpn.client.data.Prefs
 import com.apexvpn.client.data.Subscription
 import com.apexvpn.client.vpn.ApexTileService
@@ -36,7 +35,6 @@ class ApexApp : Application() {
         CrashReporter.install(this)
         Prefs.init(this)
         AppSettings.init(this)
-        News.init(this)
         com.apexvpn.client.update.UpdateManager.init(this)
 
         val workingDir = File(filesDir, "work").apply { mkdirs() }

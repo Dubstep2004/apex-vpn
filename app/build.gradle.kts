@@ -7,27 +7,8 @@ plugins {
 }
 
 // ─── Настройки приложения ──────────────────────────────────────────────
-// Ваш сервер (VPS, папка server/): там лежат APK, update.json, news.json и принимаются отчёты о сбоях.
-// Например https://vpn.example.com/apexvpn — переменная SERVER_URL в GitHub (Settings → Variables).
-// Адрес своего сервера (необязательно) — переменная SERVER_URL в GitHub. Без неё объявления
-// берутся из Remnawave (заголовок announce), а отчёты о сбоях не отправляются.
-val serverUrl: String = ((project.findProperty("serverUrl") as String?) ?: System.getenv("SERVER_URL") ?: "").trim().trimEnd('/')
-
-// Адрес JSON-файла с информацией об обновлении: панель или свой сервер.
-// Можно переопределить при сборке: -PupdateUrl=https://...  или env UPDATE_URL
-val updateUrl: String = (project.findProperty("updateUrl") as String?)
-    ?: System.getenv("UPDATE_URL")?.takeIf { it.isNotBlank() }
-    ?: if (serverUrl.isNotEmpty()) "$serverUrl/update.json" else "https://example.com/apexvpn/update.json"
-
-// Новости и объявления (news.json). По умолчанию — рядом с update.json
-val newsUrl: String = (project.findProperty("newsUrl") as String?)
-    ?: System.getenv("NEWS_URL")?.takeIf { it.isNotBlank() }
-    ?: updateUrl.substringBeforeLast('/') + "/news.json"
-
-// Куда отправлять анонимные отчёты о сбоях (POST, text/plain). Пусто — не отправлять
-val crashUrl: String = (project.findProperty("crashUrl") as String?)
-    ?: System.getenv("CRASH_URL")?.takeIf { it.isNotBlank() }
-    ?: if (serverUrl.isNotEmpty()) "$serverUrl/crash" else ""
+// Своего сервера нет: обновления — с GitHub Releases, объявления — из Remnawave (заголовок announce),
+// отчёты о сбоях хранятся на телефоне и отправляются только через «Написать в поддержку».
 
 // Версия ядра Xray, которое кладётся в APK (core/xray-version)
 val xrayVersion: String = rootProject.file("core/xray-version").takeIf { it.exists() }?.readText()?.trim()?.removePrefix("v") ?: "?"
@@ -54,13 +35,10 @@ android {
         applicationId = "com.apexvpn.client"
         minSdk = 24
         targetSdk = 35
-        versionCode = 20
-        versionName = "1.7.6"
+        versionCode = 21
+        versionName = "1.8.0"
 
-        buildConfigField("String", "UPDATE_URL", "\"$updateUrl\"")
         buildConfigField("String", "SUBSCRIPTION_HOST", "\"$subscriptionHost\"")
-        buildConfigField("String", "NEWS_URL", "\"$newsUrl\"")
-        buildConfigField("String", "CRASH_URL", "\"$crashUrl\"")
         buildConfigField("String", "RULES_BASE_URL", "\"$rulesBaseUrl\"")
         // Откуда приложение узнаёт о новых версиях: GitHub Releases этого репозитория
         buildConfigField("String", "GITHUB_REPO", "\"${System.getenv("GITHUB_REPOSITORY")?.takeIf { it.contains('/') } ?: "Dubstep2004/apex-vpn"}\"")

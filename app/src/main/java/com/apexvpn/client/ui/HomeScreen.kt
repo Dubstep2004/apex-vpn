@@ -97,7 +97,6 @@ fun HomeScreen(
     val sub by viewModel.subscription.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
-    val news by viewModel.news.collectAsStateWithLifecycle()
     val livePing by viewModel.livePing.collectAsStateWithLifecycle()
     var timerDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -133,18 +132,6 @@ fun HomeScreen(
             StatusPill(status)
         }
 
-        // 38. Объявление с сервера
-        news?.let { n ->
-            Spacer(Modifier.height(14.dp))
-            Banner(
-                icon = Icons.Rounded.Campaign,
-                color = if (n.warning) Apex.Warn else Apex.Accent,
-                title = n.title.ifBlank { null },
-                text = n.text,
-                onClick = n.url?.let { u -> { openUrl(context, u) } },
-                onClose = { viewModel.dismissNews() },
-            )
-        }
         // Объявление из Remnawave (заголовок announce) — баннером наверху, закрывается до нового текста
         var closedAnnounce by remember { mutableStateOf(com.apexvpn.client.data.Prefs.dismissedAnnounce) }
         if (sub.announce.isNotBlank() && sub.announce != closedAnnounce) {

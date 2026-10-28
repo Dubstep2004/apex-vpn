@@ -37,59 +37,6 @@ internal object Http {
     }
 }
 
-// ─── 38. Новости и объявления ───────────────────────────────────────────
-
-/**
- * news.json на вашем сервере (BuildConfig.NEWS_URL), объект или массив:
- * {"id":"2026-11-01","title":"Техработы","text":"С 02:00 до 03:00…","url":"https://…","level":"info|warning"}
- */
-data class NewsItem(val id: String, val title: String, val text: String, val url: String?, val warning: Boolean)
-
-object News {
-    private lateinit var appContext: Context
-    private val _current = MutableStateFlow<NewsItem?>(null)
-    val current: StateFlow<NewsItem?> = _current.asStateFlow()
-
-    private val sp by lazy { appContext.getSharedPreferences("news", Context.MODE_PRIVATE) }
-
-    fun init(context: Context) {
-        appContext = context.applicationContext
-        sp.getString("cached", null)?.let { runCatching { pick(JSONArray(it)) } }
-    }
-
-    suspend fun refresh() = withContext(Dispatchers.IO) {
-        if (BuildConfig.NEWS_URL.isBlank() || "example.com" in BuildConfig.NEWS_URL) return@withContext
-        runCatching {
-            val body = Http.getText(BuildConfig.NEWS_URL).trim()
-            val arr = if (body.startsWith("[")) JSONArray(body) else JSONArray().put(JSONObject(body))
-            sp.edit { putString("cached", arr.toString()) }
-            pick(arr)
-        }
-    }
-
-    fun dismiss() {
-        val n = _current.value ?: return
-        sp.edit { putStringSet("dismissed", (sp.getStringSet("dismissed", emptySet()) ?: emptySet()) + n.id) }
-        _current.value = null
-    }
-
-    private fun pick(arr: JSONArray) {
-        val dismissed = sp.getStringSet("dismissed", emptySet()) ?: emptySet()
-        _current.value = (0 until arr.length()).asSequence()
-            .map { arr.getJSONObject(it) }
-            .map {
-                NewsItem(
-                    id = it.optString("id", it.optString("title")),
-                    title = it.optString("title"),
-                    text = it.optString("text"),
-                    url = it.optString("url").takeIf { u -> u.startsWith("https://") },
-                    warning = it.optString("level") == "warning",
-                )
-            }
-            .firstOrNull { it.id.isNotBlank() && it.id !in dismissed && (it.title.isNotBlank() || it.text.isNotBlank()) }
-    }
-}
-
 // ─── 59. Обновление баз российских сайтов и рекламы ─────────────────────
 
 object RulesUpdater {
@@ -162,7 +109,7 @@ object RulesUpdater {
     }
 }
 
-// ─── 40. Анонимные отчёты о сбоях ───────────────────────────────────────
+// ─── Отчёты о сбоях: хранятся на телефоне, уходят только в «Написать в поддержку» ─
 
 object CrashReporter {
     private fun dir(context: Context) = File(context.filesDir, "crashes").apply { mkdirs() }
@@ -210,27 +157,10 @@ object CrashReporter {
         runCatching { stderr.delete() }
     }
 
-    suspend fun uploadPending(context: Context) = withContext(Dispatchers.IO) {
-        val files = dir(context).listFiles().orEmpty()
-        if (BuildConfig.CRASH_URL.isBlank() || !AppSettings.value.crashReports) {
-            files.filter { System.currentTimeMillis() - it.lastModified() > 7L * 24 * 3600 * 1000 }.forEach { it.delete() }
-            return@withContext
-        }
-        for (f in files.take(5)) {
-            runCatching {
-                val c = Http.open(BuildConfig.CRASH_URL)
-                try {
-                    c.requestMethod = "POST"
-                    c.doOutput = true
-                    c.setRequestProperty("Content-Type", "text/plain; charset=utf-8")
-                    val body = f.readBytes().let { if (it.size > 60_000) it.copyOf(60_000) else it }
-                    c.setFixedLengthStreamingMode(body.size) // сервер ждёт Content-Length
-                    c.outputStream.use { it.write(body) }
-                    if (c.responseCode in 200..299) f.delete()
-                } finally {
-                    c.disconnect()
-                }
-            }
-        }
+    /** Отчёты хранятся только на телефоне (для «Написать в поддержку»); старше 30 дней удаляются. */
+    fun cleanup(context: Context) {
+        dir(context).listFiles().orEmpty()
+            .filter { System.currentTimeMillis() - it.lastModified() > 30L * 24 * 3600 * 1000 }
+            .forEach { it.delete() }
     }
 }

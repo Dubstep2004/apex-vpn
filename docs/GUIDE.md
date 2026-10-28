@@ -6,5 +6,5 @@
 - [🔔 Как приходит обновление](../README.md#update)
 - [🛠️ Как выпустить новую версию](../README.md#release)
 - [🔑 Ключ подписи](../README.md#signing)
-- [🖥️ Свой сервер (VPS) — по желанию](../README.md#vps)
+- [📢 Объявления через Remnawave](../README.md#announce)
 - [❓ Если что-то не так](../README.md#faq)

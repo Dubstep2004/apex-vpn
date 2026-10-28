@@ -275,13 +275,6 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
             }) {
                 if (busy) Spinner()
             }
-            GroupDivider()
-            ListRow(
-                "Отчёты о сбоях",
-                "Анонимно: модель телефона и ошибка, без ссылок и сайтов",
-                leading = { tile(Icons.Rounded.BugReport) },
-                onClick = { viewModel.change(reload = false) { copy(crashReports = !crashReports) } },
-            ) { ApexSwitch(s.crashReports, { v -> viewModel.change(reload = false) { copy(crashReports = v) } }) }
         }
 
         // ── О приложении ──

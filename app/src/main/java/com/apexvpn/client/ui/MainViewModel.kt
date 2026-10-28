@@ -9,7 +9,6 @@ import com.apexvpn.client.data.AppInfo
 import com.apexvpn.client.data.AppSettings
 import com.apexvpn.client.data.InstalledApps
 import com.apexvpn.client.data.LivePing
-import com.apexvpn.client.data.News
 import com.apexvpn.client.data.Pinger
 import com.apexvpn.client.data.RulesUpdater
 import com.apexvpn.client.data.Settings
@@ -50,7 +49,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val subscription = Subscription.state
     val update = UpdateManager.state
     val settings = AppSettings.state
-    val news = News.current
 
     private val _refreshing = MutableStateFlow(false)
     val refreshing = _refreshing.asStateFlow()
@@ -73,9 +71,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (AppSettings.value.autoCheckUpdates) {
             viewModelScope.launch { UpdateManager.check(silent = true) }
         }
-        viewModelScope.launch { News.refresh() }
         // Отчёты о сбоях с прошлого запуска — сразу, а не через 3 часа
-        viewModelScope.launch { runCatching { com.apexvpn.client.data.CrashReporter.uploadPending(getApplication()) } }
+        runCatching { com.apexvpn.client.data.CrashReporter.cleanup(getApplication()) }
         viewModelScope.launch {
             VpnState.notice.collect { n ->
                 if (n != null) {
@@ -317,7 +314,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
 
-    fun dismissNews() = News.dismiss()
 
     fun consumeMessage() {
         _message.value = null

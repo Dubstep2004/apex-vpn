@@ -6,6 +6,13 @@ data class Release(val version: String, val code: Int, val date: String, val cha
 object Changelog {
     val releases = listOf(
         Release(
+            "1.8.0", 21, "28 октября 2026",
+            listOf(
+                "Работает без своего сервера: обновления — с GitHub, объявления — из Remnawave",
+                "Отчёты о сбоях хранятся на телефоне и попадают в «Написать в поддержку» — приложение ничего не отправляет само",
+            ),
+        ),
+        Release(
             "1.7.6", 20, "28 октября 2026",
             listOf(
                 "Адрес сервера больше не вшит в приложение: объявления — из Remnawave, свой сервер — по желанию",
