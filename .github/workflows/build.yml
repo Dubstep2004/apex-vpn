@@ -123,7 +123,7 @@ jobs:
           cp app/build/outputs/apk/release/app-release.apk "$APK"
           # Проверка: APK целый и подписан
           APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner
-          "$APKSIGNER" verify --print-certs "$APK" | head -3
+          "$APKSIGNER" verify --print-certs "$APK" > signer.txt; head -3 signer.txt
           LIBS=$(unzip -l "$APK" | grep -oE "lib/[^ ]+\.so" | tr '\n' ' ')
           echo "::notice title=APK::$(du -h "$APK" | cut -f1) — $LIBS"
           echo "$LIBS" | grep -q "arm64-v8a/libxray.so" || { echo "::error title=APK::в APK нет ядра Xray"; exit 1; }
