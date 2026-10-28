@@ -8,6 +8,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.material.icons.rounded.Link
+import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -229,14 +235,12 @@ fun HomeScreen(
         }
 
         Spacer(Modifier.height(12.dp))
-        TrafficCard(
-            title = sub.title,
-            used = sub.used,
-            total = sub.total,
-            expireAt = sub.expireAt,
-            updated = sub.lastUpdated,
+        SubscriptionCard(
+            sub = sub,
             refreshing = refreshing,
             onRefresh = { viewModel.refresh() },
+            onPing = onOpenServers,
+            onOpen = { openUrl(context, it) },
         )
         Spacer(Modifier.height(20.dp))
     }
@@ -419,75 +423,112 @@ private fun StatusPill(status: VpnStatus) {
     }
 }
 
+/** Карточка подписки в стиле Happ: название, обновление, трафик, объявление, поддержка. */
 @Composable
-private fun TrafficCard(
-    title: String,
-    used: Long,
-    total: Long,
-    expireAt: Long,
-    updated: Long,
+private fun SubscriptionCard(
+    sub: com.apexvpn.client.data.SubscriptionState,
     refreshing: Boolean,
     onRefresh: () -> Unit,
+    onPing: () -> Unit,
+    onOpen: (String) -> Unit,
 ) {
     Column(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
             .background(Brush.verticalGradient(listOf(Apex.HeroCard, Apex.Surface)))
-            .padding(20.dp),
+            .padding(horizontal = 16.dp, vertical = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                if (total > 0) "Осталось в этом месяце" else title.ifBlank { "Подписка" },
-                color = Apex.TextDim,
-                fontSize = 15.sp,
-                modifier = Modifier.weight(1f),
-            )
-            IconButton(onClick = onRefresh, enabled = !refreshing, modifier = Modifier.size(32.dp)) {
-                if (refreshing) {
-                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Apex.Accent)
+            Column(Modifier.weight(1f)) {
+                Text(
+                    sub.title.ifBlank { "Подписка" },
+                    color = Apex.Text,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                val updated = if (sub.lastUpdated > 0) {
+                    java.text.SimpleDateFormat("dd.MM.yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date(sub.lastUpdated))
                 } else {
-                    Icon(Icons.Rounded.Refresh, "Обновить подписку", tint = Apex.TextDim)
+                    "ещё не обновлялась"
+                }
+                Text("$updated | Автообновление - ${sub.updateHours} ч.", color = Apex.TextDim, fontSize = 13.sp)
+            }
+            IconButton(onClick = onRefresh, enabled = !refreshing) {
+                if (refreshing) {
+                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = Apex.Accent)
+                } else {
+                    Icon(Icons.Rounded.Refresh, "Обновить подписку", tint = Apex.Text)
                 }
             }
-        }
-        if (total > 0) {
-            val left = (total - used.coerceAtLeast(0)).coerceAtLeast(0)
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(formatBytes(left).substringBefore(' '), color = Apex.Text, fontSize = 44.sp, fontWeight = FontWeight.ExtraBold)
-                Spacer(Modifier.width(6.dp))
-                Text(formatBytes(left).substringAfter(' '), color = Apex.TextDim, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
-                Spacer(Modifier.weight(1f))
-                Text("потрачено ${formatBytes(used.coerceAtLeast(0))}", color = Apex.TextDim, fontSize = 14.sp, modifier = Modifier.padding(bottom = 10.dp))
-            }
-            Spacer(Modifier.height(8.dp))
-            LinearProgressIndicator(
-                progress = { (left.toFloat() / total).coerceIn(0f, 1f) },
-                modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
-                color = Apex.Accent,
-                trackColor = Apex.SurfaceHigh,
-                drawStopIndicator = {},
-                gapSize = 0.dp,
-            )
-        } else {
-            Text(
-                if (used >= 0) "Без лимита · потрачено ${formatBytes(used)}" else "Без лимита трафика",
-                color = Apex.Text,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-            )
+            IconButton(onClick = onPing) { Icon(Icons.Rounded.Speed, "Проверить пинг", tint = Apex.Text) }
         }
         Spacer(Modifier.height(12.dp))
+
+        // Трафик: «11,3 ГБ / ∞» в полосе, по краям — сайт и поддержка
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = { onOpen(sub.webPageUrl) }, enabled = sub.webPageUrl.isNotEmpty()) {
+                Icon(Icons.Outlined.Info, "Сайт", tint = if (sub.webPageUrl.isNotEmpty()) Apex.AccentText else Apex.TextDim.copy(alpha = 0.4f))
+            }
+            val used = sub.used.coerceAtLeast(0)
+            val fraction = if (sub.total > 0) (used.toFloat() / sub.total).coerceIn(0f, 1f) else 0f
+            Box(
+                Modifier
+                    .weight(1f)
+                    .height(30.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Apex.SurfaceHigh),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    Modifier
+                        .align(Alignment.CenterStart)
+                        .fillMaxWidth(fraction)
+                        .fillMaxHeight()
+                        .background(Apex.Accent.copy(alpha = 0.45f)),
+                )
+                Text(
+                    "${formatBytes(used)} / ${if (sub.total > 0) formatBytes(sub.total) else "∞"}",
+                    color = Apex.Text,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            IconButton(onClick = { onOpen(sub.supportUrl) }, enabled = sub.supportUrl.isNotEmpty()) {
+                val telegram = "t.me" in sub.supportUrl || sub.supportUrl.startsWith("tg:")
+                Icon(
+                    if (telegram) Icons.AutoMirrored.Rounded.Send else Icons.Rounded.Link,
+                    "Поддержка",
+                    tint = if (sub.supportUrl.isNotEmpty()) Apex.AccentText else Apex.TextDim.copy(alpha = 0.4f),
+                )
+            }
+        }
+
         val expire = when {
-            expireAt > 0 -> "До ${formatDate(expireAt)}"
-            expireAt == 0L -> "Бессрочно"
+            sub.expireAt > 0 -> "Действует до ${formatDate(sub.expireAt)}"
+            sub.expireAt == 0L -> "Бессрочно"
             else -> null
         }
-        Text(
-            listOfNotNull(expire, "обновлено ${formatAgo(updated)}").joinToString(" · "),
-            color = Apex.TextDim,
-            fontSize = 13.sp,
-        )
+        expire?.let {
+            Spacer(Modifier.height(6.dp))
+            Text(it, color = Apex.TextDim, fontSize = 13.sp)
+        }
+
+        // Объявление от сервиса (заголовок announce)
+        if (sub.announce.isNotBlank()) {
+            Spacer(Modifier.height(12.dp))
+            Text(
+                sub.announce,
+                color = Apex.Text,
+                fontSize = 15.sp,
+                lineHeight = 22.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
 }
 

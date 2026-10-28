@@ -34,6 +34,17 @@ var udpTypes = map[string]bool{"hysteria2": true, "hysteria": true, "tuic": true
 
 // fillMeta заполняет категорию, описание подключения и признак UDP.
 func fillMeta(n *Node) {
+	if n.Outbound == nil && n.Xray != nil {
+		if n.Category == "" {
+			n.Category = categoryOf(n)
+		}
+		if n.Detail == "" {
+			n.Detail = xrayDetail(n.Xray)
+		}
+		stream, _ := n.Xray["streamSettings"].(map[string]any)
+		n.UDP = stream["network"] == "kcp"
+		return
+	}
 	if n.Category == "" {
 		n.Category = categoryOf(n)
 	}

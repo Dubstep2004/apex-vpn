@@ -61,15 +61,32 @@ object Prefs {
         get() = sp.getInt("seen_version", 0)
         set(v) = sp.edit { putInt("seen_version", v) }
 
-    /** Свой User-Agent для запроса подписки (пусто — встроенные варианты) */
-    var customUserAgent: String
-        get() = sp.getString("custom_ua", "") ?: ""
-        set(v) = sp.edit { putString("custom_ua", v) }
+    /** Версия приложения, которой загружены серверы (новые поля — после обновления перезагрузить) */
+    var nodesVersion: Int
+        get() = sp.getInt("nodes_version", 0)
+        set(v) = sp.edit { putInt("nodes_version", v) }
 
-    /** User-Agent, с которым подписка загрузилась в последний раз */
-    var workingUserAgent: String
-        get() = sp.getString("working_ua", "") ?: ""
-        set(v) = sp.edit { putString("working_ua", v) }
+    var lastPanelPing: Long
+        get() = sp.getLong("panel_ping", 0)
+        set(v) = sp.edit { putLong("panel_ping", v) }
+
+    var announce: String
+        get() = sp.getString("announce", "") ?: ""
+        set(v) = sp.edit { putString("announce", v) }
+
+    var supportUrl: String
+        get() = sp.getString("support_url", "") ?: ""
+        set(v) = sp.edit { putString("support_url", v) }
+
+    var webPageUrl: String
+        get() = sp.getString("web_url", "") ?: ""
+        set(v) = sp.edit { putString("web_url", v) }
+
+    /** Секрет локального SOCKS между sing-box и Xray (постоянный, чтобы Xray не перезапускался зря) */
+    val xrayAuth: String
+        get() = sp.getString("xray_auth", null) ?: java.util.UUID.randomUUID().toString().also {
+            sp.edit { putString("xray_auth", it) }
+        }
 
     /** Постоянный анонимный идентификатор устройства для панелей подписок (HWID) */
     val deviceId: String
@@ -80,5 +97,6 @@ object Prefs {
     fun clearSubscription() = sp.edit {
         remove("sub_url"); remove("nodes"); remove("selected"); remove("title")
         remove("used"); remove("total"); remove("expire"); remove("updated")
+        remove("announce"); remove("support_url"); remove("web_url")
     }
 }

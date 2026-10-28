@@ -123,3 +123,14 @@ enum class AccentColor(val id: String, val title: String, val argb: Long) {
         fun of(id: String) = entries.firstOrNull { it.id == id } ?: Violet
     }
 }
+
+/** Каким ядром подключать серверы. */
+enum class CoreMode(val id: String, val title: String, val subtitle: String) {
+    Auto("auto", "Авто", "sing-box, а Xray — для XHTTP, mKCP и подобных"),
+    Xray("xray", "Только Xray", "Как в Happ: всё, что умеет Xray, — через Xray"),
+    SingBox("singbox", "Только sing-box", "Без Xray: серверы XHTTP и mKCP скрыты");
+
+    companion object {
+        fun of(id: String) = entries.firstOrNull { it.id == id } ?: Auto
+    }
+}

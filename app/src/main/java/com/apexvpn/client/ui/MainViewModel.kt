@@ -1,5 +1,7 @@
 package com.apexvpn.client.ui
 
+import com.apexvpn.client.BuildConfig
+
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -14,6 +16,7 @@ import com.apexvpn.client.data.Settings
 import com.apexvpn.client.data.SpeedResult
 import com.apexvpn.client.data.SpeedTest
 import com.apexvpn.client.data.Subscription
+import com.apexvpn.client.data.Prefs
 import com.apexvpn.client.update.UpdateInfo
 import com.apexvpn.client.update.UpdateManager
 import com.apexvpn.client.vpn.ApexVpnService
@@ -63,10 +66,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         viewModelScope.launch {
-            // После обновления до 1.3 у сохранённых серверов нет описаний протоколов — обновим один раз
-            val oldFormat = Subscription.state.value.nodes.let { n -> n.isNotEmpty() && n.all { it.detail.isEmpty() } }
+            // После обновления приложения перезагружаем серверы один раз: у новых версий новые поля
+            val oldFormat = Subscription.state.value.nodes.isNotEmpty() && Prefs.nodesVersion < BuildConfig.VERSION_CODE
             if (Subscription.needsRefresh() || oldFormat) refresh(silent = true)
         }
+        viewModelScope.launch { com.apexvpn.client.data.Panel.ping() }
         if (AppSettings.value.autoCheckUpdates) {
             viewModelScope.launch { UpdateManager.check(silent = true) }
         }

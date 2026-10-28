@@ -44,11 +44,12 @@ func TestParseBase64Subscription(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &res); err != nil {
 		t.Fatal(err)
 	}
-	if len(res.Nodes) != 8 {
-		t.Fatalf("want 8 nodes, got %d (skipped: %v)", len(res.Nodes), res.Skipped)
+	// XHTTP теперь идёт через Xray, пропускается только WireGuard без ключей
+	if len(res.Nodes) != 9 {
+		t.Fatalf("want 9 nodes, got %d (skipped: %v)", len(res.Nodes), res.Skipped)
 	}
-	if len(res.Skipped) != 2 {
-		t.Fatalf("want 2 skipped, got %v", res.Skipped)
+	if len(res.Skipped) != 1 {
+		t.Fatalf("want 1 skipped, got %v", res.Skipped)
 	}
 	if res.Nodes[0].Name != "🇳🇱 Netherlands" {
 		t.Fatalf("bad name %q", res.Nodes[0].Name)

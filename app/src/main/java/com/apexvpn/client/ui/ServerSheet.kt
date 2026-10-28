@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.apexvpn.client.data.AUTO_TAG
+import com.apexvpn.client.data.CoreMode
 import com.apexvpn.client.data.Node
 import com.apexvpn.client.data.Pinger
 import com.apexvpn.client.data.Protocols
@@ -82,17 +83,22 @@ fun ServerSheet(viewModel: MainViewModel, onDismiss: () -> Unit) {
     fun groupKey(g: ServerGroup) = g.nodes.minOf { key(it) }
 
     // Категории протоколов: сколько серверов каждого вида в подписке
-    val categories = sub.nodes.groupingBy { it.category }.eachCount().entries
+    // В режиме «Только sing-box» серверы, которым нужен Xray, не показываем
+    val base = sub.nodes.filter { !(settings.core == CoreMode.SingBox && it.xrayOnly) }
+    val categories = base.groupingBy { it.category }.eachCount().entries
         .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
     val activeProtocol = settings.protocol.takeIf { p -> categories.any { it.key == p } } ?: ""
-    val visible = if (activeProtocol.isEmpty()) sub.nodes else sub.nodes.filter { it.category == activeProtocol }
+    val visible = if (activeProtocol.isEmpty()) base else base.filter { it.category == activeProtocol }
 
     val groups = visible
         .groupBy { ServerInfo.flag(it.name) to ServerInfo.title(it.name) }
         .map { (k, list) -> ServerGroup(k.second, k.first, list.sortedBy { key(it) }) }
     val favorites = groups.filter { g -> g.nodes.any { it.name in settings.favorites } || g.title in settings.favorites }
-    val regular = groups.filter { g -> g.nodes.none { ServerInfo.isSpecial(it.name) } }
-    val special = groups.filter { g -> g.nodes.any { ServerInfo.isSpecial(it.name) } }
+    // Серверы с рекламой на YouTube — отдельной категорией внизу
+    val withAds = groups.filter { g -> g.nodes.all { it.ads } }
+    val clean = groups - withAds.toSet()
+    val regular = clean.filter { g -> g.nodes.none { ServerInfo.isSpecial(it.name) } }
+    val special = clean.filter { g -> g.nodes.any { ServerInfo.isSpecial(it.name) } }
     val fastest = regular.filter { groupKey(it) != Int.MAX_VALUE }.minByOrNull { groupKey(it) }?.title
 
     ModalBottomSheet(
@@ -123,8 +129,8 @@ fun ServerSheet(viewModel: MainViewModel, onDismiss: () -> Unit) {
             }
             Spacer(Modifier.height(16.dp))
 
-            val fallback = groups.filter { groupKey(it) != Int.MAX_VALUE }.minByOrNull { groupKey(it) }?.nodes?.first()?.tag
-                ?: sub.nodes.firstOrNull()?.tag
+            val fallback = clean.filter { groupKey(it) != Int.MAX_VALUE }.minByOrNull { groupKey(it) }?.nodes?.first()?.tag
+                ?: base.firstOrNull()?.tag
             Group {
                 ListRow(
                     title = "Автопилот",
@@ -224,6 +230,10 @@ fun ServerSheet(viewModel: MainViewModel, onDismiss: () -> Unit) {
                         SectionLabel("Особые")
                         Group { special.forEach { row(it, false) } }
                     }
+                    if (withAds.isNotEmpty()) {
+                        SectionLabel("Реклама на YouTube есть", if (settings.excludeAds) "автопилот не выбирает" else null)
+                        Group { withAds.sortedBy { groupKey(it) }.forEach { row(it, false) } }
+                    }
                 }
                 ServerTab.Lte -> {
                     val lte = groups.filter { g -> g.nodes.any { ServerInfo.isLte(it.name) } }.sortedBy { groupKey(it) }
@@ -237,7 +247,7 @@ fun ServerSheet(viewModel: MainViewModel, onDismiss: () -> Unit) {
                     }
                 }
             }
-            Caption("★ — добавить в избранное. Метки протоколов выбирают конкретное подключение.")
+            Caption("★ — добавить в избранное. Метки протоколов выбирают конкретное подключение. Пинг — настоящая задержка через сервер.")
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -271,34 +281,51 @@ private fun GroupRow(
             .clickable { onPick(best) }
             .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(verticalAlignment = Alignment.Top) {
             FlagCircle(group.flag)
             Spacer(Modifier.width(14.dp))
-            Text(
-                group.title,
-                color = Apex.Text,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
-            )
-            if (fastest) {
-                Spacer(Modifier.width(8.dp))
-                Tag("Быстрый")
+            Column(Modifier.weight(1f)) {
+                // Название целиком, до двух строк — без обрезки «Германи…»
+                Text(
+                    group.title,
+                    color = Apex.Text,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    lineHeight = 21.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                val shownNode = selectedNode ?: best
+                if (shownNode.description.isNotBlank()) {
+                    Text(
+                        shownNode.description,
+                        color = if (shownNode.ads) Apex.Warn else Apex.TextDim,
+                        fontSize = 13.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+                val info = listOf(shownNode.category, shownNode.detail).filter { it.isNotBlank() }.joinToString(" · ")
+                Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (fastest) {
+                        Tag("Быстрый")
+                        Spacer(Modifier.width(6.dp))
+                    }
+                    if (group.nodes.any { ServerInfo.isLte(it.name) }) {
+                        Tag("LTE", color = Apex.Warn, outlined = true)
+                        Spacer(Modifier.width(6.dp))
+                    }
+                    Text(info, color = Apex.TextDim, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
-            if (group.nodes.any { ServerInfo.isLte(it.name) }) {
-                Spacer(Modifier.width(8.dp))
-                Tag("LTE", color = Apex.Warn, outlined = true)
-            }
-            Spacer(Modifier.weight(1f).width(8.dp))
+            Spacer(Modifier.width(8.dp))
             val text = when (ping) {
                 null -> "…"
-                Pinger.NOT_APPLICABLE -> "UDP"
                 Pinger.UNREACHABLE -> "нет ответа"
                 else -> "$ping мс"
             }
-            Text(text, color = pingColor(ping ?: -1), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            Text(text, color = pingColor(ping ?: -1), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 10.dp))
             Box(
                 Modifier.size(40.dp).clip(CircleShape).clickable(onClick = onFavorite),
                 contentAlignment = Alignment.Center,
@@ -310,19 +337,6 @@ private fun GroupRow(
                     modifier = Modifier.size(22.dp),
                 )
             }
-        }
-        // Протокол и способ подключения: «VLESS · Reality · Vision · TCP»
-        val shownNode = selectedNode ?: best
-        val info = listOf(shownNode.category, shownNode.detail).filter { it.isNotBlank() }.joinToString(" · ")
-        if (info.isNotEmpty()) {
-            Text(
-                info,
-                color = Apex.TextDim,
-                fontSize = 13.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(start = 54.dp, top = 2.dp),
-            )
         }
         // 23. Выбор протокола, если у сервера несколько подключений
         if (group.nodes.size > 1) {

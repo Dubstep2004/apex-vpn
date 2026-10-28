@@ -16,3 +16,5 @@ core/.build/
 *.jks
 *.keystore
 keystore.properties
+core/.xray-host/
+app/src/main/jniLibs/*/libxray.so

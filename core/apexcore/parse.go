@@ -33,11 +33,20 @@ type Node struct {
 	UDP bool `json:"udp,omitempty"`
 	// Extra — промежуточные outbounds цепочки (detour): ShadowTLS и т. п.
 	Extra []map[string]any `json:"extra,omitempty"`
+	// Xray — тот же сервер в формате Xray (второе ядро). Если Outbound пуст,
+	// сервер работает только через Xray (XHTTP, mKCP, VLESS Encryption…)
+	Xray map[string]any `json:"xray,omitempty"`
+	// Description — подпись под названием (serverDescription, как в Happ)
+	Description string `json:"description,omitempty"`
+	// Ads — в описании или названии есть пометка о рекламе
+	Ads bool `json:"ads,omitempty"`
 }
 
 type parseResult struct {
 	Nodes   []Node   `json:"nodes"`
 	Skipped []string `json:"skipped"`
+	// Meta — заголовки подписки, переданные в теле строками «#announce: …»
+	Meta map[string]string `json:"meta,omitempty"`
 }
 
 // ParseSubscription accepts the raw body of a subscription response
@@ -79,10 +88,24 @@ func parse(content string) (*parseResult, error) {
 		} else {
 			for _, line := range strings.Split(content, "\n") {
 				line = strings.TrimSpace(line)
+				if k, v, ok := metaLine(line); ok {
+					if res.Meta == nil {
+						res.Meta = map[string]string{}
+					}
+					res.Meta[k] = v
+					continue
+				}
 				if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "//") {
 					continue
 				}
 				node, err := parseLink(line)
+				xn, _ := xrayFromLink(line)
+				switch {
+				case err == nil && xn != nil:
+					node.Xray = xn.Xray
+				case err != nil && xn != nil:
+					node, err = xn, nil // sing-box не умеет — подключим через Xray
+				}
 				if err != nil {
 					res.Skipped = append(res.Skipped, err.Error())
 					continue
@@ -101,9 +124,12 @@ func parse(content string) (*parseResult, error) {
 	names := map[string]int{}
 	for i := range res.Nodes {
 		n := &res.Nodes[i]
+		splitDescription(n)
 		n.Tag = fmt.Sprintf("node-%d", i+1)
-		n.Outbound["tag"] = n.Tag
-		linkChain(n)
+		if n.Outbound != nil {
+			n.Outbound["tag"] = n.Tag
+			linkChain(n)
+		}
 		fillMeta(n)
 		if strings.TrimSpace(n.Name) == "" {
 			n.Name = fmt.Sprintf("%s:%d", n.Server, n.Port)
@@ -169,7 +195,12 @@ func parseSingBoxJSON(content string, res *parseResult) error {
 		if p, ok := main["server_port"].(float64); ok {
 			port = int(p)
 		}
-		res.Nodes = append(res.Nodes, Node{Name: name, Type: typ, Server: server, Port: port, Outbound: main, Extra: extra})
+		desc := ""
+		if m, ok := main["meta"].(map[string]any); ok {
+			desc, _ = m["serverDescription"].(string)
+			delete(main, "meta")
+		}
+		res.Nodes = append(res.Nodes, Node{Name: name, Type: typ, Server: server, Port: port, Outbound: main, Extra: extra, Description: desc})
 	}
 	for _, ep := range cfg.Endpoints {
 		if typ, _ := ep["type"].(string); typ != "wireguard" {
@@ -433,6 +464,9 @@ func parseVLESS(link string) (*Node, error) {
 		"server_port":     port,
 		"uuid":            uuid,
 		"packet_encoding": "xudp",
+	}
+	if enc := q.Get("encryption"); enc != "" && enc != "none" {
+		return nil, fmt.Errorf("vless %s: VLESS Encryption не поддерживается sing-box", name)
 	}
 	if flow := q.Get("flow"); flow != "" {
 		if !strings.HasPrefix(flow, "xtls-rprx-vision") {

@@ -1,6 +1,10 @@
 package com.apexvpn.client.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.background
+import androidx.compose.material.icons.rounded.Block
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Row
@@ -22,10 +26,10 @@ import androidx.compose.material.icons.rounded.Computer
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.QrCodeScanner
@@ -60,6 +64,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.apexvpn.client.BuildConfig
 import com.apexvpn.client.data.AppsMode
+import com.apexvpn.client.data.CoreMode
 import com.apexvpn.client.data.DnsChoice
 import com.apexvpn.client.ui.theme.Apex
 import com.apexvpn.client.update.UpdateState
@@ -75,8 +80,7 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
     val rulesUpdating by viewModel.rulesUpdating.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf(false) }
     var confirmRemove by remember { mutableStateOf(false) }
-    var editingUa by remember { mutableStateOf(false) }
-    var uaSummary by remember { mutableStateOf(userAgentSummary()) }
+    var coreDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
     Column(
@@ -102,8 +106,6 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
             ) { if (refreshing) Spinner() }
             GroupDivider()
             ListRow("Изменить ссылку", leading = { tile(Icons.Rounded.Edit) }, onClick = { editing = true }) { Chevron() }
-            GroupDivider()
-            ListRow("User-Agent", uaSummary, leading = { tile(Icons.Rounded.Fingerprint) }, onClick = { editingUa = true }) { Chevron() }
             GroupDivider()
             ListRow("Сканировать QR-код", "Добавить подписку с экрана другого устройства", leading = { tile(Icons.Rounded.QrCodeScanner) }, onClick = onScanQr) { Chevron() }
             GroupDivider()
@@ -148,6 +150,20 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
                 leading = { tile(Icons.Rounded.Dns) },
                 onClick = { onOpenPage(Page.Dns) },
             ) { Chevron() }
+            GroupDivider()
+            ListRow(
+                "Ядро",
+                "${s.core.title} — ${s.core.subtitle}",
+                leading = { tile(Icons.Rounded.Memory) },
+                onClick = { coreDialog = true },
+            ) { Chevron() }
+            GroupDivider()
+            ListRow(
+                "Без серверов с рекламой",
+                "Автопилот не выбирает серверы с пометкой «реклама на YouTube»",
+                leading = { tile(Icons.Rounded.Block) },
+                onClick = { viewModel.change { copy(excludeAds = !excludeAds) } },
+            ) { ApexSwitch(s.excludeAds, { v -> viewModel.change { copy(excludeAds = v) } }) }
             GroupDivider()
             ListRow(
                 "IPv6",
@@ -260,11 +276,8 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
                 Column {
                     Text("APEX VPN", color = Apex.Text, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     Text("Версия ${BuildConfig.VERSION_NAME}", color = Apex.TextDim, fontSize = 14.sp)
-                    Text(
-                        "Ядро sing-box ${runCatching { io.nekohasekai.libbox.Libbox.version() }.getOrDefault("")}",
-                        color = Apex.TextDim,
-                        fontSize = 13.sp,
-                    )
+                    Text("Ядро sing-box ${singBoxVersion()}", color = Apex.TextDim, fontSize = 13.sp)
+                    Text("Ядро Xray ${BuildConfig.XRAY_VERSION}", color = Apex.TextDim, fontSize = 13.sp)
                 }
                 Spacer(Modifier.weight(1f))
                 Chevron()
@@ -276,6 +289,15 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
                 leading = { tile(Icons.Rounded.NewReleases) },
                 onClick = { onOpenPage(Page.Changelog) },
             ) { Chevron() }
+            if (com.apexvpn.client.data.Panel.enabled) {
+                GroupDivider()
+                ListRow(
+                    "Сообщить о проблеме",
+                    "Сообщение получит поддержка в Telegram",
+                    leading = { tile(Icons.Rounded.BugReport) },
+                    onClick = { onOpenPage(Page.Feedback) },
+                ) { Chevron() }
+            }
         }
         Spacer(Modifier.height(24.dp))
     }
@@ -298,10 +320,42 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
         )
     }
 
-    if (editingUa) {
-        UserAgentDialog(onDismiss = { editingUa = false; uaSummary = userAgentSummary() }, onSaved = {
-            if (sub.url.isNotEmpty() && !refreshing) viewModel.refresh()
-        })
+    if (coreDialog) {
+        AlertDialog(
+            onDismissRequest = { coreDialog = false },
+            containerColor = Apex.Surface,
+            title = { Text("Ядро", color = Apex.Text) },
+            text = {
+                Column {
+                    CoreMode.entries.forEach { m ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(if (m == s.core) Apex.AccentSoft else Color.Transparent)
+                                .clickable {
+                                    viewModel.change { copy(core = m) }
+                                    coreDialog = false
+                                }
+                                .padding(12.dp),
+                        ) {
+                            Column {
+                                Text(m.title, color = Apex.Text, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                                Text(m.subtitle, color = Apex.TextDim, fontSize = 14.sp)
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "sing-box ${singBoxVersion()} · Xray ${BuildConfig.XRAY_VERSION}",
+                        color = Apex.TextDim,
+                        fontSize = 13.sp,
+                    )
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { coreDialog = false }) { Text("Закрыть", color = Apex.TextDim) } },
+        )
     }
 
     if (confirmRemove) {
@@ -335,6 +389,8 @@ private fun Chevron() {
 private fun Spinner() {
     CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = Apex.Accent)
 }
+
+fun singBoxVersion(): String = runCatching { io.nekohasekai.libbox.Libbox.version() }.getOrDefault("")
 
 private fun maskUrl(url: String): String {
     val idx = url.indexOf('/', "https://".length)

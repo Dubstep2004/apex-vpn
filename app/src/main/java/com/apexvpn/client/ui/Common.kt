@@ -253,7 +253,7 @@ fun formatAgo(time: Long): String {
 
 fun pingColor(ms: Int) = when {
     ms < 0 -> Apex.TextDim
-    ms < 150 -> Apex.Good
-    ms < 400 -> Apex.Warn
+    ms < 300 -> Apex.Good
+    ms < 800 -> Apex.Warn
     else -> Apex.Bad
 }

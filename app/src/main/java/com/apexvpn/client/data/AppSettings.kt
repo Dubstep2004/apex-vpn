@@ -37,6 +37,8 @@ data class Settings(
     val sharePass: String = "",
     // Серверы
     val favorites: Set<String> = emptySet(),          // по названию сервера
+    val core: CoreMode = CoreMode.Auto,               // ядро: авто / только Xray / только sing-box
+    val excludeAds: Boolean = true,                   // автопилот не выбирает серверы с рекламой
     val protocol: String = "",                        // категория протокола в списке и для автопилота; "" — все
     // Уведомления и фон
     val speedInNotification: Boolean = true,
@@ -48,6 +50,9 @@ data class Settings(
     val theme: ThemeMode = ThemeMode.Dark,
     val accent: AccentColor = AccentColor.Violet,
 )
+
+/** Порт локального API ядра для замера задержки (см. clashApi в core/apexcore/config.go). */
+const val CLASH_API_PORT = 9095
 
 /** Настройки маршрутизации и приложения. Хранятся одним JSON, изменения сразу видны всем. */
 object AppSettings {
@@ -103,6 +108,10 @@ object AppSettings {
         put("adBlock", s.adBlock)
         put("ipv6", s.ipv6)
         put("profile", s.profile.id)
+        put("core", s.core.id)
+        put("excludeAds", s.excludeAds)
+        put("clashApi", CLASH_API_PORT)
+        put("xrayAuth", Prefs.xrayAuth)
         put("autoProtocols", JSONArray(if (s.protocol.isEmpty()) emptyList() else listOf(s.protocol)))
         put(
             "share",
@@ -140,7 +149,7 @@ object AppSettings {
         put("ipv6", s.ipv6); put("profile", s.profile.id); put("failover", s.failover)
         put("wifiRules", s.wifiRules); put("trustedWifi", list(s.trustedWifi))
         put("share", s.share); put("sharePort", s.sharePort); put("shareUser", s.shareUser); put("sharePass", s.sharePass)
-        put("favorites", list(s.favorites)); put("protocol", s.protocol)
+        put("favorites", list(s.favorites)); put("protocol", s.protocol); put("core", s.core.id); put("excludeAds", s.excludeAds)
         put("speedNotif", s.speedInNotification); put("expiryAlerts", s.expiryAlerts)
         put("autoUpdates", s.autoCheckUpdates); put("crashReports", s.crashReports); put("refreshHours", s.refreshHours)
         put("theme", s.theme.id); put("accent", s.accent.id)
@@ -172,6 +181,8 @@ object AppSettings {
             sharePass = o.optString("sharePass", d.sharePass),
             favorites = arr("favorites", d.favorites).toSet(),
             protocol = o.optString("protocol", d.protocol),
+            core = CoreMode.of(o.optString("core", if (o.optBoolean("xrayAll")) "xray" else d.core.id)),
+            excludeAds = o.optBoolean("excludeAds", d.excludeAds),
             speedInNotification = o.optBoolean("speedNotif", d.speedInNotification),
             expiryAlerts = o.optBoolean("expiryAlerts", d.expiryAlerts),
             autoCheckUpdates = o.optBoolean("autoUpdates", d.autoCheckUpdates),

@@ -11,14 +11,37 @@ permissions:
   contents: write
 
 jobs:
+  # ── Панель: Telegram-бот + сервер обновлений на Cloudflare Workers ───────
+  panel:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+      kv: ${{ steps.deploy.outputs.kv }}
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_ADMIN_IDS: ${{ secrets.TELEGRAM_ADMIN_IDS }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy panel
+        id: deploy
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ] || [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_ADMIN_IDS" ]; then
+            echo "::warning title=Панель::не заданы секреты CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, TELEGRAM_BOT_TOKEN, TELEGRAM_ADMIN_IDS — панель и обновления в приложении выключены (см. docs/PANEL.md)"
+            exit 0
+          fi
+          ./panel/deploy.sh
+
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    needs: panel
+    if: always() && (needs.panel.result == 'success' || needs.panel.result == 'skipped')
+    timeout-minutes: 75
     env:
-      # URL файла update.json на вашем сервере (Settings → Secrets and variables → Actions → Variables)
-      UPDATE_URL: ${{ vars.UPDATE_URL }}
-      # Где будет лежать APK (база для apkUrl в update.json), например https://example.com/apexvpn
-      APK_BASE_URL: ${{ vars.APK_BASE_URL }}
+      PANEL_URL: ${{ needs.panel.outputs.url }}
+      PANEL_KV: ${{ needs.panel.outputs.kv }}
 
     steps:
       - uses: actions/checkout@v4
@@ -37,6 +60,9 @@ jobs:
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;28.0.13004108" > /dev/null
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.0.13004108" >> "$GITHUB_ENV"
+
+      - name: Xray core
+        run: XRAY_HOST=1 ./core/fetch-xray.sh
 
       - name: Cache core
         id: core-cache
@@ -57,7 +83,7 @@ jobs:
             echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/apex.jks"
             echo "APEX_KEYSTORE_PATH=$RUNNER_TEMP/apex.jks" >> "$GITHUB_ENV"
           else
-            echo "::warning::Секрет APEX_KEYSTORE_BASE64 не задан — APK будет подписан отладочным ключом, обновления между сборками работать не будут."
+            echo "::warning title=Подпись::Секрет APEX_KEYSTORE_BASE64 не задан — APK подписан временным ключом: поверх установленной версии он не встанет (удалите приложение и установите заново)."
           fi
 
       - uses: gradle/actions/setup-gradle@v4
@@ -67,8 +93,10 @@ jobs:
           APEX_KEYSTORE_PASSWORD: ${{ secrets.APEX_KEYSTORE_PASSWORD }}
           APEX_KEY_ALIAS: ${{ secrets.APEX_KEY_ALIAS }}
           APEX_KEY_PASSWORD: ${{ secrets.APEX_KEY_PASSWORD }}
+          UPDATE_URL: ${{ vars.UPDATE_URL }}
         run: |
           set -o pipefail
+          echo "Панель: ${PANEL_URL:-нет}"
           if ! ./gradlew --no-daemon assembleRelease 2>&1 | tee gradle.log; then
             # Ошибки сборки — в аннотации, чтобы их было видно без полного лога
             grep -E "^e: |error:|What went wrong|Could not|> " gradle.log | sed 's/%/%25/g' | head -200 > errors.txt || true
@@ -79,7 +107,8 @@ jobs:
             exit 1
           fi
 
-      - name: Collect APK and update.json
+      - name: Collect APK
+        id: apk
         run: |
           set -euo pipefail
           VERSION_NAME=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
@@ -87,28 +116,41 @@ jobs:
           mkdir -p dist
           APK="dist/apex-vpn-${VERSION_NAME}.apk"
           cp app/build/outputs/apk/release/app-release.apk "$APK"
-          SHA=$(sha256sum "$APK" | cut -d' ' -f1)
-          BASE="${APK_BASE_URL:-https://example.com/apexvpn}"
-          cat > dist/update.json <<EOF
+          # Проверка: APK целый и подписан
+          "$ANDROID_HOME"/build-tools/*/apksigner verify --print-certs "$APK" | head -3
+          unzip -l "$APK" | grep -E "libxray.so|libgojni.so"
+          echo "APK: $(du -h "$APK" | cut -f1)"
+          # Что нового — из data/Changelog.kt (первая запись)
+          awk '/^ +Release\(/{n++} n==1 && /^ +"[^"]*",$/ {gsub(/^ +"|",$/,""); print "• " $0}' \
+            app/src/main/java/com/apexvpn/client/data/Changelog.kt > dist/changelog.txt || true
+          cat dist/changelog.txt
           {
-            "versionCode": ${VERSION_CODE},
-            "versionName": "${VERSION_NAME}",
-            "apkUrl": "${BASE%/}/apex-vpn-${VERSION_NAME}.apk",
-            "sha256": "${SHA}",
-            "changelog": "Версия ${VERSION_NAME}",
-            "mandatory": false,
-            "minSupportedVersionCode": 1
-          }
-          EOF
-          cat dist/update.json
+            echo "name=$VERSION_NAME"
+            echo "code=$VERSION_CODE"
+            echo "apk=$APK"
+          } >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: apex-vpn
-          path: dist/*
+          name: apex-vpn-${{ steps.apk.outputs.name }}
+          path: dist/*.apk
 
+      # Прямая ссылка на .apk (не zip) — на странице Releases
       - name: GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name != 'pull_request'
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*
+          tag_name: v${{ steps.apk.outputs.name }}
+          name: APEX VPN ${{ steps.apk.outputs.name }}
+          body_path: dist/changelog.txt
+          files: ${{ steps.apk.outputs.apk }}
+          make_latest: true
+
+      - name: Send build to panel
+        if: github.event_name != 'pull_request' && env.PANEL_URL != ''
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: ./panel/upload-build.sh "${{ steps.apk.outputs.apk }}" "${{ steps.apk.outputs.code }}" "${{ steps.apk.outputs.name }}" dist/changelog.txt

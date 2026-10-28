@@ -27,6 +27,12 @@ data class Node(
     val detail: String = "",
     /** Протокол поверх UDP/QUIC — пинг по TCP не измерить */
     val udp: Boolean = type in Protocols.udpTypes,
+    /** Подпись под названием (serverDescription, как в Happ) */
+    val description: String = "",
+    /** Пометка «реклама на YouTube» — автопилот такие не выбирает */
+    val ads: Boolean = false,
+    /** Сервер работает только через ядро Xray (XHTTP, mKCP…) */
+    val xrayOnly: Boolean = false,
 )
 
 /** Категории протоколов (то же, что в core/apexcore/protocols.go). */
@@ -53,24 +59,37 @@ data class SubscriptionState(
     val total: Long = -1,
     val expireAt: Long = -1,
     val lastUpdated: Long = 0,
+    /** Объявление от сервиса (заголовок announce) */
+    val announce: String = "",
+    /** Поддержка (support-url) и сайт (profile-web-page-url) */
+    val supportUrl: String = "",
+    val webPageUrl: String = "",
+    val updateHours: Int = 12,
 )
 
 const val AUTO_TAG = "auto"
 
 /** Загрузка и хранение подписки. Разрешена только ссылка на sub.knownhosts.ru. */
 object Subscription {
+    /** Протоколы, которые приложение не показывает (объявлено до _state: load() его использует) */
+    private val hiddenTypes = setOf("shadowsocks")
+
     private val _state = MutableStateFlow(load())
     val state: StateFlow<SubscriptionState> = _state.asStateFlow()
 
     private fun load(): SubscriptionState = SubscriptionState(
         url = Prefs.subscriptionUrl,
         title = Prefs.profileTitle,
-        nodes = parseNodes(Prefs.nodesJson),
+        nodes = parseNodes(Prefs.nodesJson).filter { it.type !in hiddenTypes },
         selectedTag = Prefs.selectedTag,
         used = Prefs.trafficUsed,
         total = Prefs.trafficTotal,
         expireAt = Prefs.expireAt,
         lastUpdated = Prefs.lastUpdated,
+        announce = Prefs.announce,
+        supportUrl = Prefs.supportUrl,
+        webPageUrl = Prefs.webPageUrl,
+        updateHours = Prefs.updateIntervalHours,
     )
 
     /**
@@ -121,11 +140,12 @@ object Subscription {
         _state.value = load()
     }
 
-    /** Полный конфиг sing-box для выбранного сервера и текущих настроек. */
-    fun buildConfig(context: Context): String {
+    /** Конфиги ядер: sing-box (всегда) и Xray (пусто, если не нужен). */
+    fun buildConfigs(context: Context): Pair<String, String> {
         val nodes = Prefs.nodesJson
         require(parseNodes(nodes).isNotEmpty()) { "Нет серверов — обновите подписку" }
-        return Apexcore.buildConfig(nodes, Prefs.selectedTag, AppSettings.coreOptions(RulesUpdater.activeDir(context)))
+        val out = JSONObject(Apexcore.buildConfigs(nodes, Prefs.selectedTag, AppSettings.coreOptions(RulesUpdater.activeDir(context))))
+        return out.getString("singbox") to out.optString("xray")
     }
 
     /**
@@ -139,31 +159,15 @@ object Subscription {
         return re.find(decoded)?.value?.trimEnd('.', ',', ')', ']')
     }
 
-    /**
-     * Панели подписок (Remnawave, Marzban, 3x-ui) по-разному отвечают разным клиентам.
-     * Пробуем несколько вариантов User-Agent, пока один не вернёт серверы.
-     */
-    val builtInUserAgents = listOf(
-        "v2rayNG/1.10.23",
-        "Happ/3.7.0",
-        "v2rayN/7.13.8",
-        "Hiddify/2.5.7",
-        "sing-box 1.13.21",
-        "APEX VPN/${BuildConfig.VERSION_NAME}",
-    )
-
-    /** Порядок попыток: свой User-Agent → последний сработавший → встроенные. */
-    private fun userAgents(): List<String> =
-        (listOf(Prefs.customUserAgent.trim(), Prefs.workingUserAgent) + builtInUserAgents)
-            .filter { it.isNotBlank() }
-            .distinct()
+    /** Приложение представляется серверу только как APEX VPN. */
+    private val userAgent = "APEX VPN/${BuildConfig.VERSION_NAME}"
 
     private suspend fun fetch(url: String) = withContext(Dispatchers.IO) {
         var lastError: Exception? = null
-        for (ua in userAgents()) {
+        // До двух попыток: временный сбой сети или сервера
+        repeat(2) {
             try {
-                fetchWith(url, ua)
-                Prefs.workingUserAgent = ua
+                fetchWith(url, userAgent)
                 return@withContext
             } catch (e: NotFound) {
                 throw e // ссылка неверная — другие варианты не помогут
@@ -210,17 +214,32 @@ object Subscription {
             }
             val body = conn.inputStream.bufferedReader().use { it.readText() }
             val parsed = JSONObject(Apexcore.parseSubscription(body))
-            val nodes = parsed.getJSONArray("nodes")
+            val all = parsed.getJSONArray("nodes")
+            // Shadowsocks в приложении не используется
+            val nodes = JSONArray()
+            for (i in 0 until all.length()) {
+                val o = all.getJSONObject(i)
+                if (o.optString("type") !in hiddenTypes) nodes.put(o)
+            }
+            require(nodes.length() > 0) { "В подписке нет серверов, кроме Shadowsocks" }
 
             Prefs.nodesJson = nodes.toString()
             Prefs.lastUpdated = System.currentTimeMillis()
+            Prefs.nodesVersion = BuildConfig.VERSION_CODE
 
-            val title = decodeTitle(conn.getHeaderField("profile-title"))
-            Prefs.profileTitle = title ?: ""
-            conn.getHeaderField("profile-update-interval")?.trim()?.toIntOrNull()?.let {
+            // Заголовки подписки; их же можно передать в теле строками «#имя: значение»
+            val meta = parsed.optJSONObject("meta")
+            fun header(name: String): String? =
+                conn.getHeaderField(name)?.takeIf { it.isNotBlank() } ?: meta?.optString(name)?.takeIf { it.isNotBlank() }
+
+            Prefs.profileTitle = decodeTitle(header("profile-title")) ?: ""
+            header("profile-update-interval")?.trim()?.toIntOrNull()?.let {
                 if (it in 1..168) Prefs.updateIntervalHours = it
             }
-            parseUserInfo(conn.getHeaderField("subscription-userinfo"))
+            parseUserInfo(header("subscription-userinfo"))
+            Prefs.announce = decodeTitle(header("announce"))?.take(500) ?: ""
+            Prefs.supportUrl = header("support-url")?.trim()?.takeIf { it.startsWith("http") || it.startsWith("tg:") } ?: ""
+            Prefs.webPageUrl = header("profile-web-page-url")?.trim()?.takeIf { it.startsWith("http") } ?: ""
 
             // Если выбранного сервера больше нет — переключаемся на «Авто»
             val tags = parseNodes(Prefs.nodesJson).map { it.tag }
@@ -273,6 +292,9 @@ object Subscription {
                 category = o.optString("category").ifEmpty { Protocols.category(type) },
                 detail = o.optString("detail"),
                 udp = o.optBoolean("udp", type in Protocols.udpTypes),
+                description = o.optString("description"),
+                ads = o.optBoolean("ads"),
+                xrayOnly = o.isNull("outbound") || !o.has("outbound"),
             )
         }
     }.getOrDefault(emptyList())

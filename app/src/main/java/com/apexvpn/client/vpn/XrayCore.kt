@@ -1,0 +1,98 @@
+package com.apexvpn.client.vpn
+
+import android.content.Context
+import android.util.Log
+import java.io.File
+import java.net.InetSocketAddress
+import java.net.Socket
+
+/**
+ * Второе ядро — Xray (как в Happ). Запускается отдельным процессом из
+ * nativeLibraryDir/libxray.so. sing-box подключается к нему как к SOCKS на 127.0.0.1,
+ * порты начинаются с [BASE_PORT] (см. XrayBasePort в core/apexcore/xray.go).
+ */
+object XrayCore {
+    private const val TAG = "ApexXray"
+    private const val BASE_PORT = 10910
+
+    private var process: Process? = null
+    private var runningConfig: String? = null
+    private val log = ArrayDeque<String>()
+
+    fun isInstalled(context: Context) = binary(context).canExecute()
+
+    private fun binary(context: Context) = File(context.applicationInfo.nativeLibraryDir, "libxray.so")
+
+    /** Запускает Xray с конфигом, перезапускает при изменении, останавливает при пустом. */
+    @Synchronized
+    fun apply(context: Context, config: String) {
+        if (config.isBlank()) {
+            stop()
+            return
+        }
+        if (config == runningConfig && process?.isAlive == true) return
+        stop()
+        val bin = binary(context)
+        check(bin.canExecute()) { "Ядро Xray не найдено в этой сборке приложения" }
+
+        val dir = File(context.filesDir, "xray").apply { mkdirs() }
+        val file = File(dir, "config.json")
+        file.writeText(config)
+        val p = ProcessBuilder(bin.absolutePath, "run", "-c", file.absolutePath)
+            .directory(dir)
+            .redirectErrorStream(true)
+            .apply {
+                environment()["XRAY_LOCATION_ASSET"] = dir.absolutePath
+                environment()["XRAY_LOCATION_CONFIG"] = dir.absolutePath
+            }
+            .start()
+        process = p
+        runningConfig = config
+        synchronized(log) { log.clear() }
+        Thread({
+            runCatching {
+                p.inputStream.bufferedReader().forEachLine { line ->
+                    Log.i(TAG, line)
+                    synchronized(log) {
+                        log.addLast(line)
+                        while (log.size > 30) log.removeFirst()
+                    }
+                }
+            }
+        }, "xray-log").apply { isDaemon = true }.start()
+
+        // Ждём, пока Xray откроет первый порт (или упадёт)
+        val deadline = System.currentTimeMillis() + 5_000
+        while (System.currentTimeMillis() < deadline) {
+            if (!p.isAlive) break
+            if (portOpen(BASE_PORT)) return
+            Thread.sleep(100)
+        }
+        val reason = lastError()
+        stop()
+        error(if (reason.isNotEmpty()) "Xray не запустился: $reason" else "Xray не запустился")
+    }
+
+    @Synchronized
+    fun stop() {
+        process?.let { p ->
+            runCatching { p.destroy() }
+            runCatching { if (!p.waitFor(1, java.util.concurrent.TimeUnit.SECONDS)) p.destroyForcibly() }
+        }
+        process = null
+        runningConfig = null
+    }
+
+    /** Xray должен работать, но процесс завершился. */
+    fun crashed(): Boolean = runningConfig != null && process?.isAlive == false
+
+    fun lastError(): String = synchronized(log) {
+        log.lastOrNull { it.contains("failed", true) || it.contains("error", true) || it.contains("panic", true) }
+            ?: log.lastOrNull().orEmpty()
+    }.take(200)
+
+    private fun portOpen(port: Int) = runCatching {
+        Socket().use { it.connect(InetSocketAddress("127.0.0.1", port), 200) }
+        true
+    }.getOrDefault(false)
+}

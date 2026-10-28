@@ -131,7 +131,7 @@ class ApexVpnService : VpnService(), PlatformInterface, CommandServerHandler {
             if (isTrustedWifi()) {
                 VpnState.set(VpnStatus.Paused)
             } else {
-                server.startOrReloadService(Subscription.buildConfig(this), overrideOptions())
+                server.startOrReloadService(prepareConfig(), overrideOptions())
                 VpnState.set(VpnStatus.Started)
             }
             showNotification()
@@ -147,7 +147,7 @@ class ApexVpnService : VpnService(), PlatformInterface, CommandServerHandler {
         val server = commandServer ?: return@withLock
         if (VpnState.status.value != VpnStatus.Started) return@withLock
         try {
-            server.startOrReloadService(Subscription.buildConfig(this), overrideOptions())
+            server.startOrReloadService(prepareConfig(), overrideOptions())
             showNotification()
         } catch (e: Throwable) {
             Log.e(TAG, "reload failed", e)
@@ -169,6 +169,7 @@ class ApexVpnService : VpnService(), PlatformInterface, CommandServerHandler {
     private suspend fun pause() = lock.withLock {
         if (VpnState.status.value != VpnStatus.Started) return@withLock
         runCatching { commandServer?.closeService() }
+        XrayCore.stop()
         closeTun()
         VpnState.set(VpnStatus.Paused)
         showNotification()
@@ -178,7 +179,7 @@ class ApexVpnService : VpnService(), PlatformInterface, CommandServerHandler {
         val server = commandServer ?: return@withLock
         if (VpnState.status.value != VpnStatus.Paused) return@withLock
         try {
-            server.startOrReloadService(Subscription.buildConfig(this), overrideOptions())
+            server.startOrReloadService(prepareConfig(), overrideOptions())
             VpnState.set(VpnStatus.Started)
             showNotification()
         } catch (e: Throwable) {
@@ -194,6 +195,7 @@ class ApexVpnService : VpnService(), PlatformInterface, CommandServerHandler {
         runCatching { commandServer?.closeService() }
         runCatching { commandServer?.close() }
         commandServer = null
+        XrayCore.stop()
         closeTun()
         NetworkMonitor.setListener(null)
         NetworkMonitor.stop()
@@ -205,6 +207,13 @@ class ApexVpnService : VpnService(), PlatformInterface, CommandServerHandler {
     private fun closeTun() {
         runCatching { tunFd?.close() }
         tunFd = null
+    }
+
+    /** Собирает конфиги, запускает/перезапускает Xray при необходимости, возвращает конфиг sing-box. */
+    private fun prepareConfig(): String {
+        val (singBox, xray) = Subscription.buildConfigs(this)
+        XrayCore.apply(this, xray)
+        return singBox
     }
 
     private fun overrideOptions() = OverrideOptions().apply {
@@ -252,6 +261,12 @@ class ApexVpnService : VpnService(), PlatformInterface, CommandServerHandler {
                     lastRx = rx; lastTx = tx
                 }
                 if (settings.speedInNotification && tick % 2 == 0L && status == VpnStatus.Started) showNotification()
+
+                // Xray упал — перезапускаем
+                if (tick % 5 == 0L && status == VpnStatus.Started && XrayCore.crashed()) {
+                    Log.w(TAG, "xray exited: ${XrayCore.lastError()}")
+                    reloadVpn()
+                }
 
                 // Таймер отключения
                 val offAt = VpnState.autoOffAt.value

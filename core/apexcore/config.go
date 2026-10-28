@@ -23,9 +23,9 @@ const (
 )
 
 const (
-	fileGeoipRU  = "geoip-ru.srs"
+	fileGeoipRU   = "geoip-ru.srs"
 	fileGeositeRU = "geosite-category-ru.srs"
-	fileAds      = "geosite-category-ads-all.srs"
+	fileAds       = "geosite-category-ads-all.srs"
 )
 
 type shareOptions struct {
@@ -46,10 +46,21 @@ type routeOptions struct {
 	Kids          bool         `json:"kids"`          // семейный DNS для всех запросов
 	AdBlock       bool         `json:"adBlock"`       // блокировка рекламы и трекеров
 	IPv6          bool         `json:"ipv6"`
-	Profile       string       `json:"profile"`       // normal | gaming | calls | battery
-	Share         shareOptions `json:"share"`         // раздача на компьютер
+	Profile       string       `json:"profile"` // normal | gaming | calls | battery
+	Share         shareOptions `json:"share"`   // раздача на компьютер
 	// Протоколы, среди которых автопилот выбирает сервер (категории Node.Category). Пусто — все.
 	AutoProtocols []string `json:"autoProtocols"`
+	// XrayAll — подключать через Xray все серверы, которые он умеет (как в Happ)
+	XrayAll bool `json:"xrayAll"`
+	// XrayAuth — постоянный секрет для локального SOCKS между sing-box и Xray
+	XrayAuth string `json:"xrayAuth"`
+	// Core — какое ядро подключает серверы: auto (sing-box, Xray — где нужно),
+	// xray (всё, что умеет Xray) или singbox (без Xray)
+	Core string `json:"core"`
+	// ExcludeAds — автопилот не выбирает серверы с пометкой о рекламе
+	ExcludeAds bool `json:"excludeAds"`
+	// ClashAPI — порт локального API для замера задержки (0 — выключено)
+	ClashAPI int `json:"clashApi"`
 }
 
 // профиль подключения: как часто проверять серверы и рвать ли соединения при смене
@@ -61,7 +72,7 @@ type profile struct {
 
 var profiles = map[string]profile{
 	"normal":  {"3m", 80, true},
-	"gaming":  {"1m", 25, false},  // минимальный пинг, игры не обрываются
+	"gaming":  {"1m", 25, false},   // минимальный пинг, игры не обрываются
 	"calls":   {"10m", 300, false}, // сервер «залипает», звонки не рвутся
 	"battery": {"30m", 150, false}, // редкие проверки — меньше расход батареи
 }
@@ -105,18 +116,36 @@ func (o routeOptions) rulesFile(name string) string {
 }
 
 // BuildConfig собирает полный конфиг sing-box.
-//   nodesJSON   — массив "nodes" из ParseSubscription
-//   selectedTag — "auto" или тег сервера
-//   optionsJSON — настройки (см. routeOptions), можно ""
+//
+//	nodesJSON   — массив "nodes" из ParseSubscription
+//	selectedTag — "auto" или тег сервера
+//	optionsJSON — настройки (см. routeOptions), можно ""
 func BuildConfig(nodesJSON string, selectedTag string, optionsJSON string) (string, error) {
-	var nodes []Node
-	if err := json.Unmarshal([]byte(nodesJSON), &nodes); err != nil {
-		return "", fmt.Errorf("неверный список серверов: %w", err)
-	}
-	opts, err := parseOptions(optionsJSON)
+	sb, _, err := buildAll(nodesJSON, selectedTag, optionsJSON)
+	return sb, err
+}
+
+// BuildConfigs — то же, что BuildConfig, плюс конфиг второго ядра Xray.
+// Возвращает JSON {"singbox":"…","xray":"…"}; xray пустой, если Xray не нужен.
+func BuildConfigs(nodesJSON string, selectedTag string, optionsJSON string) (string, error) {
+	sb, xr, err := buildAll(nodesJSON, selectedTag, optionsJSON)
 	if err != nil {
 		return "", err
 	}
+	out, err := json.Marshal(map[string]string{"singbox": sb, "xray": xr})
+	return string(out), err
+}
+
+func buildAll(nodesJSON string, selectedTag string, optionsJSON string) (string, string, error) {
+	var nodes []Node
+	if err := json.Unmarshal([]byte(nodesJSON), &nodes); err != nil {
+		return "", "", fmt.Errorf("неверный список серверов: %w", err)
+	}
+	opts, err := parseOptions(optionsJSON)
+	if err != nil {
+		return "", "", err
+	}
+	xray := newXrayPlan(opts.XrayAuth)
 	prof := profiles[opts.Profile]
 
 	tags := make([]string, 0, len(nodes))
@@ -129,30 +158,40 @@ func BuildConfig(nodesJSON string, selectedTag string, optionsJSON string) (stri
 	var proxyOutbounds, endpoints []any
 	for i := range nodes {
 		n := &nodes[i]
-		if n.Outbound == nil || n.Tag == "" {
+		if (n.Outbound == nil && n.Xray == nil) || n.Tag == "" {
 			continue
 		}
-		n.Outbound["tag"] = n.Tag
-		linkChain(n)
+		if opts.Core == "singbox" && n.Outbound == nil {
+			continue // без Xray такой сервер не подключить
+		}
+		useXray := n.Xray != nil && opts.Core != "singbox" && (n.Outbound == nil || opts.XrayAll || opts.Core == "xray")
+		if n.Outbound != nil {
+			n.Outbound["tag"] = n.Tag
+			linkChain(n)
+		}
+		splitDescription(n)
 		fillMeta(n)
 		tags = append(tags, n.Tag)
-		if len(allowed) == 0 || allowed[n.Category] {
+		if (len(allowed) == 0 || allowed[n.Category]) && !(opts.ExcludeAds && n.Ads) {
 			autoTags = append(autoTags, n.Tag)
 		}
 		if n.Tag == selectedTag {
 			found = true
 		}
-		if n.Endpoint {
+		switch {
+		case useXray:
+			proxyOutbounds = append(proxyOutbounds, xray.add(n))
+		case n.Endpoint:
 			endpoints = append(endpoints, n.Outbound)
-		} else {
+		default:
 			proxyOutbounds = append(proxyOutbounds, n.Outbound)
-		}
-		for _, e := range n.Extra {
-			proxyOutbounds = append(proxyOutbounds, e)
+			for _, e := range n.Extra {
+				proxyOutbounds = append(proxyOutbounds, e)
+			}
 		}
 	}
 	if len(tags) == 0 {
-		return "", errors.New("нет серверов")
+		return "", "", errors.New("нет серверов")
 	}
 	if len(autoTags) == 0 {
 		autoTags = tags // выбранных протоколов в подписке нет — берём все
@@ -231,6 +270,8 @@ func BuildConfig(nodesJSON string, selectedTag string, optionsJSON string) (stri
 		map[string]any{"protocol": "dns", "action": "hijack-dns"},
 		map[string]any{"ip_is_private": true, "outbound": "direct"},
 	}
+	// Соединения Xray к его серверам — мимо туннеля, иначе петля
+	rules = append(rules, xray.singBoxRules()...)
 	if ads != "" {
 		rules = append(rules, map[string]any{"rule_set": "ads", "action": "reject"})
 	}
@@ -365,11 +406,18 @@ func BuildConfig(nodesJSON string, selectedTag string, optionsJSON string) (stri
 	if len(endpoints) > 0 {
 		cfg["endpoints"] = endpoints
 	}
+	if opts.ClashAPI > 0 && opts.ClashAPI < 65536 {
+		// Замер задержки через работающее ядро (как «Проверить пинг» в Happ)
+		cfg["experimental"] = map[string]any{"clash_api": map[string]any{
+			"external_controller": fmt.Sprintf("127.0.0.1:%d", opts.ClashAPI),
+			"secret":              opts.XrayAuth,
+		}}
+	}
 	out, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	return string(out), nil
+	return string(out), xray.config(), nil
 }
 
 // customDNSServer разбирает адрес DNS-over-HTTPS вида https://host[:port]/path.

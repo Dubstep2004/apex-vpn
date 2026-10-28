@@ -1,5 +1,7 @@
 package com.apexvpn.client.ui
 
+import kotlinx.coroutines.launch
+
 import android.Manifest
 import android.content.Intent
 import android.net.wifi.WifiManager
@@ -84,7 +86,7 @@ import java.net.NetworkInterface
 import java.util.Locale
 
 /** Дополнительные страницы, открываются поверх вкладок. */
-enum class Page { Apps, SpeedTest, SiteCheck, Wifi, Share, Dns, Profile, Appearance, Changelog }
+enum class Page { Apps, SpeedTest, SiteCheck, Wifi, Share, Dns, Profile, Appearance, Changelog, Feedback }
 
 @Composable
 fun PageHost(page: Page, viewModel: MainViewModel, onBack: () -> Unit) {
@@ -98,6 +100,7 @@ fun PageHost(page: Page, viewModel: MainViewModel, onBack: () -> Unit) {
         Page.Profile -> ProfilePage(viewModel, onBack)
         Page.Appearance -> AppearancePage(viewModel, onBack)
         Page.Changelog -> ChangelogPage(onBack)
+        Page.Feedback -> FeedbackPage(viewModel, onBack)
     }
 }
 
@@ -341,6 +344,66 @@ private fun InputWithButton(
             Modifier.size(44.dp).clip(CircleShape).background(Apex.Accent).clickable(onClick = onSubmit),
             contentAlignment = Alignment.Center,
         ) { Icon(icon, null, tint = Color.White) }
+    }
+}
+
+// ─── Сообщить о проблеме (уходит в Telegram-бот владельца) ──────────────
+
+@Composable
+private fun FeedbackPage(viewModel: MainViewModel, onBack: () -> Unit) {
+    var text by rememberSaveable { mutableStateOf("") }
+    var contact by rememberSaveable { mutableStateOf("") }
+    var sending by remember { mutableStateOf(false) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    PageScaffold("Сообщить о проблеме", onBack) {
+        Caption("Опишите, что не работает: какой сервер, что вы открывали. Сообщение получит поддержка APEX VPN. Ссылка подписки и сайты не отправляются.")
+        Spacer(Modifier.height(12.dp))
+        val fieldColors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = Apex.Accent,
+            unfocusedBorderColor = Apex.Outline,
+            cursorColor = Apex.Accent,
+            focusedTextColor = Apex.Text,
+            unfocusedTextColor = Apex.Text,
+        )
+        androidx.compose.material3.OutlinedTextField(
+            value = text,
+            onValueChange = { text = it.take(2000) },
+            modifier = Modifier.fillMaxWidth().height(180.dp),
+            label = { Text("Что случилось?") },
+            shape = RoundedCornerShape(16.dp),
+            colors = fieldColors,
+        )
+        Spacer(Modifier.height(10.dp))
+        androidx.compose.material3.OutlinedTextField(
+            value = contact,
+            onValueChange = { contact = it.take(100) },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Как с вами связаться (необязательно)") },
+            placeholder = { Text("@telegram") },
+            singleLine = true,
+            shape = RoundedCornerShape(16.dp),
+            colors = fieldColors,
+        )
+        Spacer(Modifier.height(16.dp))
+        androidx.compose.material3.Button(
+            onClick = {
+                sending = true
+                scope.launch {
+                    val err = com.apexvpn.client.data.Panel.feedback(text.trim(), contact.trim())
+                    sending = false
+                    if (err == null) {
+                        viewModel.showMessage("Отправлено. Спасибо!")
+                        onBack()
+                    } else {
+                        viewModel.showMessage(err)
+                    }
+                }
+            },
+            enabled = !sending && text.isNotBlank(),
+            modifier = Modifier.fillMaxWidth().height(54.dp),
+            shape = RoundedCornerShape(14.dp),
+            colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = Apex.Accent, contentColor = Color.White),
+        ) { Text(if (sending) "Отправка…" else "Отправить", fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
     }
 }
 
