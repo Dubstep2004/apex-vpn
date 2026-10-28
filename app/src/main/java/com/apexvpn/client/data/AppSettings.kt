@@ -94,6 +94,8 @@ data class Settings(
     val automation: Boolean = false,
     // 413. Считать трафик по приложениям
     val appTraffic: Boolean = true,
+    // Стабильный автопилот: не выбирать серверы России и обхода LTE
+    val autoSkipSpecial: Boolean = true,
 ) {
     /** Цвет акцента с учётом «Своего». */
     val accentArgb: Long get() = if (accent == AccentColor.Custom) customAccent else accent.argb
@@ -210,6 +212,11 @@ object AppSettings {
         runCatching { put("logFile", Diagnostics.coreLog(com.apexvpn.client.ApexApp.instance).path) }
         if (s.warp && s.warpConfig.isNotBlank()) runCatching { put("warp", JSONObject(s.warpConfig)) }
         put("autoProtocols", JSONArray(if (s.protocol.isEmpty()) emptyList() else listOf(s.protocol)))
+        // Стабильный автопилот: без России и LTE-обхода (их пинг самый низкий, но сайты через них не открываются)
+        val nodes = Subscription.state.value.nodes
+        if (s.autoSkipSpecial) put("autoExclude", JSONArray(nodes.filter { ServerInfo.isSpecial(it.name) }.map { it.tag }))
+        // …и до первой проверки — сначала серверы, которые были быстрее при прошлом замере
+        put("autoOrder", JSONArray(Prefs.lastPings().entries.filter { it.value > 0 }.sortedBy { it.value }.map { it.key }))
         put(
             "share",
             JSONObject().put("enabled", s.share).put("port", s.sharePort)
@@ -263,7 +270,7 @@ object AppSettings {
         put("domainStrategy", s.domainStrategy); put("fakeDns", s.fakeDns)
         put("remoteDns", s.remoteDns.json()); put("directDns", s.directDns.json()); put("rulesSource", s.rulesSource)
         put("warp", s.warp); put("warpConfig", s.warpConfig); put("shieldBackdrop", s.shieldBackdrop); put("backdropStamp", s.backdropStamp)
-        put("iconStatus", s.iconStatus); put("animatedFlags", s.animatedFlags); put("task", s.task); put("hiddenApps", list(s.hiddenApps)); put("secret", s.secretUnlocked); put("shield3d", s.shield3d); put("automation", s.automation); put("appTraffic", s.appTraffic)
+        put("iconStatus", s.iconStatus); put("animatedFlags", s.animatedFlags); put("task", s.task); put("hiddenApps", list(s.hiddenApps)); put("secret", s.secretUnlocked); put("shield3d", s.shield3d); put("automation", s.automation); put("appTraffic", s.appTraffic); put("autoSkipSpecial", s.autoSkipSpecial)
     }
 
     private fun fromJson(o: JSONObject): Settings {
@@ -355,6 +362,7 @@ object AppSettings {
             shield3d = o.optBoolean("shield3d", d.shield3d),
             automation = o.optBoolean("automation", d.automation),
             appTraffic = o.optBoolean("appTraffic", d.appTraffic),
+            autoSkipSpecial = o.optBoolean("autoSkipSpecial", d.autoSkipSpecial),
         )
     }
 }

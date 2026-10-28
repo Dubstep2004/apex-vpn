@@ -900,7 +900,13 @@ private fun ProfilePage(viewModel: MainViewModel, onBack: () -> Unit) {
                 ChoiceRow(p.title, p.subtitle, s.profile == p) { viewModel.change { copy(profile = p) } }
             }
         }
-        Caption("«Игры» и «Звонки» не обрывают соединения при смене сервера автопилотом. «Экономия батареи» проверяет серверы раз в 30 минут.")
+        Caption("Автопилот меняет сервер, только если другой заметно быстрее, и не обрывает открытые соединения. «Игры» проверяют серверы каждую минуту, «Экономия батареи» — раз в 30 минут.")
+        Spacer(Modifier.height(12.dp))
+        Group {
+            ListRow("Автопилот без России и LTE", "Не выбирать российские серверы и обход белых списков — у них низкий пинг, но заблокированные сайты через них не открываются") {
+                ApexSwitch(s.autoSkipSpecial, { v -> viewModel.change { copy(autoSkipSpecial = v) } })
+            }
+        }
     }
 }
 

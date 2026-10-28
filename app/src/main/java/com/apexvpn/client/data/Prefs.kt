@@ -118,6 +118,17 @@ object Prefs {
             sp.edit { putString("device_id", it) }
         }
 
+    /** Последний замер пинга (tag → мс) — порядок серверов для автопилота при подключении. */
+    fun lastPings(): Map<String, Int> = runCatching {
+        val o = org.json.JSONObject(sp.getString("last_pings", "{}") ?: "{}")
+        o.keys().asSequence().associateWith { o.getInt(it) }
+    }.getOrDefault(emptyMap())
+
+    fun saveLastPings(map: Map<String, Int>) {
+        if (map.values.none { it > 0 }) return
+        sp.edit { putString("last_pings", org.json.JSONObject(map.filterValues { it > 0 }).toString()) }
+    }
+
     /** 320. Знакомство с приложением уже показано */
     var onboarded: Boolean
         get() = sp.getBoolean("onboarded", false)

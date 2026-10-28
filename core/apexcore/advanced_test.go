@@ -118,3 +118,13 @@ func TestCustomLists(t *testing.T) {
 		t.Fatalf("проверка сайта: %s", out)
 	}
 }
+
+func TestStableAuto(t *testing.T) {
+	got := stableAuto([]string{"a", "ru", "b", "c"}, []string{"ru"}, []string{"c", "a"})
+	if strings.Join(got, ",") != "c,a,b" {
+		t.Fatalf("got %v", got)
+	}
+	if got := stableAuto([]string{"ru"}, []string{"ru"}, nil); len(got) != 1 {
+		t.Fatalf("all excluded must keep original: %v", got)
+	}
+}

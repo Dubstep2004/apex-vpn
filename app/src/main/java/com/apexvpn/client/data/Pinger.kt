@@ -37,7 +37,7 @@ object Pinger {
         val running = VpnState.status.value == VpnStatus.Started
         if (running) {
             val viaCore = runCatching { viaClashApi(nodes) }.getOrNull()
-            if (viaCore != null) return@withContext viaCore
+            if (viaCore != null) return@withContext viaCore.also { Prefs.saveLastPings(it) }
         }
         val result = mutableMapOf<String, Int>()
         val udpNodes = nodes.filter { it.udp }
@@ -53,6 +53,7 @@ object Pinger {
         val limit = Semaphore(8)
         rest.map { node -> async { limit.withPermit { node.tag to tcpPing(node.server, node.port) } } }
             .awaitAll().toMap(result)
+        Prefs.saveLastPings(result)
         result
     }
 

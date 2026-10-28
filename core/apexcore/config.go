@@ -94,6 +94,10 @@ type routeOptions struct {
 	AdsDNSPort int `json:"adsDnsPort"`
 	// 413. Определять приложение для каждого соединения (трафик по приложениям)
 	FindProcess bool `json:"findProcess"`
+	// Стабильный автопилот: какие серверы не брать (Россия, обход LTE) и в каком
+	// порядке пробовать до первой проверки (по последнему замеру пинга в приложении)
+	AutoExclude []string `json:"autoExclude"`
+	AutoOrder   []string `json:"autoOrder"`
 }
 
 // профиль подключения: как часто проверять серверы и рвать ли соединения при смене
@@ -104,10 +108,12 @@ type profile struct {
 }
 
 var profiles = map[string]profile{
-	"normal":  {"3m", 80, true},
-	"gaming":  {"1m", 25, false},   // минимальный пинг, игры не обрываются
+	// Стабильный автопилот: сервер меняется, только если другой быстрее на 150 мс,
+	// и смена не рвёт открытые соединения (видео и загрузки не обрываются)
+	"normal":  {"2m", 150, false},
+	"gaming":  {"1m", 40, false},   // минимальный пинг, игры не обрываются
 	"calls":   {"10m", 300, false}, // сервер «залипает», звонки не рвутся
-	"battery": {"30m", 150, false}, // редкие проверки — меньше расход батареи
+	"battery": {"30m", 200, false}, // редкие проверки — меньше расход батареи
 }
 
 var dnsServers = map[string]map[string]any{
@@ -232,6 +238,7 @@ func buildAll(nodesJSON string, selectedTag string, optionsJSON string) (string,
 	if len(autoTags) == 0 {
 		autoTags = tags // выбранных протоколов в подписке нет — берём все
 	}
+	autoTags = stableAuto(autoTags, opts.AutoExclude, opts.AutoOrder)
 	if !found {
 		selectedTag = AutoTag
 	}
@@ -665,4 +672,41 @@ func cleanDomain(d string) string {
 		return ""
 	}
 	return d
+}
+
+// stableAuto убирает из автопилота «особые» серверы (если остаются другие)
+// и ставит первыми те, что были быстрее при последнем замере: до первой
+// проверки sing-box берёт первый сервер группы — пусть это будет хороший.
+func stableAuto(tags, exclude, order []string) []string {
+	skip := map[string]bool{}
+	for _, t := range exclude {
+		skip[t] = true
+	}
+	kept := make([]string, 0, len(tags))
+	for _, t := range tags {
+		if !skip[t] {
+			kept = append(kept, t)
+		}
+	}
+	if len(kept) == 0 {
+		kept = append(kept, tags...)
+	}
+	if len(order) == 0 {
+		return kept
+	}
+	rank := map[string]int{}
+	for i, t := range order {
+		if _, ok := rank[t]; !ok {
+			rank[t] = i
+		}
+	}
+	sort.SliceStable(kept, func(i, j int) bool {
+		ri, okI := rank[kept[i]]
+		rj, okJ := rank[kept[j]]
+		if okI != okJ {
+			return okI
+		}
+		return okI && ri < rj
+	})
+	return kept
 }

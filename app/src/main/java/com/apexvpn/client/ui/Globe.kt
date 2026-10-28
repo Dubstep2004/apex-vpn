@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -280,7 +281,7 @@ private class PointBuffers {
 /** 433. Силуэт самолётика носом по направлению [angle] (градусы). */
 fun DrawScope.drawPlane(at: Offset, angle: Float, size: Float, color: Color, glow: Color) {
     drawCircle(Brush.radialGradient(listOf(glow.copy(alpha = 0.55f), Color.Transparent), at, size * 1.8f), size * 1.8f, at)
-    androidx.compose.ui.graphics.drawscope.rotate(angle, at) {
+    rotate(angle, at) {
         val s = size / 10f
         val path = androidx.compose.ui.graphics.Path().apply {
             moveTo(at.x + 10 * s, at.y)                 // нос
