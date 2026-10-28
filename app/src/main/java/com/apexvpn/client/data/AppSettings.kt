@@ -51,9 +51,6 @@ data class Settings(
     val accent: AccentColor = AccentColor.Violet,
 )
 
-/** Порт локального API ядра для замера задержки (см. clashApi в core/apexcore/config.go). */
-const val CLASH_API_PORT = 9095
-
 /** Настройки маршрутизации и приложения. Хранятся одним JSON, изменения сразу видны всем. */
 object AppSettings {
     private lateinit var sp: SharedPreferences
@@ -110,7 +107,8 @@ object AppSettings {
         put("profile", s.profile.id)
         put("core", s.core.id)
         put("excludeAds", s.excludeAds)
-        put("clashApi", CLASH_API_PORT)
+        put("clashApi", Prefs.clashApiPort)
+        put("xrayPort", Prefs.xrayBasePort)
         put("xrayAuth", Prefs.xrayAuth)
         put("autoProtocols", JSONArray(if (s.protocol.isEmpty()) emptyList() else listOf(s.protocol)))
         put(

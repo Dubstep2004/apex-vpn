@@ -56,11 +56,22 @@ object UpdateManager {
 
     val currentVersion: String get() = BuildConfig.VERSION_NAME
 
+    /** Адрес сервера обновлений задан при сборке (не заглушка example.com). */
+    val configured: Boolean
+        get() = BuildConfig.UPDATE_URL.startsWith("https://") && "example.com" !in BuildConfig.UPDATE_URL
+
     suspend fun check(silent: Boolean = false) {
         if (_state.value is UpdateState.Downloading) return
+        if (!configured) {
+            _state.value = if (silent) UpdateState.Idle else UpdateState.Failed("Сервер обновлений не настроен в этой сборке")
+            return
+        }
         if (!silent) _state.value = UpdateState.Checking
         try {
-            val info = fetchInfo()
+            val info = fetchInfo() ?: run {
+                _state.value = UpdateState.UpToDate // на сервере обновление не выпущено
+                return
+            }
             _state.value = if (info.versionCode > BuildConfig.VERSION_CODE) {
                 UpdateState.Available(info)
             } else {
@@ -154,13 +165,16 @@ object UpdateManager {
         context.startActivity(intent)
     }
 
-    private suspend fun fetchInfo(): UpdateInfo = withContext(Dispatchers.IO) {
+    /** null — обновление на сервере не выпущено (update.json нет или он пустой). */
+    private suspend fun fetchInfo(): UpdateInfo? = withContext(Dispatchers.IO) {
         val conn = open(BuildConfig.UPDATE_URL)
         try {
+            if (conn.responseCode == HttpURLConnection.HTTP_NOT_FOUND) return@withContext null
             if (conn.responseCode != HttpURLConnection.HTTP_OK) {
                 error("Сервер обновлений ответил кодом ${conn.responseCode}")
             }
             val json = JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
+            if (json.optInt("versionCode", 0) <= 0) return@withContext null
             val apkUrl = json.getString("apkUrl")
             require(apkUrl.startsWith("https://")) { "Ссылка на APK должна быть https" }
             val minSupported = json.optInt("minSupportedVersionCode", 0)

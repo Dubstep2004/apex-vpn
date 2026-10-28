@@ -57,7 +57,7 @@ object Pinger {
     }
 
     private fun clashGet(path: String, readTimeout: Int): Pair<Int, String> {
-        val conn = URL("http://127.0.0.1:$CLASH_API_PORT$path").openConnection() as HttpURLConnection
+        val conn = URL("http://127.0.0.1:${Prefs.clashApiPort}$path").openConnection() as HttpURLConnection
         conn.connectTimeout = 2000
         conn.readTimeout = readTimeout
         conn.setRequestProperty("Authorization", "Bearer ${Prefs.xrayAuth}")

@@ -21,7 +21,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 echo "==> пакеты"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq curl jq python3 apksigner default-jre-headless debian-keyring debian-archive-keyring apt-transport-https gnupg >/dev/null
+apt-get install -y -qq curl jq unzip python3 apksigner default-jre-headless debian-keyring debian-archive-keyring apt-transport-https gnupg >/dev/null
 
 if ! command -v caddy >/dev/null; then
   echo "==> Caddy"

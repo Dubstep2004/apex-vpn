@@ -57,6 +57,8 @@ type routeOptions struct {
 	// Core — какое ядро подключает серверы: auto (sing-box, Xray — где нужно),
 	// xray (всё, что умеет Xray) или singbox (без Xray)
 	Core string `json:"core"`
+	// XrayPort — первый локальный порт SOCKS для Xray (0 — XrayBasePort)
+	XrayPort int `json:"xrayPort"`
 	// ExcludeAds — автопилот не выбирает серверы с пометкой о рекламе
 	ExcludeAds bool `json:"excludeAds"`
 	// ClashAPI — порт локального API для замера задержки (0 — выключено)
@@ -146,6 +148,9 @@ func buildAll(nodesJSON string, selectedTag string, optionsJSON string) (string,
 		return "", "", err
 	}
 	xray := newXrayPlan(opts.XrayAuth)
+	if opts.XrayPort > 1024 && opts.XrayPort < 65000 {
+		xray.basePort = opts.XrayPort
+	}
 	prof := profiles[opts.Profile]
 
 	tags := make([]string, 0, len(nodes))

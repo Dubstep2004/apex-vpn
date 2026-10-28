@@ -111,6 +111,8 @@ object Subscription {
     /** Сохраняет новую ссылку и загружает серверы. */
     suspend fun setUrl(raw: String) {
         val url = validate(raw)
+        // Новая подписка — старый выбор сервера к ней не относится
+        if (url != Prefs.subscriptionUrl) Prefs.selectedTag = AUTO_TAG
         fetch(url)
         Prefs.subscriptionUrl = url
         _state.value = load()
@@ -213,6 +215,9 @@ object Subscription {
                 "Подписка перенаправила на другой домен — отклонено"
             }
             val body = conn.inputStream.bufferedReader().use { it.readText() }
+            // Запоминаем выбранный сервер по сути (имя, протокол, адрес), а не по номеру:
+            // после обновления порядок серверов в подписке может измениться
+            val previous = parseNodes(Prefs.nodesJson).find { it.tag == Prefs.selectedTag }
             val parsed = JSONObject(Apexcore.parseSubscription(body))
             val all = parsed.getJSONArray("nodes")
             // Shadowsocks в приложении не используется
@@ -241,10 +246,15 @@ object Subscription {
             Prefs.supportUrl = header("support-url")?.trim()?.takeIf { it.startsWith("http") || it.startsWith("tg:") } ?: ""
             Prefs.webPageUrl = header("profile-web-page-url")?.trim()?.takeIf { it.startsWith("http") } ?: ""
 
-            // Если выбранного сервера больше нет — переключаемся на «Авто»
-            val tags = parseNodes(Prefs.nodesJson).map { it.tag }
-            if (Prefs.selectedTag != AUTO_TAG && Prefs.selectedTag !in tags) {
-                Prefs.selectedTag = AUTO_TAG
+            // Тот же сервер под новым номером; если его больше нет — «Авто»
+            if (Prefs.selectedTag != AUTO_TAG) {
+                val fresh = parseNodes(Prefs.nodesJson)
+                val same = previous?.let { p ->
+                    fresh.find { it.name == p.name && it.type == p.type && it.server == p.server && it.port == p.port }
+                        ?: fresh.find { it.name == p.name && it.type == p.type }
+                        ?: fresh.find { it.name == p.name }
+                }
+                Prefs.selectedTag = same?.tag ?: AUTO_TAG
             }
         } finally {
             conn.disconnect()

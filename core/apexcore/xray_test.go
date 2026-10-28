@@ -177,3 +177,26 @@ func TestXrayRefusesPlainVLESS(t *testing.T) {
 		t.Fatalf("want explanation, got %v", err)
 	}
 }
+
+func TestXrayPortAndIPv4First(t *testing.T) {
+	saved := lookupIPs
+	defer func() { lookupIPs = saved }()
+	calls := 0
+	lookupIPs = func(string) []string { calls++; return []string{"203.0.113.9"} }
+	nodes := parseNodes(t, strings.Join(xrayLinks()[:2], "\n")+"\nvless://"+testUUID+"@xh.example.com:443?type=xhttp&security=tls#Same%20host")
+	data, _ := json.Marshal(nodes)
+	_, xr, err := buildAll(string(data), AutoTag, `{"xrayPort":31000,"xrayAuth":"k"}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(xr, `"port": 31000`) || !strings.Contains(xr, `"port": 31001`) {
+		t.Fatalf("custom xray port not used:\n%s", xr)
+	}
+	if calls != 1 {
+		t.Fatalf("one domain must be resolved once, got %d", calls)
+	}
+	lookupIPs = saved
+	if ips := lookupIPs("localhost"); len(ips) > 0 && strings.Contains(ips[0], ":") {
+		t.Fatalf("IPv4 must come first: %v", ips)
+	}
+}

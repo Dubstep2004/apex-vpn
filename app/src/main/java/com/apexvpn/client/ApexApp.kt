@@ -53,7 +53,9 @@ class ApexApp : Application() {
                 it.debug = BuildConfig.DEBUG
             },
         )
-        runCatching { Libbox.redirectStderr(File(workingDir, "stderr.log").path) }
+        val stderr = File(workingDir, "stderr.log")
+        CrashReporter.collectNativeCrash(this, stderr) // сбой ядра в прошлый раз
+        runCatching { Libbox.redirectStderr(stderr.path) }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val nm = getSystemService<NotificationManager>()!!

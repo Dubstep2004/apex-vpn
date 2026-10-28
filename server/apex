@@ -86,6 +86,14 @@ cmd_publish() {
   fi
   [[ "$code" =~ ^[0-9]+$ ]] || die "неверный номер сборки: $code"
 
+  # Сборка должна знать адрес этого сервера, иначе приложение не найдёт обновления и новости
+  if command -v unzip >/dev/null && ! unzip -p "$apk" 'classes*.dex' 2>/dev/null | grep -aqF "$BASE_URL"; then
+    echo "⚠️  В этой сборке нет адреса $BASE_URL — приложение не увидит обновления, новости и не пришлёт сбои."
+    echo "    Задайте в GitHub переменную SERVER_URL=$BASE_URL и пересоберите. Продолжить всё равно? [y/N]"
+    read -r answer
+    [[ "$answer" == "y" || "$answer" == "Y" ]] || die "отменено"
+  fi
+
   echo "==> подписываю ключом сервера"
   local out="$WEB_DIR/apex-vpn-$name.apk"
   apksigner sign --ks "$KEYSTORE" --ks-pass "file:$KEYPASS_FILE" --ks-key-alias apex \

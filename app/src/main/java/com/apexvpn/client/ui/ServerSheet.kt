@@ -156,7 +156,7 @@ fun ServerSheet(viewModel: MainViewModel, onDismiss: () -> Unit) {
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    ProtocolChip("Все протоколы", sub.nodes.size, activeProtocol.isEmpty()) {
+                    ProtocolChip("Все протоколы", base.size, activeProtocol.isEmpty()) {
                         viewModel.change { copy(protocol = "") }
                     }
                     categories.forEach { (name, count) ->

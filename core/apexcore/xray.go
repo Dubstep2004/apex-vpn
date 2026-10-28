@@ -400,12 +400,18 @@ var lookupIPs = func(host string) []string {
 	if err != nil {
 		return nil
 	}
-	var out []string
+	var v4, v6 []string
 	for _, a := range addrs {
-		out = append(out, a.IP.String())
+		if a.IP.To4() != nil {
+			v4 = append(v4, a.IP.String())
+		} else {
+			v6 = append(v6, a.IP.String())
+		}
 	}
-	sort.Strings(out)
-	return out
+	// IPv4 первым: Xray подключается к первому адресу, а IPv6 есть не у всех
+	sort.Strings(v4)
+	sort.Strings(v6)
+	return append(v4, v6...)
 }
 
 func randomToken() string {
@@ -422,6 +428,8 @@ type xrayPlan struct {
 	direct    []string // домены, которые не удалось разрешить
 	user      string
 	pass      string
+	basePort  int
+	resolved  map[string][]string // один домен — одно разрешение на сборку конфига
 }
 
 func newXrayPlan(auth string) *xrayPlan {
@@ -432,13 +440,13 @@ func newXrayPlan(auth string) *xrayPlan {
 	if len(sum) > 16 {
 		sum = sum[:16]
 	}
-	return &xrayPlan{user: "apex", pass: sum}
+	return &xrayPlan{user: "apex", pass: sum, basePort: XrayBasePort, resolved: map[string][]string{}}
 }
 
 // add переводит узел на Xray и возвращает SOCKS-outbound для sing-box.
 func (x *xrayPlan) add(n *Node) map[string]any {
 	idx := len(x.inbounds)
-	port := XrayBasePort + idx
+	port := x.basePort + idx
 	in := fmt.Sprintf("in-%d", idx)
 	out := fmt.Sprintf("out-%d", idx)
 
@@ -446,7 +454,7 @@ func (x *xrayPlan) add(n *Node) map[string]any {
 	ob["tag"] = out
 	if net.ParseIP(n.Server) != nil {
 		x.directIPs = append(x.directIPs, n.Server)
-	} else if ips := lookupIPs(n.Server); len(ips) > 0 {
+	} else if ips := x.lookup(n.Server); len(ips) > 0 {
 		x.directIPs = append(x.directIPs, ips...)
 		pinToIP(ob, n.Server, ips[0])
 	} else {
@@ -465,6 +473,15 @@ func (x *xrayPlan) add(n *Node) map[string]any {
 		"type": "socks", "tag": n.Tag, "server": "127.0.0.1", "server_port": port, "version": "5",
 		"username": x.user, "password": x.pass,
 	}
+}
+
+func (x *xrayPlan) lookup(host string) []string {
+	if ips, ok := x.resolved[host]; ok {
+		return ips
+	}
+	ips := lookupIPs(host)
+	x.resolved[host] = ips
+	return ips
 }
 
 // singBoxRules — правила sing-box, чтобы соединения Xray к серверам шли мимо туннеля.

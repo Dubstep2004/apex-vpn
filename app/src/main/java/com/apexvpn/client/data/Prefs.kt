@@ -78,6 +78,16 @@ object Prefs {
         get() = sp.getString("web_url", "") ?: ""
         set(v) = sp.edit { putString("web_url", v) }
 
+    /**
+     * Свои локальные порты для каждого устройства (API ядра и SOCKS для Xray): фиксированные
+     * 9095/10910 могли быть заняты другим приложением — тогда VPN не включался.
+     */
+    val localPortBase: Int
+        get() = sp.getInt("port_base", 0).takeIf { it in 20000..50000 }
+            ?: (20000 + java.security.SecureRandom().nextInt(3000) * 10).also { sp.edit { putInt("port_base", it) } }
+    val clashApiPort: Int get() = localPortBase
+    val xrayBasePort: Int get() = localPortBase + 10
+
     /** Секрет локального SOCKS между sing-box и Xray (постоянный, чтобы Xray не перезапускался зря) */
     val xrayAuth: String
         get() = sp.getString("xray_auth", null) ?: java.util.UUID.randomUUID().toString().also {

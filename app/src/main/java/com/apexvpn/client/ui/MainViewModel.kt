@@ -74,6 +74,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             viewModelScope.launch { UpdateManager.check(silent = true) }
         }
         viewModelScope.launch { News.refresh() }
+        // Отчёты о сбоях с прошлого запуска — сразу, а не через 3 часа
+        viewModelScope.launch { runCatching { com.apexvpn.client.data.CrashReporter.uploadPending(getApplication()) } }
         viewModelScope.launch {
             VpnState.notice.collect { n ->
                 if (n != null) {
@@ -113,6 +115,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             _refreshing.value = true
             try {
                 Subscription.refresh()
+                _pings.value = emptyMap() // номера серверов могли смениться — старые замеры не к тем строкам
                 applyToVpn()
                 if (!silent) _message.value = "Подписка обновлена"
             } catch (e: Exception) {
@@ -129,6 +132,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             _refreshing.value = true
             try {
                 Subscription.setUrl(url)
+                _pings.value = emptyMap()
                 applyToVpn()
                 onDone(null)
             } catch (e: Exception) {
@@ -156,6 +160,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             _pinging.value = true
             try {
                 _pings.value = Pinger.pingAll(Subscription.state.value.nodes)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // замер — не повод закрывать приложение
             } finally {
                 _pinging.value = false
             }
@@ -232,8 +240,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 runCatching { Apexcore.matchRoute(AppSettings.coreOptions(RulesUpdater.activeDir(ctx)), domain) }.getOrNull()
             }
             _siteCheck.value = json?.let {
-                val o = JSONObject(it)
-                SiteCheck(o.optString("domain"), o.optString("outbound"), o.optString("reason"))
+                runCatching {
+                    val o = JSONObject(it)
+                    SiteCheck(o.optString("domain"), o.optString("outbound"), o.optString("reason"))
+                }.getOrNull()
             }
         }
     }
@@ -266,7 +276,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { _apps.value = InstalledApps.load(getApplication<Application>()) }
     }
 
-    fun validateDns(url: String): String? = Apexcore.validateDNS(url).ifBlank { null }
+    fun validateDns(url: String): String? =
+        runCatching { Apexcore.validateDNS(url).ifBlank { null } }.getOrElse { it.message ?: "Неверный адрес" }
 
     // ─── Обновления приложения ───────────────────────────────────────────
 

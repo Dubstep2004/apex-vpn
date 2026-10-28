@@ -9,11 +9,10 @@ import java.net.Socket
 /**
  * Второе ядро — Xray (как в Happ). Запускается отдельным процессом из
  * nativeLibraryDir/libxray.so. sing-box подключается к нему как к SOCKS на 127.0.0.1,
- * порты начинаются с [BASE_PORT] (см. XrayBasePort в core/apexcore/xray.go).
+ * порты начинаются с Prefs.xrayBasePort (свои на каждом устройстве, см. xrayPort в core/apexcore).
  */
 object XrayCore {
     private const val TAG = "ApexXray"
-    private const val BASE_PORT = 10910
 
     private var process: Process? = null
     private var runningConfig: String? = null
@@ -35,6 +34,12 @@ object XrayCore {
         val bin = binary(context)
         check(bin.canExecute()) { "Ядро Xray не найдено в этой сборке приложения" }
 
+        // Порт занят, а своего процесса нет — остался Xray от прошлого запуска (приложение
+        // было убито системой). Иначе новый Xray не сможет открыть порт.
+        if (portOpen(com.apexvpn.client.data.Prefs.xrayBasePort)) {
+            runCatching { ProcessBuilder("pkill", "-f", "libxray.so").start().waitFor() }
+            Thread.sleep(300)
+        }
         val dir = File(context.filesDir, "xray").apply { mkdirs() }
         val file = File(dir, "config.json")
         file.writeText(config)
@@ -65,7 +70,7 @@ object XrayCore {
         val deadline = System.currentTimeMillis() + 5_000
         while (System.currentTimeMillis() < deadline) {
             if (!p.isAlive) break
-            if (portOpen(BASE_PORT)) return
+            if (portOpen(com.apexvpn.client.data.Prefs.xrayBasePort)) return
             Thread.sleep(100)
         }
         val reason = lastError()

@@ -325,6 +325,10 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(if (m == s.core) Apex.AccentSoft else Color.Transparent)
                                 .clickable {
+                                    // Без Xray выбранный XHTTP/mKCP-сервер не подключить — переходим на автопилот
+                                    if (m == CoreMode.SingBox && sub.nodes.any { it.tag == sub.selectedTag && it.xrayOnly }) {
+                                        viewModel.select(com.apexvpn.client.data.AUTO_TAG)
+                                    }
                                     viewModel.change { copy(core = m) }
                                     coreDialog = false
                                 }
