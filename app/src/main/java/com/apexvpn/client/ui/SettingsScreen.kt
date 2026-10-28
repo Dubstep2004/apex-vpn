@@ -317,10 +317,12 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
             androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
         ) { uri ->
             if (uri != null) {
-                val subUrl = com.apexvpn.client.data.SettingsBackup.import(context, uri)
+                val restored = com.apexvpn.client.data.SettingsBackup.import(context, uri)
                 when {
-                    subUrl == null -> viewModel.showMessage("Это не файл настроек APEX VPN")
-                    subUrl.isNotBlank() && subUrl != sub.url -> viewModel.setSubscription(subUrl) { err ->
+                    restored == null -> viewModel.showMessage("Это не файл настроек APEX VPN")
+                    restored.subscription.isNotBlank() && restored.subscription != sub.url -> viewModel.setSubscription(restored.subscription) { err ->
+                        // Новая подписка сбрасывает выбор сервера — возвращаем выбранный в копии
+                        if (err == null && restored.selected.isNotBlank()) viewModel.select(restored.selected)
                         viewModel.showMessage(err ?: "Настройки и подписка восстановлены")
                     }
                     else -> {

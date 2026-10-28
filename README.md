@@ -7,7 +7,7 @@
 <p>
 <a href="https://github.com/Dubstep2004/apex-vpn/releases/latest"><b>⬇️ Скачать APK</b></a>
 &nbsp;&nbsp;·&nbsp;&nbsp;
-<a href="#-что-нового"><b>🆕 Что нового в 1.9.4</b></a>
+<a href="#-что-нового"><b>🆕 Что нового в 1.9.5</b></a>
 &nbsp;&nbsp;·&nbsp;&nbsp;
 <a href="#setup"><b>🚀 Как установить</b></a>
 </p>
@@ -434,6 +434,18 @@ core/apexcore/          Go: разбор подписки → конфиги sin
 
 <img src="docs/img/tags/new.svg" alt="Новое" height="22"> <img src="docs/img/tags/improved.svg" alt="Улучшено" height="22"> <img src="docs/img/tags/changed.svg" alt="Изменено" height="22"> <img src="docs/img/tags/fixed.svg" alt="Исправлено" height="22"> <img src="docs/img/tags/removed.svg" alt="Удалено" height="22">
 
+### 1.9.5 · 28 октября 2026
+
+<img src="docs/img/tags/improved.svg" alt="Улучшено" height="22">
+
+- С фото за щитом на главном экране не тратится батарея на невидимую анимацию
+
+<img src="docs/img/tags/fixed.svg" alt="Исправлено" height="22">
+
+- После восстановления из файла возвращается и выбранный сервер, а не автопилот
+- Сохранение настроек в файл работает и в папках, которые не поддерживают перезапись
+- Виджет 4×2 подсвечивает выбранную страну, даже если выбран другой сервер этой страны
+
 ### 1.9.4 · 28 октября 2026
 
 <img src="docs/img/tags/new.svg" alt="Новое" height="22">
@@ -458,14 +470,6 @@ core/apexcore/          Go: разбор подписки → конфиги sin
 <img src="docs/img/tags/changed.svg" alt="Изменено" height="22">
 
 - Описание новых версий на GitHub — с теми же метками
-
-### 1.9.2 · 28 октября 2026
-
-<img src="docs/img/tags/fixed.svg" alt="Исправлено" height="22">
-
-- Обновление подписки могло стереть всё избранное
-- Свайп по щиту и виджет 4×2 не видели избранные серверы
-- «Ссылка-приглашение» без подписки показывает подсказку вместо пустой ссылки
 
 📜 **[Все версии с метками →](docs/CHANGELOG.md)** · [Releases](https://github.com/Dubstep2004/apex-vpn/releases)
 

@@ -131,7 +131,12 @@ object NewWidgets {
                     } else {
                         setViewVisibility(id, android.view.View.VISIBLE)
                         setTextViewText(id, item.second)
-                        val chosen = item.first == sub.selectedTag || (item.first == AUTO_TAG && sub.nodes.none { it.tag == sub.selectedTag })
+                        // Выбран этот сервер или другой сервер той же страны (группы)
+                        val selectedNode = sub.nodes.find { it.tag == sub.selectedTag }
+                        val itemNode = sub.nodes.find { it.tag == item.first }
+                        val chosen = item.first == sub.selectedTag ||
+                            (item.first == AUTO_TAG && selectedNode == null) ||
+                            (itemNode != null && selectedNode != null && ServerInfo.title(itemNode.name) == ServerInfo.title(selectedNode.name))
                         setInt(id, "setBackgroundResource", if (chosen) R.drawable.widget_cell_on else R.drawable.widget_cell)
                         setOnClickPendingIntent(id, PendingIntent.getBroadcast(
                             context, 400 + i,

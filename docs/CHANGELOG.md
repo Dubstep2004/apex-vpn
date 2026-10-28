@@ -2,6 +2,18 @@
 
 <img src="img/tags/new.svg" height="22"> <img src="img/tags/improved.svg" height="22"> <img src="img/tags/changed.svg" height="22"> <img src="img/tags/fixed.svg" height="22"> <img src="img/tags/removed.svg" height="22">
 
+## 1.9.5 · 28 октября 2026
+
+<img src="img/tags/improved.svg" alt="Улучшено" height="22">
+
+- С фото за щитом на главном экране не тратится батарея на невидимую анимацию
+
+<img src="img/tags/fixed.svg" alt="Исправлено" height="22">
+
+- После восстановления из файла возвращается и выбранный сервер, а не автопилот
+- Сохранение настроек в файл работает и в папках, которые не поддерживают перезапись
+- Виджет 4×2 подсвечивает выбранную страну, даже если выбран другой сервер этой страны
+
 ## 1.9.4 · 28 октября 2026
 
 <img src="img/tags/new.svg" alt="Новое" height="22">

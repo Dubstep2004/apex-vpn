@@ -28,7 +28,7 @@ import kotlin.random.Random
 /** 17. Анимированный фон за щитом: волны, частицы или звёзды. */
 @Composable
 fun ShieldAmbient(style: String, active: Boolean, modifier: Modifier = Modifier) {
-    if (style == "none") return
+    if (style !in setOf("waves", "particles", "stars")) return // «нет» и своё фото — без анимации
     val smooth = Apex.feel.smooth
     val t = rememberInfiniteTransition(label = "ambient")
     val phase by t.animateFloat(0f, 1f, infiniteRepeatable(tween(if (active) 6000 else 12000, easing = LinearEasing)), label = "phase")
