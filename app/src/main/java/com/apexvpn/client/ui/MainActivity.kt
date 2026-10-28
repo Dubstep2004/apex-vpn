@@ -246,7 +246,7 @@ class MainActivity : ComponentActivity() {
                                 Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
                                     whatsNew.forEach { r ->
                                         Text("Версия ${r.version}", color = Apex.Text, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                        r.changes.forEach { c -> Text("• $c", color = Apex.TextDim, fontSize = 14.sp, modifier = Modifier.padding(top = 3.dp)) }
+                                        com.apexvpn.client.ui.ChangeList(r.changes, textColor = Apex.TextDim)
                                         Spacer(Modifier.height(10.dp))
                                     }
                                 }

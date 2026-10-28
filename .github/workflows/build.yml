@@ -137,9 +137,8 @@ jobs:
           LIBS=$(unzip -l "$APK" | grep -oE "lib/[^ ]+\.so" | tr '\n' ' ')
           echo "::notice title=APK::$(du -h "$APK" | cut -f1) — $LIBS"
           echo "$LIBS" | grep -q "arm64-v8a/libxray.so" || { echo "::error title=APK::в APK нет ядра Xray"; exit 1; }
-          # Что нового — из data/Changelog.kt (первая запись)
-          awk '/^ +Release\(/{n++} n==1 && /^ +"[^"]*",$/ {gsub(/^ +"|",$/,""); print "• " $0}' \
-            app/src/main/java/com/apexvpn/client/data/Changelog.kt > dist/changelog.txt || true
+          # Что нового — из data/Changelog.kt (первая запись) с метками: 🟢 Новое, 🟣 Улучшено/Изменено, 🔵 Исправлено, 🔴 Удалено
+          python3 scripts/changelog.py notes "$VERSION_NAME" > dist/changelog.txt
           cat dist/changelog.txt
           # Описание версии для команды «apex publish» на сервере
           jq -n --argjson code "$VERSION_CODE" --arg name "$VERSION_NAME" --rawfile notes dist/changelog.txt \

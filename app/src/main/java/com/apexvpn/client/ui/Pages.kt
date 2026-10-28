@@ -891,11 +891,35 @@ fun ReleaseCard(r: com.apexvpn.client.data.Release, installed: Boolean) {
             Spacer(Modifier.weight(1f))
             Text(r.date, color = Apex.TextDim, fontSize = 13.sp)
         }
-        Spacer(Modifier.height(8.dp))
-        r.changes.forEach { c ->
+        Spacer(Modifier.height(4.dp))
+        ChangeList(r.changes)
+    }
+}
+
+/** Изменения версии по видам: цветная метка (Новое, Улучшено, Изменено, Исправлено, Удалено) и пункты. */
+@Composable
+fun ChangeList(changes: List<com.apexvpn.client.data.Change>, textColor: Color = Apex.Text) {
+    com.apexvpn.client.data.ChangeKind.entries.forEach { kind ->
+        val items = changes.filter { it.kind == kind }
+        if (items.isEmpty()) return@forEach
+        val color = Color(kind.argb)
+        Spacer(Modifier.height(10.dp))
+        Text(
+            kind.title,
+            color = color,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier
+                .clip(RoundedCornerShape(50))
+                .background(color.copy(alpha = 0.16f))
+                .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(50))
+                .padding(horizontal = 10.dp, vertical = 3.dp),
+        )
+        Spacer(Modifier.height(4.dp))
+        items.forEach { c ->
             Row(Modifier.padding(vertical = 3.dp)) {
-                Text("•", color = Apex.Accent, fontSize = 15.sp, modifier = Modifier.width(16.dp))
-                Text(c, color = Apex.Text, fontSize = 15.sp, lineHeight = 20.sp)
+                Text("•", color = color, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(16.dp))
+                Text(c.text, color = textColor, fontSize = 15.sp, lineHeight = 20.sp)
             }
         }
     }
