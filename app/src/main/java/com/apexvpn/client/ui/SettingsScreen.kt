@@ -35,6 +35,9 @@ import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.QrCodeScanner
+import androidx.compose.material.icons.rounded.QrCode2
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Route
 import androidx.compose.material.icons.rounded.Schedule
@@ -264,7 +267,7 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
             GroupDivider()
             ListRow(
                 "Конец подписки",
-                "Предупредить за 3 дня и при остатке трафика < 10%",
+                "Уведомить за 3 дня, за 1 день и в день окончания, а ещё при остатке трафика < 10%",
                 leading = { tile(Icons.Rounded.NotificationsActive) },
                 onClick = { viewModel.change(reload = false) { copy(expiryAlerts = !expiryAlerts) } },
             ) { ApexSwitch(s.expiryAlerts, { v -> viewModel.change(reload = false) { copy(expiryAlerts = v) } }) }
@@ -318,21 +321,34 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
         ) { uri ->
             if (uri != null) {
                 val restored = com.apexvpn.client.data.SettingsBackup.import(context, uri)
-                when {
-                    restored == null -> viewModel.showMessage("Это не файл настроек APEX VPN")
-                    restored.subscription.isNotBlank() && restored.subscription != sub.url -> viewModel.setSubscription(restored.subscription) { err ->
-                        // Новая подписка сбрасывает выбор сервера — возвращаем выбранный в копии
-                        if (err == null && restored.selected.isNotBlank()) viewModel.select(restored.selected)
-                        viewModel.showMessage(err ?: "Настройки и подписка восстановлены")
-                    }
-                    else -> {
-                        viewModel.change { this }
-                        viewModel.showMessage("Настройки восстановлены")
-                    }
-                }
+                if (restored == null) viewModel.showMessage("Это не файл настроек APEX VPN") else viewModel.applyRestored(restored)
             }
         }
+        var transferQr by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
         Group {
+            // 262. Перенос на новый телефон одним QR
+            ListRow(
+                "Перенести на новый телефон",
+                "QR-код со всеми настройками и подпиской",
+                leading = { tile(Icons.Rounded.QrCode2) },
+                onClick = {
+                    when (val r = com.apexvpn.client.data.Transfer.encode()) {
+                        is com.apexvpn.client.data.Transfer.Result.Ok ->
+                            transferQr = runCatching { com.apexvpn.client.data.Transfer.qrBitmap(r.text) }.getOrNull()
+                                ?: run { viewModel.showMessage("Не удалось создать QR-код"); null }
+                        is com.apexvpn.client.data.Transfer.Result.TooBig ->
+                            viewModel.showMessage("Слишком много данных для QR — сохраните настройки в файл")
+                    }
+                },
+            ) { Chevron() }
+            GroupDivider()
+            ListRow(
+                "Принять с другого телефона",
+                "Отсканируйте QR-код переноса",
+                leading = { tile(Icons.Rounded.QrCodeScanner) },
+                onClick = onScanQr,
+            ) { Chevron() }
+            GroupDivider()
             ListRow(
                 "Сохранить настройки в файл",
                 "Всё, включая свои списки, правила, избранное и подписку",
@@ -347,7 +363,10 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
                 onClick = { importLauncher.launch(arrayOf("application/json", "application/octet-stream", "text/plain", "*/*")) },
             ) { Chevron() }
         }
-        Caption("Настройки сохраняются при обновлении приложения. Файл нужен, если приложение пришлось удалить. В нём ссылка подписки — не отправляйте его другим. Ещё настройки попадают в резервную копию Android, если она включена на телефоне.")
+        transferQr?.let { bmp ->
+            TransferQrDialog(bmp) { transferQr = null }
+        }
+        Caption("Новый телефон: установите APEX VPN, нажмите «Сканировать QR-код» и наведите камеру на QR переноса. Настройки сохраняются при обновлении приложения. Файл нужен, если приложение пришлось удалить. В нём ссылка подписки — не отправляйте его другим. Ещё настройки попадают в резервную копию Android, если она включена на телефоне.")
 
         // ── О приложении ──
         SectionLabel("О приложении")
@@ -546,4 +565,44 @@ private fun maskUrl(url: String): String {
     val path = url.substring(idx + 1)
     val masked = if (path.length > 6) path.take(3) + "•••" + path.takeLast(3) else "•••"
     return url.substring(0, idx + 1) + masked
+}
+
+/** 262. QR переноса: крупно, на белом фоне, с предупреждением — в нём ссылка подписки. */
+@Composable
+private fun TransferQrDialog(bitmap: android.graphics.Bitmap, onDismiss: () -> Unit) {
+    // Пока QR на экране — максимальная яркость, чтобы камера нового телефона его быстро прочитала
+    val activity = androidx.compose.ui.platform.LocalContext.current as? android.app.Activity
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        val w = activity?.window
+        val before = w?.attributes?.screenBrightness
+        w?.let { it.attributes = it.attributes.apply { screenBrightness = 1f } }
+        onDispose { w?.let { it.attributes = it.attributes.apply { screenBrightness = before ?: -1f } } }
+    }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Apex.Dialog,
+        title = { Text("Перенос на новый телефон", color = Apex.Text) },
+        text = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                androidx.compose.foundation.Image(
+                    bitmap.asImageBitmap(), "QR-код переноса",
+                    Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.White)
+                        .padding(8.dp),
+                    filterQuality = androidx.compose.ui.graphics.FilterQuality.None,
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "На новом телефоне: APEX VPN → «Сканировать QR-код». Перенесутся настройки, свои списки, избранное и подписка.",
+                    color = Apex.TextDim, fontSize = 14.sp,
+                )
+                Spacer(Modifier.height(8.dp))
+                Text("⚠️ В QR-коде ваша личная подписка — не показывайте его посторонним.", color = Apex.Warn, fontSize = 13.sp)
+            }
+        },
+        confirmButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Готово", color = Apex.Accent) } },
+    )
 }

@@ -65,6 +65,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -217,44 +218,43 @@ private fun SearchField(value: String, hint: String, onChange: (String) -> Unit)
     }
 }
 
-// ─── 5. Тест скорости ───────────────────────────────────────────────────
+// ─── 5/229. Тест скорости 2.0 ───────────────────────────────────────────
 
 @Composable
 private fun SpeedTestPage(viewModel: MainViewModel, onBack: () -> Unit) {
     val st by viewModel.speed.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val history by com.apexvpn.client.data.SpeedHistory.entries.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { com.apexvpn.client.data.SpeedHistory.load(context) }
     val running = st.phase in listOf(SpeedPhase.Ping, SpeedPhase.Download, SpeedPhase.Upload)
     PageScaffold("Тест скорости", { viewModel.cancelSpeedTest(); onBack() }) {
-        Spacer(Modifier.height(20.dp))
-        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            val big = when (st.phase) {
-                SpeedPhase.Download, SpeedPhase.Upload -> "%.1f".format(Locale.US, st.live)
-                SpeedPhase.Done -> "%.1f".format(Locale.US, st.result.downMbps)
-                else -> "—"
-            }
-            Text(big, color = Apex.Text, fontSize = 72.sp, fontWeight = FontWeight.ExtraBold)
-            Text("Мбит/с", color = Apex.TextDim, fontSize = 18.sp)
-            Spacer(Modifier.height(8.dp))
-            Text(
-                when (st.phase) {
-                    SpeedPhase.Idle -> "Измерим пинг, загрузку и отдачу"
-                    SpeedPhase.Ping -> "Измеряем пинг…"
-                    SpeedPhase.Download -> "Загрузка…"
-                    SpeedPhase.Upload -> "Отдача…"
-                    SpeedPhase.Done -> "Готово"
-                    SpeedPhase.Error -> st.error ?: "Ошибка"
-                },
-                color = if (st.phase == SpeedPhase.Error) Apex.Bad else Apex.TextDim,
-                fontSize = 16.sp,
-            )
+        Spacer(Modifier.height(8.dp))
+        val shown = when (st.phase) {
+            SpeedPhase.Download, SpeedPhase.Upload -> st.live
+            SpeedPhase.Done -> st.result.downMbps
+            else -> 0.0
         }
-        Spacer(Modifier.height(28.dp))
+        SpeedGauge(
+            mbps = shown,
+            label = when (st.phase) {
+                SpeedPhase.Idle -> "Пинг, загрузка и отдача"
+                SpeedPhase.Ping -> "Измеряем пинг…"
+                SpeedPhase.Download -> "↓ Загрузка"
+                SpeedPhase.Upload -> "↑ Отдача"
+                SpeedPhase.Done -> "Готово"
+                SpeedPhase.Error -> st.error ?: "Ошибка"
+            },
+            upload = st.phase == SpeedPhase.Upload,
+            error = st.phase == SpeedPhase.Error,
+        )
+        Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             val r = st.result
             Metric("Пинг", if (r.pingMs >= 0) "${r.pingMs} мс" else "—", Modifier.weight(1f))
             Metric("Загрузка", if (r.downMbps >= 0) "%.1f".format(Locale.US, r.downMbps) + " Мбит/с" else "—", Modifier.weight(1f))
             Metric("Отдача", if (r.upMbps >= 0) "%.1f".format(Locale.US, r.upMbps) + " Мбит/с" else "—", Modifier.weight(1f))
         }
-        Spacer(Modifier.height(28.dp))
+        Spacer(Modifier.height(20.dp))
         Button(
             onClick = { if (running) viewModel.cancelSpeedTest() else viewModel.runSpeedTest() },
             modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -264,7 +264,163 @@ private fun SpeedTestPage(viewModel: MainViewModel, onBack: () -> Unit) {
             Text(if (running) "Остановить" else if (st.phase == SpeedPhase.Idle) "Начать тест" else "Повторить", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
         }
         Caption("Если VPN включён, измеряется скорость через VPN. Сервер теста — Cloudflare. Тест расходует около 50–100 МБ трафика.")
+
+        // 220. Самый быстрый сервер
+        SectionLabel("Самый быстрый сервер")
+        FastestCard(viewModel)
+
+        // 229. История
+        if (history.isNotEmpty()) {
+            SectionLabel("История", trailing = "${history.size}")
+            Group {
+                val best = history.maxOf { it.down }
+                history.forEachIndexed { i, e ->
+                    if (i > 0) GroupDivider()
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(e.server, color = Apex.Text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                            Text(
+                                java.text.SimpleDateFormat("d MMM, HH:mm", Locale("ru")).format(java.util.Date(e.time)) +
+                                    (if (e.pingMs >= 0) " · ${e.pingMs} мс" else "") +
+                                    (if (e.up >= 0) " · ↑ " + "%.0f".format(Locale.US, e.up) else ""),
+                                color = Apex.TextDim, fontSize = 13.sp,
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            // Полоска относительно лучшего результата
+                            Box(Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(3.dp)).background(Apex.SurfaceHigh)) {
+                                Box(
+                                    Modifier
+                                        .fillMaxWidth(if (best > 0) (e.down / best).toFloat().coerceIn(0.03f, 1f) else 0f)
+                                        .height(5.dp)
+                                        .clip(RoundedCornerShape(3.dp))
+                                        .background(Apex.accent),
+                                )
+                            }
+                        }
+                        Spacer(Modifier.width(14.dp))
+                        Text(
+                            if (e.down >= 0) "%.1f".format(Locale.US, e.down) else "—",
+                            color = Apex.Text, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold,
+                        )
+                        Text(" Мбит/с", color = Apex.TextDim, fontSize = 12.sp)
+                    }
+                }
+            }
+            androidx.compose.material3.TextButton(onClick = { com.apexvpn.client.data.SpeedHistory.clear(context) }) {
+                Text("Очистить историю", color = Apex.TextDim)
+            }
+        }
+        Spacer(Modifier.height(24.dp))
     }
+}
+
+/** 229. Спидометр: дуга 240°, шкала до 1000 Мбит/с (логарифмическая), стрелка плавно догоняет значение. */
+@Composable
+private fun SpeedGauge(mbps: Double, label: String, upload: Boolean, error: Boolean) {
+    val target = (kotlin.math.log10(1.0 + mbps.coerceAtLeast(0.0)) / 3.0).toFloat().coerceIn(0f, 1f)
+    val frac by androidx.compose.animation.core.animateFloatAsState(
+        target, androidx.compose.animation.core.tween(if (Apex.feel.smooth) 0 else 450), label = "gauge",
+    )
+    val c1 = if (upload) Apex.Cyan else Apex.Violet
+    val c2 = if (upload) Apex.Violet else Apex.Cyan
+    val track = Apex.SurfaceHigh
+    val dim = Apex.TextDim
+    val measurer = androidx.compose.ui.text.rememberTextMeasurer()
+    Box(Modifier.fillMaxWidth().height(250.dp), contentAlignment = Alignment.Center) {
+        androidx.compose.foundation.Canvas(Modifier.size(250.dp)) {
+            val stroke = 18.dp.toPx()
+            val inset = stroke / 2 + 18.dp.toPx()
+            val arcSize = androidx.compose.ui.geometry.Size(size.width - inset * 2, size.height - inset * 2)
+            val topLeft = androidx.compose.ui.geometry.Offset(inset, inset)
+            drawArc(track, 150f, 240f, false, topLeft, arcSize, style = androidx.compose.ui.graphics.drawscope.Stroke(stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round))
+            if (frac > 0.002f) {
+                drawArc(
+                    androidx.compose.ui.graphics.Brush.sweepGradient(listOf(c1, c2, c1), center),
+                    150f, 240f * frac, false, topLeft, arcSize,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round),
+                )
+            }
+            // Подписи шкалы
+            val r = arcSize.width / 2
+            listOf(0, 10, 100, 1000).forEach { v ->
+                val f = (kotlin.math.log10(1.0 + v) / 3.0).toFloat().coerceIn(0f, 1f)
+                val a = Math.toRadians((150 + 240 * f).toDouble())
+                val rr = r + stroke * 0.5f + 10.dp.toPx()
+                val text = measurer.measure(v.toString(), TextStyle(color = dim, fontSize = 11.sp))
+                val x = center.x + (rr * kotlin.math.cos(a)).toFloat() - text.size.width / 2
+                val y = center.y + (rr * kotlin.math.sin(a)).toFloat() - text.size.height / 2
+                drawText(text, topLeft = androidx.compose.ui.geometry.Offset(x, y))
+            }
+            // Точка-стрелка на конце дуги
+            val a = Math.toRadians((150 + 240 * frac).toDouble())
+            drawCircle(
+                Color.White, stroke * 0.42f,
+                androidx.compose.ui.geometry.Offset(center.x + (r * kotlin.math.cos(a)).toFloat(), center.y + (r * kotlin.math.sin(a)).toFloat()),
+            )
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                if (mbps > 0) (if (mbps >= 100) "%.0f" else "%.1f").format(Locale.US, mbps) else "—",
+                color = Apex.Text, fontSize = 56.sp, fontWeight = FontWeight.ExtraBold,
+            )
+            Text("Мбит/с", color = Apex.TextDim, fontSize = 15.sp)
+            Spacer(Modifier.height(6.dp))
+            Text(label, color = if (error) Apex.Bad else Apex.TextDim, fontSize = 14.sp, textAlign = TextAlign.Center, modifier = Modifier.width(170.dp))
+        }
+    }
+}
+
+/** 220. Подбор самого быстрого сервера через VPN. */
+@Composable
+private fun FastestCard(viewModel: MainViewModel) {
+    val f by viewModel.fastest.collectAsStateWithLifecycle()
+    Column(Modifier.fillMaxWidth().apexCard().padding(16.dp)) {
+        Text(
+            when {
+                f.running -> f.step
+                f.best != null -> "Выбран ${f.best!!.title} — " + "%.0f".format(Locale.US, f.best!!.mbps) + " Мбит/с"
+                f.error != null -> f.error!!
+                else -> "APEX проверит 5 серверов с лучшим пингом, измерит скорость каждого и закрепит самый быстрый."
+            },
+            color = if (f.error != null && !f.running) Apex.Bad else Apex.Text,
+            fontSize = 15.sp,
+        )
+        if (f.probes.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            val top = f.probes.maxOf { it.mbps }.coerceAtLeast(1.0)
+            f.probes.forEach { p ->
+                Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                    FlagCircle(p.flag, 28.dp)
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Row {
+                            Text(p.title, color = Apex.Text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.weight(1f))
+                            Text(
+                                if (p.mbps >= 0) "%.0f".format(Locale.US, p.mbps) + " Мбит/с" else "${p.pingMs} мс",
+                                color = if (p.tag == f.best?.tag) Apex.Good else Apex.TextDim, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(Apex.SurfaceHigh)) {
+                            if (p.mbps > 0) {
+                                Box(Modifier.fillMaxWidth((p.mbps / top).toFloat().coerceIn(0.03f, 1f)).height(4.dp).clip(RoundedCornerShape(2.dp)).background(Apex.accent))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        Button(
+            onClick = { if (f.running) viewModel.cancelFastest() else viewModel.findFastest() },
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = if (f.running) Apex.SurfaceHigh else Apex.AccentSoft, contentColor = if (f.running) Apex.Text else Apex.AccentText),
+        ) {
+            Text(if (f.running) "Остановить" else if (f.best != null) "Подобрать снова" else "Подобрать сервер", fontWeight = FontWeight.SemiBold)
+        }
+    }
+    Caption("Нужен включённый VPN. Подбор расходует около 30 МБ. Выбранный сервер закрепляется — автопилот выключится, пока не выберете его снова.")
 }
 
 @Composable
@@ -538,6 +694,42 @@ private fun DnsPage(viewModel: MainViewModel, onBack: () -> Unit) {
 private fun ProfilePage(viewModel: MainViewModel, onBack: () -> Unit) {
     val s by viewModel.settings.collectAsStateWithLifecycle()
     PageScaffold("Профиль подключения", onBack) {
+        // 220. Автовыбор сервера по задаче
+        SectionLabel("Для чего VPN сейчас")
+        val tasks = listOf(
+            Triple("games", "🎮", "Игры") to "Минимальный пинг",
+            Triple("video", "🎬", "Видео") to "Самая высокая скорость",
+            Triple("calls", "📞", "Звонки") to "Стабильная связь",
+        )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            tasks.forEach { (t, sub) ->
+                val (id, glyph, title) = t
+                val on = s.task == id
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .apexCard(if (on) Apex.SelectedCard else Apex.Surface)
+                        .border(2.dp, if (on) Apex.Accent else Color.Transparent, RoundedCornerShape(Apex.Radius))
+                        .clickable { viewModel.chooseTask(if (on) "" else id) }
+                        .padding(vertical = 14.dp, horizontal = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(glyph, fontSize = 30.sp)
+                    Spacer(Modifier.height(6.dp))
+                    Text(title, color = Apex.Text, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                    Text(sub, color = Apex.TextDim, fontSize = 12.sp, textAlign = TextAlign.Center, lineHeight = 15.sp)
+                }
+            }
+        }
+        Caption(
+            when (s.task) {
+                "games" -> "Автопилот проверяет серверы каждую минуту и держит самый низкий пинг. Игры не обрываются при смене."
+                "video" -> "После подключения APEX измерит скорость 5 лучших серверов и закрепит самый быстрый. Подобрать заново — в «Тесте скорости»."
+                "calls" -> "Сервер «залипает» и не меняется без нужды — звонки не рвутся."
+                else -> "Выберите задачу — APEX сам настроит профиль и выбор сервера. Нажмите ещё раз, чтобы снять."
+            },
+        )
+        SectionLabel("Профиль")
         Group {
             ConnProfile.entries.forEachIndexed { i, p ->
                 if (i > 0) GroupDivider()
@@ -560,7 +752,7 @@ private fun AppearancePage(viewModel: MainViewModel, onBack: () -> Unit) {
         designs.chunked(3).forEach { row ->
             Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 row.forEach { d ->
-                    DesignPreview(d, s.theme, s.accent, selected = s.design == d, modifier = Modifier.weight(1f)) {
+                    DesignPreview(d, s.theme, s.accent, s.customAccent, selected = s.design == d, modifier = Modifier.weight(1f)) {
                         viewModel.change(reload = false) { copy(design = d) }
                     }
                 }
@@ -650,14 +842,31 @@ private fun AppearancePage(viewModel: MainViewModel, onBack: () -> Unit) {
                         Modifier
                             .size(46.dp)
                             .clip(CircleShape)
-                            .background(Color(a.argb))
+                            .then(
+                                if (a == AccentColor.Custom) {
+                                    Modifier.background(androidx.compose.ui.graphics.Brush.sweepGradient(rainbow))
+                                } else {
+                                    Modifier.background(Color(a.argb))
+                                },
+                            )
                             .border(3.dp, if (on) Apex.Text else Color.Transparent, CircleShape),
                         contentAlignment = Alignment.Center,
-                    ) { if (on) Icon(Icons.Rounded.Check, null, tint = Color.White) }
+                    ) {
+                        if (a == AccentColor.Custom) {
+                            Box(Modifier.size(24.dp).clip(CircleShape).background(Color(s.customAccent)).border(2.dp, Color.White, CircleShape))
+                        } else if (on) {
+                            Icon(Icons.Rounded.Check, null, tint = Color.White)
+                        }
+                    }
                     Spacer(Modifier.height(6.dp))
                     Text(a.title, color = if (on) Apex.Text else Apex.TextDim, fontSize = 12.sp)
                 }
             }
+        }
+        // 216. Свой цвет: оттенок, насыщенность и яркость
+        if (s.accent == AccentColor.Custom) {
+            Spacer(Modifier.height(8.dp))
+            AccentPicker(s.customAccent) { argb -> viewModel.change(reload = false) { copy(customAccent = argb) } }
         }
 
         // Ощущения
@@ -683,6 +892,15 @@ private fun AppearancePage(viewModel: MainViewModel, onBack: () -> Unit) {
                             contentAlignment = Alignment.Center,
                         ) { Icon(Icons.Rounded.PlayArrow, "Послушать", tint = Apex.Accent) }
                     }
+                }
+                // 271. Звук отключения из того же набора
+                GroupDivider()
+                ListRow(
+                    "Звук отключения",
+                    if (s.disconnectSound) "«${com.apexvpn.client.data.ConnectFeedback.title(s.sound)}» вниз — нажмите, чтобы послушать" else "Только при подключении",
+                    onClick = { com.apexvpn.client.data.ConnectFeedback.play(context, s.sound, force = true, off = true) },
+                ) {
+                    ApexSwitch(s.disconnectSound, { v -> viewModel.change(reload = false) { copy(disconnectSound = v) } })
                 }
             }
             GroupDivider()
@@ -776,19 +994,93 @@ private fun AppearancePage(viewModel: MainViewModel, onBack: () -> Unit) {
     }
 }
 
+private val rainbow = listOf(
+    Color(0xFFFF3B30), Color(0xFFFFCC00), Color(0xFF34C759), Color(0xFF00C7BE),
+    Color(0xFF007AFF), Color(0xFFAF52DE), Color(0xFFFF2D92), Color(0xFFFF3B30),
+)
+
+/**
+ * 216. Выбор любого цвета акцента. Пока ползунок тянут, меняется только образец;
+ * тема перекрашивается, когда палец отпущен.
+ */
+@Composable
+private fun AccentPicker(argb: Long, onPick: (Long) -> Unit) {
+    val hsv = remember(argb) {
+        FloatArray(3).also { android.graphics.Color.colorToHSV((argb and 0xFFFFFFFFL).toInt(), it) }
+    }
+    var hue by remember(argb) { mutableStateOf(hsv[0]) }
+    var sat by remember(argb) { mutableStateOf(hsv[1].coerceIn(0.25f, 1f)) }
+    var value by remember(argb) { mutableStateOf(hsv[2].coerceIn(0.35f, 1f)) }
+    fun current(): Long = android.graphics.Color.HSVToColor(floatArrayOf(hue, sat, value)).toLong() and 0xFFFFFFFFL
+    val preview = Color(current())
+    val commit = { onPick(current()) }
+    Column(Modifier.fillMaxWidth().apexCard().padding(16.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(44.dp).clip(CircleShape).background(preview))
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Свой цвет", color = Apex.Text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text("#%06X".format(current() and 0xFFFFFF), color = Apex.TextDim, fontSize = 13.sp)
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        PickerSlider("Оттенок", hue / 360f, androidx.compose.ui.graphics.Brush.horizontalGradient(rainbow), { hue = it * 360f }, commit)
+        PickerSlider(
+            "Насыщенность", (sat - 0.25f) / 0.75f,
+            androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, 0.25f, value))), Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, 1f, value))))),
+            { sat = 0.25f + it * 0.75f }, commit,
+        )
+        PickerSlider(
+            "Яркость", (value - 0.35f) / 0.65f,
+            androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, sat, 0.35f))), Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, sat, 1f))))),
+            { value = 0.35f + it * 0.65f }, commit,
+        )
+        // Быстрые образцы
+        Spacer(Modifier.height(6.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            listOf(0xFFFF6B35, 0xFFE11D48, 0xFFF59E0B, 0xFF84CC16, 0xFF06B6D4, 0xFF6366F1, 0xFFA855F7, 0xFF94A3B8).forEach { c ->
+                Box(
+                    Modifier.size(28.dp).clip(CircleShape).background(Color(c))
+                        .border(2.dp, if (c == argb) Apex.Text else Color.Transparent, CircleShape)
+                        .clickable { onPick(c) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PickerSlider(title: String, fraction: Float, track: androidx.compose.ui.graphics.Brush, onChange: (Float) -> Unit, onDone: () -> Unit) {
+    Text(title, color = Apex.TextDim, fontSize = 13.sp)
+    Box(Modifier.fillMaxWidth().height(40.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier.fillMaxWidth().padding(horizontal = 10.dp).height(12.dp).clip(RoundedCornerShape(6.dp)).background(track))
+        androidx.compose.material3.Slider(
+            value = fraction.coerceIn(0f, 1f),
+            onValueChange = onChange,
+            onValueChangeFinished = onDone,
+            colors = androidx.compose.material3.SliderDefaults.colors(
+                thumbColor = Color.White,
+                activeTrackColor = Color.Transparent,
+                inactiveTrackColor = Color.Transparent,
+            ),
+        )
+    }
+}
+
 /** Мини-экран дизайна: фон, карточка и щит в его цветах. */
 @Composable
 private fun DesignPreview(
     design: Design,
     theme: ThemeMode,
     accent: AccentColor,
+    customAccent: Long,
     selected: Boolean,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
-    val p = remember(design, theme, accent, systemDark) {
-        com.apexvpn.client.ui.theme.paletteFor(design, theme, accent, systemDark)
+    val p = remember(design, theme, accent, customAccent, systemDark) {
+        com.apexvpn.client.ui.theme.paletteFor(design, theme, accent, systemDark, customArgb = customAccent)
     }
     val shape = RoundedCornerShape(18.dp)
     Column(
@@ -803,6 +1095,7 @@ private fun DesignPreview(
                 .height(118.dp)
                 .background(
                     when (design) {
+                        Design.Apex2 -> androidx.compose.ui.graphics.Brush.verticalGradient(listOf(p.brand1.copy(alpha = if (p.dark) 0.35f else 0.2f), p.base, p.base))
                         Design.Glass, Design.Aurora -> androidx.compose.ui.graphics.Brush.linearGradient(listOf(p.accent.copy(alpha = 0.7f), p.base, Color(0xFF22D3EE).copy(alpha = 0.6f)))
                         Design.Pastel -> androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xFFFFF1E8), Color(0xFFF6EEFF)))
                         Design.Neon -> androidx.compose.ui.graphics.Brush.linearGradient(listOf(p.brand1.copy(alpha = 0.35f), p.base, p.brand2.copy(alpha = 0.3f)))

@@ -95,7 +95,7 @@ class ApexWallpaper : WallpaperService() {
         private fun render(c: Canvas) {
             val w = c.width.toFloat()
             val h = c.height.toFloat()
-            val accent = AppSettings.value.accent.argb.toInt()
+            val accent = AppSettings.value.accentArgb.toInt()
             val cyan = 0xFF22D3EE.toInt()
             val on = status == VpnStatus.Started
             val t = (System.currentTimeMillis() - start) / 1000f

@@ -55,11 +55,13 @@ data class Settings(
     val refreshHours: Int = 12,
     // Внешний вид
     val theme: ThemeMode = ThemeMode.Dark,
-    val design: Design = Design.Classic,
+    val design: Design = Design.Apex2,
     val accent: AccentColor = AccentColor.Violet,
+    val customAccent: Long = 0xFF7B6CFF,              // 216. свой цвет (accent = Custom)
     val homeStyle: String = "button",                 // главный экран: button | map
     val connectSound: Boolean = false,                // звук подключения
-    val sound: String = "signal",                     // signal | crystal | sphere | chime
+    val sound: String = "signal",                     // 271. набор звуков (ConnectFeedback.sounds)
+    val disconnectSound: Boolean = true,              // 271. звук и при отключении
     val vibration: Boolean = true,
     val smoothMode: Boolean = false,                  // меньше анимаций для слабых телефонов
     val glassBlur: Boolean = true,                    // размытие фона под стеклом
@@ -80,7 +82,12 @@ data class Settings(
     val iconStatus: Boolean = false,
     // 94. Флаги в списке серверов колышутся
     val animatedFlags: Boolean = true,
-)
+    // 220. Задача: games | video | calls ("" — не выбрана)
+    val task: String = "",
+) {
+    /** Цвет акцента с учётом «Своего». */
+    val accentArgb: Long get() = if (accent == AccentColor.Custom) customAccent else accent.argb
+}
 
 /** Своё правило маршрутизации: домен/IP и действие proxy | direct | block. */
 data class UserRule(val value: String, val action: String)
@@ -229,14 +236,14 @@ object AppSettings {
         put("favorites", list(s.favorites)); put("protocol", s.protocol); put("core", s.core.id); put("excludeAds", s.excludeAds)
         put("speedNotif", s.speedInNotification); put("expiryAlerts", s.expiryAlerts)
         put("autoUpdates", s.autoCheckUpdates); put("crashReports", s.crashReports); put("refreshHours", s.refreshHours)
-        put("theme", s.theme.id); put("design", s.design.id); put("accent", s.accent.id)
-        put("homeStyle", s.homeStyle); put("connectSound", s.connectSound); put("sound", s.sound); put("vibration", s.vibration)
+        put("theme", s.theme.id); put("design", s.design.id); put("accent", s.accent.id); put("customAccent", s.customAccent)
+        put("homeStyle", s.homeStyle); put("connectSound", s.connectSound); put("sound", s.sound); put("disconnectSound", s.disconnectSound); put("vibration", s.vibration)
         put("smooth", s.smoothMode); put("glassBlur", s.glassBlur); put("liveMap", s.liveMap)
         put("userRules", JSONArray(s.userRules.map { JSONObject().put("value", it.value).put("action", it.action) }))
         put("domainStrategy", s.domainStrategy); put("fakeDns", s.fakeDns)
         put("remoteDns", s.remoteDns.json()); put("directDns", s.directDns.json()); put("rulesSource", s.rulesSource)
         put("warp", s.warp); put("warpConfig", s.warpConfig); put("shieldBackdrop", s.shieldBackdrop); put("backdropStamp", s.backdropStamp)
-        put("iconStatus", s.iconStatus); put("animatedFlags", s.animatedFlags)
+        put("iconStatus", s.iconStatus); put("animatedFlags", s.animatedFlags); put("task", s.task)
     }
 
     private fun fromJson(o: JSONObject): Settings {
@@ -296,9 +303,11 @@ object AppSettings {
             theme = ThemeMode.of(o.optString("theme", d.theme.id)),
             design = Design.of(o.optString("design", d.design.id)),
             accent = AccentColor.of(o.optString("accent", d.accent.id)),
+            customAccent = o.optLong("customAccent", d.customAccent).let { if (it == 0L) d.customAccent else it or 0xFF000000L },
             homeStyle = o.optString("homeStyle", d.homeStyle),
             connectSound = o.optBoolean("connectSound", d.connectSound),
             sound = o.optString("sound", d.sound),
+            disconnectSound = o.optBoolean("disconnectSound", d.disconnectSound),
             vibration = o.optBoolean("vibration", d.vibration),
             smoothMode = o.optBoolean("smooth", d.smoothMode),
             glassBlur = o.optBoolean("glassBlur", d.glassBlur),
@@ -320,6 +329,7 @@ object AppSettings {
             backdropStamp = o.optLong("backdropStamp", d.backdropStamp),
             iconStatus = o.optBoolean("iconStatus", d.iconStatus),
             animatedFlags = o.optBoolean("animatedFlags", d.animatedFlags),
+            task = o.optString("task", d.task),
         )
     }
 }

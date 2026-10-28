@@ -195,7 +195,7 @@ fun ListRow(
         Modifier
             .fillMaxWidth()
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(horizontal = 16.dp, vertical = 13.dp),
+            .padding(horizontal = if (Apex.palette.roomy) 18.dp else 16.dp, vertical = if (Apex.palette.roomy) 15.dp else 13.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (leading != null) {

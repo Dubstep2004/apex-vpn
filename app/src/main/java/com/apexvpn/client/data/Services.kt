@@ -134,7 +134,9 @@ enum class AccentColor(val id: String, val title: String, val argb: Long) {
     Blue("blue", "Синий", 0xFF3B82F6),
     Green("green", "Зелёный", 0xFF22C55E),
     Turquoise("turquoise", "Бирюзовый", 0xFF14B8C4),
-    Pink("pink", "Розовый", 0xFFEC4899);
+    Pink("pink", "Розовый", 0xFFEC4899),
+    /** 216. Любой цвет: значение в Settings.customAccent */
+    Custom("custom", "Свой", 0xFF7B6CFF);
 
     companion object {
         fun of(id: String) = entries.firstOrNull { it.id == id } ?: Violet
@@ -154,6 +156,7 @@ enum class CoreMode(val id: String, val title: String, val subtitle: String) {
 
 /** Дизайн приложения (2026). Меняет цвета, форму карточек, фон, шрифт и главный экран. */
 enum class Design(val id: String, val title: String, val subtitle: String) {
+    Apex2("apex2", "APEX 2.0", "Новый облик 2026: крупные карточки и мягкое свечение"),
     Classic("classic", "Классика", "Строгий тёмный APEX"),
     Glass("glass", "Liquid Glass", "Стеклянные карточки на цветном фоне"),
     Expressive("expressive", "Material Expressive", "Цвета от обоев, крупные формы"),

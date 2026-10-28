@@ -61,6 +61,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.width
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -117,8 +120,16 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestPermission(),
     ) { connectNow() }
 
+    /** 262. QR переноса с другого телефона — ждёт подтверждения. */
+    private val pendingTransfer = MutableStateFlow<org.json.JSONObject?>(null)
+
     private val qrScanner = registerForActivityResult(ScanContract()) { result ->
         val text = result.contents ?: return@registerForActivityResult
+        if (com.apexvpn.client.data.Transfer.isTransfer(text)) {
+            val o = com.apexvpn.client.data.Transfer.decode(text)
+            if (o != null) pendingTransfer.value = o else viewModel.showMessage("QR-код переноса повреждён — попробуйте ещё раз")
+            return@registerForActivityResult
+        }
         val link = Subscription.extractLink(text)
         if (link != null) pendingImport.value = link else viewModel.showMessage("В QR-коде нет ссылки на sub.knownhosts.ru")
     }
@@ -133,7 +144,7 @@ class MainActivity : ComponentActivity() {
                 val wallpaper = if (Build.VERSION.SDK_INT >= 31) {
                     runCatching { androidx.compose.ui.graphics.Color(getColor(android.R.color.system_accent1_400)) }.getOrNull()
                 } else null
-                val p = paletteFor(s.design, s.theme, s.accent, systemDark, wallpaper)
+                val p = paletteFor(s.design, s.theme, s.accent, systemDark, wallpaper, customArgb = s.customAccent)
                 applyPalette(p)
                 com.apexvpn.client.ui.theme.applyFeel(
                     com.apexvpn.client.ui.theme.Feel(s.vibration, s.smoothMode, s.glassBlur, s.liveMap),
@@ -155,6 +166,7 @@ class MainActivity : ComponentActivity() {
                     val sub by viewModel.subscription.collectAsStateWithLifecycle()
                     val message by viewModel.message.collectAsStateWithLifecycle()
                     val importLink by pendingImport.collectAsStateWithLifecycle()
+                    val transfer by pendingTransfer.collectAsStateWithLifecycle()
                     val snackbar = remember { SnackbarHostState() }
                     var tab by rememberSaveable { mutableStateOf(Tab.Home) }
                     var page by rememberSaveable { mutableStateOf<Page?>(null) }
@@ -176,7 +188,17 @@ class MainActivity : ComponentActivity() {
                             Column(Modifier.fillMaxSize()) {
                                 AnimatedContent(
                                     targetState = tab,
-                                    transitionSpec = { fadeIn() togetherWith fadeOut() },
+                                    // 212. Вкладки «выезжают» в сторону нажатой, а не просто растворяются
+                                    transitionSpec = {
+                                        if (Apex.feel.smooth) {
+                                            fadeIn(androidx.compose.animation.core.tween(150)) togetherWith fadeOut(androidx.compose.animation.core.tween(150))
+                                        } else {
+                                            val dir = if (targetState.ordinal > initialState.ordinal) 1 else -1
+                                            val spec = androidx.compose.animation.core.tween<androidx.compose.ui.unit.IntOffset>(320, easing = androidx.compose.animation.core.FastOutSlowInEasing)
+                                            (slideInHorizontally(spec) { w -> dir * w / 5 } + fadeIn(androidx.compose.animation.core.tween(260, delayMillis = 60))) togetherWith
+                                                (slideOutHorizontally(spec) { w -> -dir * w / 5 } + fadeOut(androidx.compose.animation.core.tween(180)))
+                                        }
+                                    },
                                     modifier = Modifier.weight(1f),
                                     label = "tab",
                                 ) { current ->
@@ -197,8 +219,10 @@ class MainActivity : ComponentActivity() {
                             // Страницы поверх вкладок
                             AnimatedVisibility(
                                 visible = page != null,
-                                enter = slideInHorizontally { it } + fadeIn(),
-                                exit = slideOutHorizontally { it } + fadeOut(),
+                                enter = slideInHorizontally(androidx.compose.animation.core.tween(320, easing = androidx.compose.animation.core.FastOutSlowInEasing)) { it } +
+                                    fadeIn() + androidx.compose.animation.scaleIn(initialScale = 0.96f),
+                                exit = slideOutHorizontally(androidx.compose.animation.core.tween(260)) { it } + fadeOut() +
+                                    androidx.compose.animation.scaleOut(targetScale = 0.96f),
                             ) {
                                 val current = page
                                 if (current != null) {
@@ -233,6 +257,31 @@ class MainActivity : ComponentActivity() {
                                 }) { Text("Добавить", color = Apex.Accent) }
                             },
                             dismissButton = { TextButton(onClick = { pendingImport.value = null }) { Text("Отмена", color = Apex.TextDim) } },
+                        )
+                    }
+                    transfer?.let { o ->
+                        AlertDialog(
+                            onDismissRequest = { pendingTransfer.value = null },
+                            containerColor = Apex.Dialog,
+                            title = { Text("Перенести с другого телефона?", color = Apex.Text) },
+                            text = {
+                                Text(
+                                    "Перенесётся: " + com.apexvpn.client.data.Transfer.summary(o) + ". Текущие настройки на этом телефоне заменятся.",
+                                    color = Apex.TextDim,
+                                )
+                            },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    pendingTransfer.value = null
+                                    val restored = com.apexvpn.client.data.SettingsBackup.restore(o)
+                                    if (restored == null) {
+                                        viewModel.showMessage("Не удалось применить настройки")
+                                    } else {
+                                        viewModel.applyRestored(restored, "Всё перенесено")
+                                    }
+                                }) { Text("Перенести", color = Apex.Accent) }
+                            },
+                            dismissButton = { TextButton(onClick = { pendingTransfer.value = null }) { Text("Отмена", color = Apex.TextDim) } },
                         )
                     }
                     // «Что нового» один раз после обновления приложения
@@ -341,7 +390,7 @@ class MainActivity : ComponentActivity() {
         qrScanner.launch(
             ScanOptions()
                 .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-                .setPrompt("Наведите камеру на QR-код подписки")
+                .setPrompt("Наведите камеру на QR-код подписки или переноса")
                 .setBeepEnabled(false)
                 .setOrientationLocked(false),
         )
@@ -378,9 +427,13 @@ private fun maskLink(url: String): String {
     return url.substring(0, idx + 1) + if (path.length > 6) path.take(3) + "•••" + path.takeLast(3) else "•••"
 }
 
-/** Нижняя навигация: плавающая «пилюля» с тремя вкладками. */
+/**
+ * Нижняя навигация 2.0: плавающая «пилюля», выделение плавно переезжает
+ * к нажатой вкладке, значок слегка подпрыгивает.
+ */
 @Composable
 private fun BottomBar(current: Tab, onSelect: (Tab) -> Unit) {
+    val smooth = Apex.feel.smooth
     Box(
         Modifier
             .fillMaxWidth()
@@ -388,7 +441,7 @@ private fun BottomBar(current: Tab, onSelect: (Tab) -> Unit) {
             .navigationBarsPadding()
             .padding(horizontal = 16.dp, vertical = 10.dp),
     ) {
-        Row(
+        androidx.compose.foundation.layout.BoxWithConstraints(
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(28.dp))
@@ -396,28 +449,61 @@ private fun BottomBar(current: Tab, onSelect: (Tab) -> Unit) {
                 .border(1.dp, Apex.CardBorder, RoundedCornerShape(28.dp))
                 .padding(6.dp),
         ) {
-            Tab.entries.forEach { t ->
-                val selected = t == current
-                Column(
-                    Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(22.dp))
-                        .background(if (selected) Apex.SurfaceHigh else Apex.Surface)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                        ) { onSelect(t) }
-                        .padding(vertical = 8.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Icon(t.icon, null, tint = if (selected) Apex.Accent else Apex.TextDim, modifier = Modifier.size(22.dp))
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        t.title,
-                        fontSize = 12.sp,
-                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                        color = if (selected) Apex.Text else Apex.TextDim,
+            val count = Tab.entries.size
+            val itemWidth = maxWidth / count
+            val offset by androidx.compose.animation.core.animateDpAsState(
+                itemWidth * current.ordinal,
+                if (smooth) androidx.compose.animation.core.snap() else androidx.compose.animation.core.spring(dampingRatio = 0.75f, stiffness = 420f),
+                label = "tabIndicator",
+            )
+            // Переезжающее выделение
+            Box(
+                Modifier
+                    .offset(x = offset)
+                    .width(itemWidth)
+                    .height(54.dp)
+                    .clip(RoundedCornerShape(22.dp))
+                    .background(Apex.SurfaceHigh),
+            )
+            Row(Modifier.fillMaxWidth()) {
+                Tab.entries.forEach { t ->
+                    val selected = t == current
+                    val lift by androidx.compose.animation.core.animateFloatAsState(
+                        if (selected && !smooth) 1f else 0f,
+                        androidx.compose.animation.core.spring(dampingRatio = 0.45f, stiffness = 500f),
+                        label = "tabLift",
                     )
+                    val tint by androidx.compose.animation.animateColorAsState(if (selected) Apex.Accent else Apex.TextDim, label = "tabTint")
+                    Column(
+                        Modifier
+                            .weight(1f)
+                            .height(54.dp)
+                            .clip(RoundedCornerShape(22.dp))
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                            ) { onSelect(t) },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+                    ) {
+                        Icon(
+                            t.icon, null, tint = tint,
+                            modifier = Modifier
+                                .size(22.dp)
+                                .graphicsLayer {
+                                    translationY = -lift * 2.dp.toPx()
+                                    scaleX = 1f + lift * 0.12f
+                                    scaleY = 1f + lift * 0.12f
+                                },
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            t.title,
+                            fontSize = 12.sp,
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                            color = if (selected) Apex.Text else Apex.TextDim,
+                        )
+                    }
                 }
             }
         }

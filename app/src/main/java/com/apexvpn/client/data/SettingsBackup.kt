@@ -14,14 +14,17 @@ object SettingsBackup {
 
     fun fileName() = "apex-vpn-settings.json"
 
+    /** Всё для переноса: настройки, подписка, выбранный сервер. */
+    fun payload(): JSONObject = JSONObject()
+        .put("app", "APEX VPN")
+        .put("format", 1)
+        .put("version", BuildConfig.VERSION_NAME)
+        .put("settings", AppSettings.exportJson())
+        .put("subscription", Prefs.subscriptionUrl)
+        .put("selected", Prefs.selectedTag)
+
     fun export(context: Context, uri: Uri): Boolean = runCatching {
-        val o = JSONObject()
-            .put("app", "APEX VPN")
-            .put("format", 1)
-            .put("version", BuildConfig.VERSION_NAME)
-            .put("settings", AppSettings.exportJson())
-            .put("subscription", Prefs.subscriptionUrl)
-            .put("selected", Prefs.selectedTag)
+        val o = payload()
         // «wt» — перезаписать файл целиком; некоторые папки его не понимают, тогда обычная запись
         val out = runCatching { context.contentResolver.openOutputStream(uri, "wt") }.getOrNull()
             ?: context.contentResolver.openOutputStream(uri)
@@ -35,7 +38,11 @@ object SettingsBackup {
     /** Читает файл и применяет настройки; null — файл не подошёл. */
     fun import(context: Context, uri: Uri): Restored? = runCatching {
         val text = context.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) } ?: return null
-        val o = JSONObject(text)
+        restore(JSONObject(text))
+    }.getOrNull()
+
+    /** Применить копию (из файла или QR-кода); null — это не копия APEX VPN. */
+    fun restore(o: JSONObject): Restored? = runCatching {
         if (o.optString("app") != "APEX VPN") return null
         val settings = o.optJSONObject("settings") ?: return null
         if (!AppSettings.importJson(settings)) return null

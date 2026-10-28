@@ -81,20 +81,41 @@ class BackgroundWork(context: Context, params: WorkerParameters) : CoroutineWork
     }
 }
 
-// ─── 13. Подписка скоро закончится ──────────────────────────────────────
+// ─── 13/259. Подписка скоро закончится ──────────────────────────────────
+
+/** Срабатывает точно в момент «за 3 дня», «за 1 день» и «закончилась» — даже без интернета. */
+class ExpiryWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+    override suspend fun doWork(): Result {
+        ExpiryAlerts.check(applicationContext)
+        return Result.success()
+    }
+}
 
 object ExpiryAlerts {
     private const val DAY = 24L * 3600 * 1000
 
+    /** Этап: 3 — осталось ≤ 3 дней, 1 — ≤ 1 дня, 0 — закончилась, null — всё в порядке. */
+    private fun stage(expireAt: Long, nowSec: Long): Int? {
+        if (expireAt <= 0) return null
+        val left = expireAt - nowSec
+        return when {
+            left <= 0 -> 0
+            left <= 86400 -> 1
+            left <= 3 * 86400 -> 3
+            else -> null
+        }
+    }
+
     /** Текст предупреждения или null, если всё в порядке. */
     fun warning(state: SubscriptionState): String? {
         val now = System.currentTimeMillis() / 1000
-        if (state.expireAt > 0) {
-            val daysLeft = ((state.expireAt - now) / 86400).toInt()
-            when {
-                state.expireAt <= now -> return "Подписка закончилась — продлите её"
-                daysLeft <= 3 -> return "Подписка закончится через ${daysWord(daysLeft.coerceAtLeast(1))}"
+        when (stage(state.expireAt, now)) {
+            0 -> return "Подписка закончилась — продлите её"
+            1 -> {
+                val hours = ((state.expireAt - now) / 3600).toInt()
+                return if (hours < 1) "Подписка закончится меньше чем через час" else "Подписка закончится через ${hoursWord(hours)}"
             }
+            3 -> return "Подписка закончится через ${daysWord((((state.expireAt - now) + 86399) / 86400).toInt().coerceIn(2, 3))}"
         }
         if (state.total > 0 && state.used >= 0) {
             val left = state.total - state.used
@@ -112,24 +133,77 @@ object ExpiryAlerts {
         else -> "$n дней"
     }
 
-    /** Показывает уведомление не чаще раза в сутки. */
+    private fun hoursWord(n: Int): String = when {
+        n % 10 == 1 && n % 100 != 11 -> "$n час"
+        n % 10 in 2..4 && n % 100 !in 12..14 -> "$n часа"
+        else -> "$n часов"
+    }
+
+    /**
+     * 259. Уведомления о конце подписки: по одному за 3 дня, за 1 день и в момент окончания
+     * (каждое — один раз для этой даты). О трафике — не чаще раза в сутки.
+     */
     fun check(context: Context) {
         if (!AppSettings.value.expiryAlerts) return
-        val text = warning(Subscription.state.value) ?: return
+        val state = Subscription.state.value
         val sp = context.getSharedPreferences("alerts", Context.MODE_PRIVATE)
-        if (System.currentTimeMillis() - sp.getLong("expiry", 0) < DAY) return
-        sp.edit { putLong("expiry", System.currentTimeMillis()) }
+        val now = System.currentTimeMillis() / 1000
+        val st = stage(state.expireAt, now)
+        if (st != null) {
+            val key = "expiry_${state.expireAt}"
+            val last = sp.getInt(key, 99)
+            if (st < last) {
+                sp.edit { putInt(key, st) }
+                notify(context, warning(state) ?: return, st)
+            }
+            return
+        }
+        val text = warning(state) ?: return
+        if (System.currentTimeMillis() - sp.getLong("traffic", 0) < DAY) return
+        sp.edit { putLong("traffic", System.currentTimeMillis()) }
+        notify(context, text, -1)
+    }
+
+    /** Будильники WorkManager точно на «за 3 дня», «за 1 день» и окончание. */
+    fun schedule(context: Context) {
+        val expireAt = Subscription.state.value.expireAt
+        val wm = WorkManager.getInstance(context)
+        val nowMs = System.currentTimeMillis()
+        listOf(3 * 86400L to "expiry-3", 86400L to "expiry-1", 0L to "expiry-0").forEach { (before, name) ->
+            val at = (expireAt - before) * 1000
+            if (expireAt <= 0 || at <= nowMs) {
+                wm.cancelUniqueWork(name)
+            } else {
+                wm.enqueueUniqueWork(
+                    name,
+                    androidx.work.ExistingWorkPolicy.REPLACE,
+                    androidx.work.OneTimeWorkRequestBuilder<ExpiryWorker>()
+                        .setInitialDelay(at - nowMs + 60_000, TimeUnit.MILLISECONDS)
+                        .build(),
+                )
+            }
+        }
+    }
+
+    private fun notify(context: Context, text: String, stage: Int) {
         val nm = context.getSystemService<NotificationManager>() ?: return
         val pi = PendingIntent.getActivity(
             context, 11, Intent(context, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
+        val title = when (stage) {
+            0 -> "Подписка APEX VPN закончилась"
+            1 -> "Подписка заканчивается завтра"
+            3 -> "Подписка скоро закончится"
+            else -> "APEX VPN"
+        }
         nm.notify(
             4,
             NotificationCompat.Builder(context, ApexApp.CHANNEL_ALERTS)
                 .setSmallIcon(R.drawable.ic_stat_apex)
-                .setContentTitle("APEX VPN")
-                .setContentText(text)
+                .setContentTitle(title)
+                .setContentText(if (stage >= 0) "$text. Продлите в личном кабинете, чтобы VPN не отключился." else text)
+                .setStyle(NotificationCompat.BigTextStyle())
                 .setContentIntent(pi)
                 .setAutoCancel(true)
                 .build(),

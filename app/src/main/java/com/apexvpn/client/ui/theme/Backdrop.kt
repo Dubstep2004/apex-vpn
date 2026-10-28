@@ -38,6 +38,7 @@ fun DesignBackground(modifier: Modifier = Modifier) {
         Backdrop.Neon -> Canvas(modifier.fillMaxSize()) { drawNeon(p) }
         Backdrop.Terminal -> Canvas(modifier.fillMaxSize()) { drawTerminal(p) }
         Backdrop.Pastel -> Canvas(modifier.fillMaxSize()) { drawPastel(p) }
+        Backdrop.Apex2 -> Canvas(modifier.fillMaxSize()) { drawApex2(p) }
     }
 }
 
@@ -107,6 +108,16 @@ private fun DrawScope.drawTerminal(p: Palette) {
         y += step
     }
     blob(p.accent.copy(alpha = 0.08f), Offset(size.width / 2, size.height / 3), size.width)
+}
+
+/** 212. APEX 2.0: мягкое свечение акцента сверху и бирюзы снизу. */
+private fun DrawScope.drawApex2(p: Palette) {
+    drawRect(p.base)
+    val w = size.width
+    val h = size.height
+    val a = if (p.dark) 0.30f else 0.18f
+    blob(p.brand1.copy(alpha = a), Offset(w * 0.5f, -h * 0.05f), w * 1.0f)
+    blob(p.brand2.copy(alpha = a * 0.55f), Offset(w * 1.05f, h * 0.95f), w * 0.85f)
 }
 
 private fun DrawScope.drawPastel(p: Palette) {

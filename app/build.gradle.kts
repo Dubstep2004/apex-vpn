@@ -35,8 +35,8 @@ android {
         applicationId = "com.apexvpn.client"
         minSdk = 24
         targetSdk = 35
-        versionCode = 30
-        versionName = "1.9.6"
+        versionCode = 31
+        versionName = "2.0.0"
 
         buildConfigField("String", "SUBSCRIPTION_HOST", "\"$subscriptionHost\"")
         buildConfigField("String", "RULES_BASE_URL", "\"$rulesBaseUrl\"")
@@ -120,6 +120,8 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.10.0")
     // Сканер QR-кодов
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    // 262. QR-код переноса на новый телефон
+    implementation("com.google.zxing:core:3.4.1")
     // 11. Связь с часами Wear OS
     implementation("com.google.android.gms:play-services-wearable:19.0.0")
     // Google Play Services тянет старый Fragment 1.0 — поднимаем (иначе ломаются запросы разрешений)

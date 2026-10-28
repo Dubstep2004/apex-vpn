@@ -22,7 +22,7 @@ import com.apexvpn.client.data.Design
 import com.apexvpn.client.data.ThemeMode
 
 /** Чем закрашен фон экранов. */
-enum class Backdrop { Solid, Glass, Aurora, Neon, Terminal, Pastel }
+enum class Backdrop { Solid, Glass, Aurora, Neon, Terminal, Pastel, Apex2 }
 
 /** Всё, что определяет внешний вид: цвета, форма карточек, фон, шрифт, раскладка главного экрана. */
 data class Palette(
@@ -56,6 +56,8 @@ data class Palette(
     /** Главный экран из плиток */
     val bento: Boolean = false,
     val design: Design = Design.Classic,
+    /** 212. Крупные карточки и строки (APEX 2.0) */
+    val roomy: Boolean = false,
 )
 
 private fun darkPalette(accent: Color, amoled: Boolean) = Palette(
@@ -177,6 +179,43 @@ private fun auroraPalette(accent: Color, dark: Boolean): Palette =
         backdrop = Backdrop.Aurora,
         design = Design.Aurora,
     )
+
+/**
+ * 212. APEX 2.0 — новый облик 2026: глубокий фон с мягким свечением акцента,
+ * крупные скругления и строки, тонкая светлая кромка карточек.
+ */
+private fun apex2Palette(accent: Color, dark: Boolean, amoled: Boolean): Palette {
+    val base = if (dark) darkPalette(accent, amoled) else lightPalette(accent)
+    return if (dark) base.copy(
+        bg = Color.Transparent,
+        base = if (amoled) Color.Black else Color(0xFF08080E),
+        surface = if (amoled) Color(0xFF0F0F16) else Color(0xFF13131C),
+        surfaceHigh = if (amoled) Color(0xFF1A1A24) else Color(0xFF1E1E2A),
+        divider = Color.White.copy(alpha = 0.06f),
+        heroCard = lerp(Color(0xFF13131C), accent, 0.18f),
+        accentSoft = lerp(Color(0xFF13131C), accent, 0.26f),
+        brand1 = accent,
+        brand2 = lerp(accent, Color(0xFF22D3EE), 0.6f),
+        cardBorder = Color.White.copy(alpha = 0.07f),
+        radius = 30.dp,
+        backdrop = Backdrop.Apex2,
+        design = Design.Apex2,
+        roomy = true,
+    ) else base.copy(
+        bg = Color.Transparent,
+        base = Color(0xFFF3F3F9),
+        surface = Color.White,
+        surfaceHigh = Color(0xFFEDEDF5),
+        heroCard = lerp(Color.White, accent, 0.12f),
+        brand1 = accent,
+        brand2 = lerp(accent, Color(0xFF22D3EE), 0.6f),
+        cardBorder = Color.Black.copy(alpha = 0.05f),
+        radius = 30.dp,
+        backdrop = Backdrop.Apex2,
+        design = Design.Apex2,
+        roomy = true,
+    )
+}
 
 /** Д7. Ретро-терминал — зелёный моноширинный текст на чёрном. */
 private fun terminalPalette(): Palette {
@@ -301,14 +340,17 @@ fun paletteFor(
     accent: AccentColor,
     systemDark: Boolean,
     wallpaper: Color? = null,
+    /** 216. Свой цвет, если accent = Custom */
+    customArgb: Long? = null,
 ): Palette {
-    val accentColor = Color(accent.argb)
+    val accentColor = Color(if (accent == AccentColor.Custom && customArgb != null) customArgb else accent.argb)
     val dark = when (theme) {
         ThemeMode.Light -> false
         ThemeMode.Dark, ThemeMode.Amoled -> true
         ThemeMode.System -> systemDark
     }
     return when (design) {
+        Design.Apex2 -> apex2Palette(accentColor, dark, theme == ThemeMode.Amoled)
         Design.Classic -> when (theme) {
             ThemeMode.Light -> lightPalette(accentColor)
             ThemeMode.Dark -> darkPalette(accentColor, amoled = false)

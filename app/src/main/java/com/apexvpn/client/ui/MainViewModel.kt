@@ -146,6 +146,21 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _pings.value = emptyMap()
     }
 
+    /** Применить восстановленную копию (файл или QR переноса): подписка, выбранный сервер, настройки. */
+    fun applyRestored(restored: com.apexvpn.client.data.SettingsBackup.Restored, done: String = "Настройки восстановлены") {
+        val current = Subscription.state.value.url
+        if (restored.subscription.isNotBlank() && restored.subscription != current) {
+            setSubscription(restored.subscription) { err ->
+                // Новая подписка сбрасывает выбор сервера — возвращаем выбранный в копии
+                if (err == null && restored.selected.isNotBlank()) select(restored.selected)
+                showMessage(err ?: "$done вместе с подпиской")
+            }
+        } else {
+            change { this }
+            showMessage(done)
+        }
+    }
+
     fun select(tag: String) {
         Subscription.select(tag)
         applyToVpn()
@@ -212,11 +227,66 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 _speed.value = SpeedState(SpeedPhase.Upload, result = r)
                 r = r.copy(upMbps = SpeedTest.upload { v -> _speed.value = _speed.value.copy(live = v) })
                 _speed.value = SpeedState(SpeedPhase.Done, result = r)
+                // 229. История замеров
+                val running = com.apexvpn.client.vpn.VpnState.status.value == com.apexvpn.client.vpn.VpnStatus.Started
+                val sub = Subscription.state.value
+                val server = when {
+                    !running -> "Без VPN"
+                    sub.selectedTag == com.apexvpn.client.data.AUTO_TAG -> "Автопилот"
+                    else -> sub.nodes.firstOrNull { it.tag == sub.selectedTag }?.let { com.apexvpn.client.data.ServerInfo.title(it.name) } ?: "VPN"
+                }
+                com.apexvpn.client.data.SpeedHistory.add(
+                    getApplication(),
+                    com.apexvpn.client.data.SpeedHistory.Entry(System.currentTimeMillis(), r.pingMs, r.downMbps, r.upMbps, server),
+                )
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
                 _speed.value = SpeedState(SpeedPhase.Error, result = r, error = e.message ?: "Ошибка теста")
             }
+        }
+    }
+
+    // ─── 220. Сервер под задачу ──────────────────────────────────────────
+
+    val fastest = com.apexvpn.client.data.FastestServer.state
+    private var fastestJob: Job? = null
+
+    fun findFastest() {
+        if (fastestJob?.isActive == true) return
+        fastestJob = viewModelScope.launch {
+            val best = com.apexvpn.client.data.FastestServer.run(getApplication())
+            if (best != null) showMessage("Самый быстрый: ${best.title} — ${"%.0f".format(java.util.Locale.US, best.mbps)} Мбит/с")
+        }
+    }
+
+    fun cancelFastest() {
+        fastestJob?.cancel()
+    }
+
+    /** Задача: игры, видео или звонки — профиль и способ выбора сервера. */
+    fun chooseTask(task: String) {
+        when (task) {
+            "games" -> {
+                change(reload = false) { copy(task = task, profile = com.apexvpn.client.data.ConnProfile.Gaming) }
+                select(com.apexvpn.client.data.AUTO_TAG)
+                showMessage("Игры: автопилот держит сервер с самым низким пингом")
+            }
+            "calls" -> {
+                change(reload = false) { copy(task = task, profile = com.apexvpn.client.data.ConnProfile.Calls) }
+                select(com.apexvpn.client.data.AUTO_TAG)
+                showMessage("Звонки: стабильный сервер, связь не рвётся при смене")
+            }
+            "video" -> {
+                change(reload = false) { copy(task = task, profile = com.apexvpn.client.data.ConnProfile.Normal) }
+                if (com.apexvpn.client.vpn.VpnState.status.value == com.apexvpn.client.vpn.VpnStatus.Started) {
+                    findFastest()
+                } else {
+                    select(com.apexvpn.client.data.AUTO_TAG)
+                    showMessage("Видео: после подключения APEX сам найдёт самый быстрый сервер")
+                }
+            }
+            else -> change { copy(task = "") }
         }
     }
 

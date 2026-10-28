@@ -21,6 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -95,7 +96,22 @@ class ApexApp : Application() {
             VpnState.status.collect { st ->
                 if (st == com.apexvpn.client.vpn.VpnStatus.Started &&
                     (last == com.apexvpn.client.vpn.VpnStatus.Starting || last == com.apexvpn.client.vpn.VpnStatus.Stopped)
-                ) com.apexvpn.client.data.ConnectFeedback.onConnected(this@ApexApp)
+                ) {
+                    com.apexvpn.client.data.ConnectFeedback.onConnected(this@ApexApp)
+                    // 220. Задача «Видео»: на автопилоте сами подбираем самый быстрый сервер
+                    if (AppSettings.value.task == "video" && Prefs.selectedTag == com.apexvpn.client.data.AUTO_TAG) {
+                        appScope.launch {
+                            kotlinx.coroutines.delay(3000)
+                            if (VpnState.status.value == com.apexvpn.client.vpn.VpnStatus.Started) {
+                                com.apexvpn.client.data.FastestServer.run(this@ApexApp)
+                            }
+                        }
+                    }
+                }
+                // 271. Звук отключения
+                if (st == com.apexvpn.client.vpn.VpnStatus.Stopped && last == com.apexvpn.client.vpn.VpnStatus.Stopping) {
+                    com.apexvpn.client.data.ConnectFeedback.onDisconnected(this@ApexApp)
+                }
                 last = st
             }
         }
@@ -108,6 +124,13 @@ class ApexApp : Application() {
         }
 
         BackgroundWork.schedule(this)
+        // 259. Точные напоминания о конце подписки — при каждой новой дате окончания
+        appScope.launch {
+            Subscription.state.map { it.expireAt }.distinctUntilChanged().collect {
+                runCatching { com.apexvpn.client.data.ExpiryAlerts.schedule(this@ApexApp) }
+                runCatching { com.apexvpn.client.data.ExpiryAlerts.check(this@ApexApp) }
+            }
+        }
     }
 
     companion object {
