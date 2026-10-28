@@ -454,6 +454,26 @@ fun paletteFor(
     wallpaper: Color? = null,
     /** 216. Свой цвет, если accent = Custom */
     customArgb: Long? = null,
+    /** 564. Второй цвет готовой палитры (градиент щита), 0 — нет */
+    customArgb2: Long = 0,
+): Palette {
+    val p = basePaletteFor(design, theme, accent, systemDark, wallpaper, customArgb)
+    // Палитра из двух цветов — только для дизайнов, где цвет выбирает пользователь
+    if (accent != AccentColor.Custom || customArgb2 == 0L || customArgb == null) return p
+    return when (design) {
+        Design.Apex2, Design.Classic, Design.Glass, Design.Aurora, Design.Bento ->
+            p.copy(brand1 = Color(customArgb), brand2 = Color(customArgb2))
+        else -> p
+    }
+}
+
+private fun basePaletteFor(
+    design: Design,
+    theme: ThemeMode,
+    accent: AccentColor,
+    systemDark: Boolean,
+    wallpaper: Color?,
+    customArgb: Long?,
 ): Palette {
     val accentColor = Color(if (accent == AccentColor.Custom && customArgb != null) customArgb else accent.argb)
     val dark = when (theme) {

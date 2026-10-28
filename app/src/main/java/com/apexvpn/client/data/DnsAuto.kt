@@ -1,6 +1,11 @@
 package com.apexvpn.client.data
 
+import android.net.NetworkCapabilities
 import android.util.Base64
+import com.apexvpn.client.ApexApp
+import com.apexvpn.client.vpn.NetworkMonitor
+import com.apexvpn.client.vpn.WifiInfoReader
+import io.nekohasekai.apexcore.Apexcore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -8,48 +13,106 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Авто-выбор DNS: меряем, как быстро отвечают Cloudflare, Google, Quad9, Mullvad, OpenDNS и Control D по DNS-over-HTTPS
- * (если VPN включён — через VPN, как ходит и сам DNS), и берём самый быстрый.
- * AdGuard, Яндекс, Comss и NextDNS в выбор не входят: они меняют поведение (фильтры, геолокация), а не только скорость.
+ * Авто-выбор DNS. Меряем, как быстро отвечают Cloudflare, Google, Quad9, Mullvad, OpenDNS и Control D,
+ * причём разными способами: DNS-over-HTTPS, DNS-over-TLS и DNS-over-QUIC (516) — где-то быстрее один,
+ * где-то другой. Если VPN включён — через VPN, как ходит и сам DNS.
+ * Лучший запоминается отдельно для каждой сети (499): домашний Wi-Fi, рабочий Wi-Fi, мобильная сеть.
+ * AdGuard, Яндекс, Comss и NextDNS в выбор не входят: они меняют поведение (фильтры, геолокация).
  */
 object DnsAuto {
-    data class Result(val id: String, val ms: Int)
+    /** Вариант: DNS, способ и адреса для замера. */
+    data class Variant(val choice: DnsChoice, val proto: String, val doh: String = "", val ip: String = "", val sni: String = "") {
+        val key get() = "${choice.id}/$proto"
+        val protoTitle get() = when (proto) { "tls" -> "DoT"; "quic" -> "DoQ"; else -> "DoH" }
+    }
 
-    private val candidates = listOf(
-        DnsChoice.Cloudflare to "https://1.1.1.1/dns-query",
-        DnsChoice.Google to "https://dns.google/dns-query",
-        DnsChoice.Quad9 to "https://dns.quad9.net/dns-query",
-        DnsChoice.Mullvad to "https://dns.mullvad.net/dns-query",
-        DnsChoice.OpenDns to "https://doh.opendns.com/dns-query",
-        DnsChoice.ControlD to "https://freedns.controld.com/p0",
+    data class Result(val variant: Variant, val ms: Int)
+
+    val variants = listOf(
+        Variant(DnsChoice.Cloudflare, "https", doh = "https://1.1.1.1/dns-query"),
+        Variant(DnsChoice.Cloudflare, "tls", ip = "1.1.1.1", sni = "cloudflare-dns.com"),
+        Variant(DnsChoice.Google, "https", doh = "https://dns.google/dns-query"),
+        Variant(DnsChoice.Google, "tls", ip = "8.8.8.8", sni = "dns.google"),
+        Variant(DnsChoice.Quad9, "https", doh = "https://dns.quad9.net/dns-query"),
+        Variant(DnsChoice.Quad9, "tls", ip = "9.9.9.9", sni = "dns.quad9.net"),
+        Variant(DnsChoice.Mullvad, "https", doh = "https://dns.mullvad.net/dns-query"),
+        Variant(DnsChoice.Mullvad, "tls", ip = "194.242.2.2", sni = "dns.mullvad.net"),
+        Variant(DnsChoice.OpenDns, "https", doh = "https://doh.opendns.com/dns-query"),
+        Variant(DnsChoice.ControlD, "https", doh = "https://freedns.controld.com/p0"),
+        Variant(DnsChoice.ControlD, "tls", ip = "76.76.2.0", sni = "p0.freedns.controld.com"),
+        Variant(DnsChoice.ControlD, "quic", ip = "76.76.2.0", sni = "p0.freedns.controld.com"),
     )
 
     private val _results = MutableStateFlow<List<Result>>(emptyList())
     val results = _results.asStateFlow()
 
-    /** Текущий выбор (id для ядра); по умолчанию — Cloudflare. */
-    val best: String get() = Prefs.autoDnsBest.ifBlank { DnsChoice.Cloudflare.id }
+    /** Ключ сети (499): «mobile», «wifi:<имя сети>» или «wifi». */
+    fun networkKey(): String = runCatching {
+        val cm = ApexApp.connectivity
+        val net = NetworkMonitor.defaultNetwork ?: cm.activeNetwork
+        val caps = net?.let { cm.getNetworkCapabilities(it) }
+        when {
+            caps?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true -> "mobile"
+            caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true ->
+                WifiInfoReader.currentSsid(ApexApp.instance)?.let { "wifi:$it" } ?: "wifi"
+            caps?.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) == true -> "ethernet"
+            else -> "other"
+        }
+    }.getOrDefault("other")
 
-    /** Замер; возвращает true, если лучший DNS сменился. */
+    fun networkTitle(key: String = networkKey()): String = when {
+        key == "mobile" -> "мобильная сеть"
+        key.startsWith("wifi:") -> "Wi-Fi «${key.removePrefix("wifi:")}»"
+        key == "wifi" -> "Wi-Fi"
+        key == "ethernet" -> "кабель"
+        else -> "эта сеть"
+    }
+
+    private fun saved(): JSONObject = runCatching { JSONObject(Prefs.autoDnsBest.takeIf { it.startsWith("{") } ?: "{}") }.getOrDefault(JSONObject())
+
+    /** Лучший вариант для текущей сети; по умолчанию — Cloudflare DoH. */
+    fun bestVariant(key: String = networkKey()): Variant {
+        val k = saved().optString(key).ifBlank { saved().optString("any") }
+        return variants.firstOrNull { it.key == k } ?: variants.first()
+    }
+
+    /** Совместимость: id DNS для ядра. */
+    val best: String get() = bestVariant().choice.id
+
+    /** Что сейчас применено в ядре — чтобы при смене сети понять, нужна ли перезагрузка. */
+    @Volatile var applied: String = ""
+
+    /** Замер; возвращает true, если лучший DNS для этой сети сменился. */
     suspend fun measure(): Boolean = withContext(Dispatchers.IO) {
+        val key = networkKey()
         val res = coroutineScope {
-            candidates.map { (c, url) -> async { Result(c.id, probe(url)) } }.awaitAll()
+            variants.map { v -> async { Result(v, probe(v)) } }.awaitAll()
         }.sortedBy { if (it.ms < 0) Int.MAX_VALUE else it.ms }
         _results.value = res
         val win = res.firstOrNull { it.ms >= 0 } ?: return@withContext false
-        val old = res.firstOrNull { it.id == best }?.ms ?: -1
+        val cur = bestVariant(key)
+        val old = res.firstOrNull { it.variant == cur }?.ms ?: -1
         // Меняем, только если новый заметно быстрее — чтобы DNS не «прыгал»
-        val change = win.id != best && (old < 0 || old - win.ms > 25)
-        if (change) Prefs.autoDnsBest = win.id
+        val change = win.variant != cur && (old < 0 || old - win.ms > 25)
+        if (change || saved().optString(key).isBlank()) {
+            val o = saved().put(key, win.variant.key).put("any", win.variant.key)
+            Prefs.autoDnsBest = o.toString()
+        }
         change
     }
 
+    private fun probe(v: Variant): Int = when (v.proto) {
+        "https" -> probeDoh(v.doh)
+        else -> runCatching { Apexcore.dnsProbe(v.proto, v.ip, v.sni, 3000) }.getOrDefault(-1)
+    }
+
     /** Лучшее из трёх запросов, мс; -1 — не ответил. */
-    private fun probe(url: String): Int {
+    private fun probeDoh(url: String): Int {
         val q = Base64.encodeToString(query(), Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
         var bestMs = -1
         repeat(3) {

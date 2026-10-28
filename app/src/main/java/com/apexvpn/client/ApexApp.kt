@@ -99,13 +99,6 @@ class ApexApp : Application() {
                     (last == com.apexvpn.client.vpn.VpnStatus.Starting || last == com.apexvpn.client.vpn.VpnStatus.Stopped)
                 ) {
                     com.apexvpn.client.data.ConnectFeedback.onConnected(this@ApexApp)
-                    // Авто-выбор DNS: замер после подключения; сменился лучший — применяем
-                    if (AppSettings.value.dns == com.apexvpn.client.data.DnsChoice.Auto) {
-                        appScope.launch {
-                            kotlinx.coroutines.delay(2000)
-                            if (com.apexvpn.client.data.DnsAuto.measure()) com.apexvpn.client.vpn.ApexVpnService.reload(this@ApexApp)
-                        }
-                    }
                     // 382. Конфетти на первом и юбилейных подключениях
                     com.apexvpn.client.data.Celebrate.onConnected()
                     // 220. Задача «Видео»: на автопилоте сами подбираем самый быстрый сервер
@@ -137,6 +130,40 @@ class ApexApp : Application() {
         }
 
         Prefs.initConnectCount()
+        // DNS «Авто» (499/516) и белые списки (491): после подключения и при каждой смене сети
+        appScope.launch {
+            var job: kotlinx.coroutines.Job? = null
+            combine(VpnState.status, com.apexvpn.client.vpn.NetworkMonitor.transport) { st, tr -> st to tr }
+                .distinctUntilChanged()
+                .collect { (st, tr) ->
+                    job?.cancel()
+                    if (st != com.apexvpn.client.vpn.VpnStatus.Started) return@collect
+                    job = appScope.launch {
+                        val app = this@ApexApp
+                        var reload = false
+                        val s = AppSettings.value
+                        val mobile = tr.substringBefore(':') == "mobile"
+                        if (!mobile || !s.autoWhitelist) reload = com.apexvpn.client.data.WhiteList.reset(app)
+                        // Для этой сети уже известен лучший DNS — применяем сразу
+                        if (s.dns == com.apexvpn.client.data.DnsChoice.Auto &&
+                            com.apexvpn.client.data.DnsAuto.bestVariant().key != com.apexvpn.client.data.DnsAuto.applied
+                        ) reload = true
+                        if (reload) com.apexvpn.client.vpn.ApexVpnService.reload(app)
+                        kotlinx.coroutines.delay(3000)
+                        if (VpnState.status.value != com.apexvpn.client.vpn.VpnStatus.Started) return@launch
+                        if (AppSettings.value.dns == com.apexvpn.client.data.DnsChoice.Auto && com.apexvpn.client.data.DnsAuto.measure()) {
+                            com.apexvpn.client.vpn.ApexVpnService.reload(app)
+                        }
+                        // Белые списки: на мобильной сети с автопилотом — проверка раз в 5 минут
+                        while (mobile && AppSettings.value.autoWhitelist &&
+                            VpnState.status.value == com.apexvpn.client.vpn.VpnStatus.Started
+                        ) {
+                            if (com.apexvpn.client.data.WhiteList.check(app)) com.apexvpn.client.vpn.ApexVpnService.reload(app)
+                            kotlinx.coroutines.delay(5 * 60_000L)
+                        }
+                    }
+                }
+        }
         // 413. Трафик по приложениям — пока VPN включён
         com.apexvpn.client.data.AppTraffic.init(this)
         appScope.launch {

@@ -58,6 +58,7 @@ data class Settings(
     val design: Design = Design.Apex2,
     val accent: AccentColor = AccentColor.Violet,
     val customAccent: Long = 0xFF7B6CFF,              // 216. свой цвет (accent = Custom)
+    val customAccent2: Long = 0,                      // 564. второй цвет палитры (0 — подбирается сам)
     val homeStyle: String = "button",                 // главный экран: button | map
     val connectSound: Boolean = false,                // звук подключения
     val sound: String = "signal",                     // 271. набор звуков (ConnectFeedback.sounds)
@@ -78,6 +79,9 @@ data class Settings(
     // 17. Фон за щитом: none | waves | particles | stars | photo (157)
     val shieldBackdrop: String = "none",
     val backdropStamp: Long = 0,                      // 157. меняется при выборе нового фото
+    val photoBlur: Int = 6,                           // 563. размытие своего фото, dp (0…24)
+    val photoDim: Int = 55,                           // 563. затемнение, % (0…90)
+    val photoParallax: Boolean = true,                // 563. фото сдвигается при наклоне телефона
     // 20. Иконка на рабочем столе показывает, включён ли VPN
     val iconStatus: Boolean = false,
     // 94. Флаги в списке серверов колышутся
@@ -96,6 +100,8 @@ data class Settings(
     val appTraffic: Boolean = true,
     // Стабильный автопилот: не выбирать серверы России и обхода LTE
     val autoSkipSpecial: Boolean = true,
+    // 491. На мобильной сети сам включать LTE-обход, если оператор пускает только по белым спискам
+    val autoWhitelist: Boolean = true,
 ) {
     /** Цвет акцента с учётом «Своего». */
     val accentArgb: Long get() = if (accent == AccentColor.Custom) customAccent else accent.argb
@@ -189,7 +195,17 @@ object AppSettings {
         put("customDomains", JSONArray(s.customDomains))
         put("directDomains", JSONArray(s.directDomains))
         put("rulesDir", rulesDir ?: "")
-        put("dns", if (s.dns == DnsChoice.Auto) DnsAuto.best else s.dns.id)
+        if (s.dns == DnsChoice.Auto) {
+            // DNS «Авто»: лучший для текущей сети, способом, который быстрее (DoH / DoT / DoQ)
+            val v = DnsAuto.bestVariant()
+            DnsAuto.applied = v.key
+            put("dns", v.choice.id)
+            if (v.proto != "https" && !s.remoteDns.isSet) {
+                put("remoteDns", JSONObject().put("type", v.proto).put("server", v.sni).put("ip", v.ip))
+            }
+        } else {
+            put("dns", s.dns.id)
+        }
         put("customDns", s.customDns)
         put("kids", s.kids)
         put("adBlock", s.adBlock)
@@ -214,7 +230,12 @@ object AppSettings {
         put("autoProtocols", JSONArray(if (s.protocol.isEmpty()) emptyList() else listOf(s.protocol)))
         // Стабильный автопилот: без России и LTE-обхода (их пинг самый низкий, но сайты через них не открываются)
         val nodes = Subscription.state.value.nodes
-        if (s.autoSkipSpecial) put("autoExclude", JSONArray(nodes.filter { ServerInfo.isSpecial(it.name) }.map { it.tag }))
+        if (WhiteList.active && s.autoWhitelist) {
+            // 491. Белые списки: только LTE-обход
+            put("autoExclude", JSONArray(nodes.filter { !ServerInfo.isLte(it.name) }.map { it.tag }))
+        } else if (s.autoSkipSpecial) {
+            put("autoExclude", JSONArray(nodes.filter { ServerInfo.isSpecial(it.name) }.map { it.tag }))
+        }
         // …и до первой проверки — сначала серверы, которые были быстрее при прошлом замере
         put("autoOrder", JSONArray(Prefs.lastPings().entries.filter { it.value > 0 }.sortedBy { it.value }.map { it.key }))
         put(
@@ -270,7 +291,8 @@ object AppSettings {
         put("domainStrategy", s.domainStrategy); put("fakeDns", s.fakeDns)
         put("remoteDns", s.remoteDns.json()); put("directDns", s.directDns.json()); put("rulesSource", s.rulesSource)
         put("warp", s.warp); put("warpConfig", s.warpConfig); put("shieldBackdrop", s.shieldBackdrop); put("backdropStamp", s.backdropStamp)
-        put("iconStatus", s.iconStatus); put("animatedFlags", s.animatedFlags); put("task", s.task); put("hiddenApps", list(s.hiddenApps)); put("secret", s.secretUnlocked); put("shield3d", s.shield3d); put("automation", s.automation); put("appTraffic", s.appTraffic); put("autoSkipSpecial", s.autoSkipSpecial)
+        put("iconStatus", s.iconStatus); put("animatedFlags", s.animatedFlags); put("task", s.task); put("hiddenApps", list(s.hiddenApps)); put("secret", s.secretUnlocked); put("shield3d", s.shield3d); put("automation", s.automation); put("appTraffic", s.appTraffic); put("autoSkipSpecial", s.autoSkipSpecial); put("autoWhitelist", s.autoWhitelist)
+        put("customAccent2", s.customAccent2); put("photoBlur", s.photoBlur); put("photoDim", s.photoDim); put("photoParallax", s.photoParallax)
     }
 
     private fun fromJson(o: JSONObject): Settings {
@@ -363,6 +385,11 @@ object AppSettings {
             automation = o.optBoolean("automation", d.automation),
             appTraffic = o.optBoolean("appTraffic", d.appTraffic),
             autoSkipSpecial = o.optBoolean("autoSkipSpecial", d.autoSkipSpecial),
+            autoWhitelist = o.optBoolean("autoWhitelist", d.autoWhitelist),
+            customAccent2 = o.optLong("customAccent2", d.customAccent2).let { if (it == 0L) 0L else it or 0xFF000000L },
+            photoBlur = o.optInt("photoBlur", d.photoBlur).coerceIn(0, 24),
+            photoDim = o.optInt("photoDim", d.photoDim).coerceIn(0, 90),
+            photoParallax = o.optBoolean("photoParallax", d.photoParallax),
         )
     }
 }

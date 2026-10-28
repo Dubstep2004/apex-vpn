@@ -852,11 +852,14 @@ private fun DnsPage(viewModel: MainViewModel, onBack: () -> Unit) {
             }
             Spacer(Modifier.height(10.dp))
             Column(Modifier.fillMaxWidth().apexCard().padding(16.dp)) {
-                Text("Сейчас: " + DnsChoice.of(com.apexvpn.client.data.DnsAuto.best).title, color = Apex.Text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                val bestV = com.apexvpn.client.data.DnsAuto.bestVariant()
+                Text("Сейчас: ${bestV.choice.title} · ${bestV.protoTitle}", color = Apex.Text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                // 499. Свой лучший DNS для каждой сети
+                Text("Для сети: " + com.apexvpn.client.data.DnsAuto.networkTitle(), color = Apex.TextDim, fontSize = 13.sp)
                 Spacer(Modifier.height(6.dp))
                 results.forEach { r ->
                     Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
-                        Text(DnsChoice.of(r.id).title, color = if (r.id == com.apexvpn.client.data.DnsAuto.best) Apex.AccentText else Apex.TextDim, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                        Text("${r.variant.choice.title} · ${r.variant.protoTitle}", color = if (r.variant == bestV) Apex.AccentText else Apex.TextDim, fontSize = 14.sp, modifier = Modifier.weight(1f))
                         Text(if (r.ms >= 0) "${r.ms} мс" else "нет ответа", color = if (r.ms >= 0) pingColor(r.ms) else Apex.Bad, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
@@ -869,7 +872,7 @@ private fun DnsPage(viewModel: MainViewModel, onBack: () -> Unit) {
                     }
                 }) { Text(if (busy) "Проверяю…" else "Проверить сейчас", color = Apex.Accent) }
             }
-            Caption("Авто сравнивает Cloudflare, Google, Quad9, Mullvad, OpenDNS и Control D после каждого подключения и берёт самый быстрый. Меняет DNS, только если другой заметно быстрее.")
+            Caption("Авто сравнивает Cloudflare, Google, Quad9, Mullvad, OpenDNS и Control D — и разными способами (DoH, DoT, DoQ) — после подключения и при смене сети. Для каждой сети запоминает свой лучший DNS. Меняет DNS, только если другой заметно быстрее. Если в «Маршрутизации» задан свой удалённый DNS, он главнее.")
         }
         if (s.kids) Caption("Семейный режим закрывает сайты 18+, казино и букмекеров, а DNS — семейный AdGuard (выбор DNS не действует).")
         SectionLabel("Свой DNS-over-HTTPS")
@@ -939,6 +942,15 @@ private fun ProfilePage(viewModel: MainViewModel, onBack: () -> Unit) {
         Group {
             ListRow("Автопилот без России и LTE", "Не выбирать российские серверы и обход белых списков — у них низкий пинг, но заблокированные сайты через них не открываются") {
                 ApexSwitch(s.autoSkipSpecial, { v -> viewModel.change { copy(autoSkipSpecial = v) } })
+            }
+            GroupDivider()
+            // 491
+            ListRow(
+                "Белые списки на мобильной сети",
+                if (com.apexvpn.client.data.WhiteList.active) "Сейчас включён LTE-обход: обычные серверы недоступны"
+                else "Если оператор пускает только «разрешённые» сайты, автопилот сам включит LTE-обход, а потом вернёт обычные серверы",
+            ) {
+                ApexSwitch(s.autoWhitelist, { v -> viewModel.change { copy(autoWhitelist = v) } })
             }
         }
     }
@@ -1039,6 +1051,14 @@ private fun AppearancePage(viewModel: MainViewModel, onBack: () -> Unit) {
                 }
             }
         }
+        // 563. Эффекты своего фото
+        if (s.shieldBackdrop == "photo") {
+            Spacer(Modifier.height(10.dp))
+            PhotoEffects(s.photoBlur, s.photoDim, s.photoParallax) { b, d, p ->
+                viewModel.change(reload = false) { copy(photoBlur = b, photoDim = d, photoParallax = p) }
+            }
+            if (android.os.Build.VERSION.SDK_INT < 31) Caption("Размытие работает на Android 12 и новее.")
+        }
 
         SectionLabel("Цвет")
         Row(Modifier.fillMaxWidth()) {
@@ -1076,7 +1096,35 @@ private fun AppearancePage(viewModel: MainViewModel, onBack: () -> Unit) {
         // 216. Свой цвет: оттенок, насыщенность и яркость
         if (s.accent == AccentColor.Custom) {
             Spacer(Modifier.height(8.dp))
-            AccentPicker(s.customAccent) { argb -> ThemeReveal.run { viewModel.change(reload = false) { copy(customAccent = argb) } } }
+            AccentPicker(s.customAccent) { argb -> ThemeReveal.run { viewModel.change(reload = false) { copy(customAccent = argb, customAccent2 = 0) } } }
+        }
+        // 564. Готовые палитры из двух цветов
+        SectionLabel("Палитры")
+        androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            items(ColorPresets.size) { i ->
+                val pr = ColorPresets[i]
+                val on = s.accent == AccentColor.Custom && s.customAccent == pr.c1 && s.customAccent2 == pr.c2
+                Column(
+                    Modifier.width(78.dp).clip(RoundedCornerShape(18.dp))
+                        .clickable { ThemeReveal.run { viewModel.change(reload = false) { copy(accent = AccentColor.Custom, customAccent = pr.c1, customAccent2 = pr.c2) } } }
+                        .padding(vertical = 6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Box(
+                        Modifier.size(56.dp).clip(RoundedCornerShape(18.dp))
+                            .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(pr.c1), Color(pr.c2))))
+                            .border(3.dp, if (on) Apex.Text else Color.Transparent, RoundedCornerShape(18.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (on) Icon(Icons.Rounded.Check, null, tint = Color.White) else Text(pr.emoji, fontSize = 22.sp)
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text(pr.title, color = if (on) Apex.Text else Apex.TextDim, fontSize = 12.sp, maxLines = 1)
+                }
+            }
+        }
+        if (s.design !in listOf(Design.Apex2, Design.Classic, Design.Glass, Design.Aurora, Design.Bento)) {
+            Caption("В этом дизайне свои цвета — палитры работают в APEX 2, Классике, Liquid Glass, Авроре и Бенто.")
         }
 
         // Ощущения
@@ -1280,6 +1328,58 @@ private fun PickerSlider(title: String, fraction: Float, track: androidx.compose
             ),
         )
     }
+}
+
+/** 564. Палитра: акцент и второй цвет градиента щита. */
+internal data class ColorPreset(val title: String, val emoji: String, val c1: Long, val c2: Long)
+
+internal val ColorPresets = listOf(
+    ColorPreset("Закат", "🌅", 0xFFFF5E62, 0xFFFFB347),
+    ColorPreset("Мята", "🌿", 0xFF10B981, 0xFF6EE7B7),
+    ColorPreset("Лаванда", "💜", 0xFF8B5CF6, 0xFFE9A8FF),
+    ColorPreset("Кофе", "☕", 0xFFA0673C, 0xFFE3B98A),
+    ColorPreset("Океан", "🌊", 0xFF0EA5E9, 0xFF2DD4BF),
+    ColorPreset("Вишня", "🍒", 0xFFE11D48, 0xFFF472B6),
+    ColorPreset("Лайм", "🍋", 0xFF65A30D, 0xFFFDE047),
+    ColorPreset("Золото", "✨", 0xFFD4A017, 0xFFFFE08A),
+    ColorPreset("Полночь", "🌙", 0xFF3B4CCA, 0xFF7DD3FC),
+)
+
+/** 563. Размытие, затемнение и движение своего фото. */
+@Composable
+private fun PhotoEffects(blur: Int, dim: Int, parallax: Boolean, onChange: (Int, Int, Boolean) -> Unit) {
+    var b by remember(blur) { mutableStateOf(blur.toFloat()) }
+    var d by remember(dim) { mutableStateOf(dim.toFloat()) }
+    Column(Modifier.fillMaxWidth().apexCard().padding(16.dp)) {
+        EffectSlider("Размытие", "${b.toInt()}", b, 0f..24f, { b = it }) { onChange(b.toInt(), d.toInt(), parallax) }
+        EffectSlider("Затемнение", "${d.toInt()}%", d, 0f..90f, { d = it }) { onChange(b.toInt(), d.toInt(), parallax) }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Движение при наклоне", color = Apex.Text, fontSize = 15.sp)
+                Text("Фото слегка сдвигается, как живые обои", color = Apex.TextDim, fontSize = 13.sp)
+            }
+            ApexSwitch(parallax, { v -> onChange(b.toInt(), d.toInt(), v) })
+        }
+    }
+}
+
+@Composable
+private fun EffectSlider(title: String, value: String, v: Float, range: ClosedFloatingPointRange<Float>, onChange: (Float) -> Unit, onDone: () -> Unit) {
+    Row(Modifier.fillMaxWidth()) {
+        Text(title, color = Apex.TextDim, fontSize = 13.sp, modifier = Modifier.weight(1f))
+        Text(value, color = Apex.Text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+    }
+    androidx.compose.material3.Slider(
+        value = v.coerceIn(range.start, range.endInclusive),
+        onValueChange = onChange,
+        onValueChangeFinished = onDone,
+        valueRange = range,
+        colors = androidx.compose.material3.SliderDefaults.colors(
+            thumbColor = Apex.Accent,
+            activeTrackColor = Apex.Accent,
+            inactiveTrackColor = Apex.SurfaceHigh,
+        ),
+    )
 }
 
 /** Мини-экран дизайна: фон, карточка и щит в его цветах. */

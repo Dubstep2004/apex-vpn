@@ -22,6 +22,24 @@ object NetworkMonitor {
 
     @Volatile
     private var listener: InterfaceUpdateListener? = null
+
+    /**
+     * Текущая сеть «тип:номер»: mobile:…, wifi:…, ethernet:…, other:… или "" (нет сети) —
+     * для DNS «Авто» и белых списков. Номер меняется при переходе на другую сеть того же типа.
+     */
+    val transport = kotlinx.coroutines.flow.MutableStateFlow("")
+
+    private fun updateTransport(network: Network?) {
+        val caps = network?.let { runCatching { ApexApp.connectivity.getNetworkCapabilities(it) }.getOrNull() }
+        val type = when {
+            caps == null -> ""
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "mobile"
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "wifi"
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "ethernet"
+            else -> "other"
+        }
+        transport.value = if (type.isEmpty()) "" else "$type:${network?.networkHandle ?: 0}"
+    }
     private var registered = false
     // Отдельный поток: колбэки сети не должны блокировать UI
     private val handler by lazy {
@@ -37,16 +55,21 @@ object NetworkMonitor {
     private val callback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
             defaultNetwork = network
+            updateTransport(network)
             notifyListener()
         }
 
         override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
-            if (network == defaultNetwork) notifyListener()
+            if (network == defaultNetwork) {
+                updateTransport(network)
+                notifyListener()
+            }
         }
 
         override fun onLost(network: Network) {
             if (network == defaultNetwork) {
                 defaultNetwork = null
+                updateTransport(null)
                 notifyListener()
             }
         }
@@ -64,6 +87,7 @@ object NetworkMonitor {
         }
         registered = true
         if (defaultNetwork == null) defaultNetwork = cm.activeNetwork
+        updateTransport(defaultNetwork)
     }
 
     @Synchronized

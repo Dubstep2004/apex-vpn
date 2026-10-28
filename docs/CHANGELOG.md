@@ -2,6 +2,20 @@
 
 <img src="img/tags/new.svg" height="22"> <img src="img/tags/improved.svg" height="22"> <img src="img/tags/changed.svg" height="22"> <img src="img/tags/fixed.svg" height="22"> <img src="img/tags/removed.svg" height="22">
 
+## 2.4.0 · 29 октября 2026
+
+<img src="img/tags/new.svg" alt="Новое" height="22">
+
+- Белые списки: если на мобильной сети обычные серверы не отвечают, а LTE-обход работает — автопилот сам переходит на обход LTE и пишет об этом. Выключается в Настройки → Профиль
+- DNS «Авто» запоминает лучший DNS для каждой сети: свой для домашнего Wi-Fi, работы и мобильной связи — и сразу ставит его при смене сети
+- DNS «Авто» проверяет не только DoH, но и DoT и DoQ — Cloudflare, Google, Quad9, Mullvad (DoT) и Control D (DoT и DoQ)
+- Своё фото на главном экране: размытие, затемнение и движение при наклоне телефона
+- Готовые палитры из двух цветов: Закат, Мята, Лаванда, Кофе, Океан, Вишня, Лайм, Золото и Полночь
+
+<img src="img/tags/improved.svg" alt="Улучшено" height="22">
+
+- В настройках DNS видно, для какой сети выбран DNS и по какому протоколу
+
 ## 2.3.1 · 28 октября 2026
 
 <img src="img/tags/new.svg" alt="Новое" height="22">

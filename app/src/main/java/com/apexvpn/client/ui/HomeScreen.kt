@@ -114,7 +114,7 @@ fun HomeScreen(
     }
 
     // 157. Своё фото за щитом (из галереи)
-    if (settings.shieldBackdrop == "photo") PhotoBackdrop(settings.backdropStamp)
+    if (settings.shieldBackdrop == "photo") PhotoBackdrop(settings.backdropStamp, settings.photoBlur, settings.photoDim, settings.photoParallax)
     // 354. Фото дня страны сервера (автопилот — ваша страна)
     if (settings.shieldBackdrop == "country") {
         val sel = sub.nodes.find { it.tag == sub.selectedTag }
@@ -824,9 +824,12 @@ private fun plural(n: Long, one: String, few: String, many: String): String {
     }
 }
 
-/** 157. Фото из галереи на весь экран, с затемнением, чтобы текст читался. */
+/**
+ * 157/563. Фото из галереи на весь экран. Размытие и затемнение настраиваются,
+ * а с «Движением» фото чуть сдвигается при наклоне телефона (как обои на iPhone).
+ */
 @Composable
-private fun PhotoBackdrop(stamp: Long) {
+fun PhotoBackdrop(stamp: Long, blurDp: Int = 6, dim: Int = 55, parallax: Boolean = true) {
     val context = LocalContext.current
     val bitmap by androidx.compose.runtime.produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, stamp) {
         value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -835,17 +838,35 @@ private fun PhotoBackdrop(stamp: Long) {
     }
     val img = bitmap ?: return
     val base = Apex.Base
-    val blur = Apex.feel.blur && android.os.Build.VERSION.SDK_INT >= 31
+    // Размытие есть только на Android 12+
+    val blur = blurDp > 0 && android.os.Build.VERSION.SDK_INT >= 31
+    val move = parallax && !Apex.feel.smooth
+    val d = dim.coerceIn(0, 90) / 100f
     Box(Modifier.fillMaxSize()) {
         androidx.compose.foundation.Image(
             img, null,
             contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-            modifier = Modifier.fillMaxSize().then(if (blur) Modifier.blur(6.dp) else Modifier),
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    if (move) {
+                        // Чуть увеличиваем, чтобы при сдвиге не показывались края
+                        scaleX = 1.1f; scaleY = 1.1f
+                        translationX = -com.apexvpn.client.ui.theme.Tilt.x * size.width * 0.045f
+                        translationY = -com.apexvpn.client.ui.theme.Tilt.y * size.height * 0.03f
+                    }
+                }
+                .then(if (blur) Modifier.blur(blurDp.dp) else Modifier),
         )
+        // Затемнение: сверху и снизу сильнее, чтобы читались заголовок и кнопки
         Box(
             Modifier.fillMaxSize().background(
                 androidx.compose.ui.graphics.Brush.verticalGradient(
-                    listOf(base.copy(alpha = 0.55f), base.copy(alpha = 0.25f), base.copy(alpha = 0.85f)),
+                    listOf(
+                        base.copy(alpha = (d + 0.1f).coerceAtMost(0.95f)),
+                        base.copy(alpha = d * 0.45f),
+                        base.copy(alpha = (d + 0.3f).coerceAtMost(0.95f)),
+                    ),
                 ),
             ),
         )
