@@ -6,6 +6,14 @@ data class Release(val version: String, val code: Int, val date: String, val cha
 object Changelog {
     val releases = listOf(
         Release(
+            "1.9.1", 25, "28 октября 2026",
+            listOf(
+                "Новые сервисы «Через VPN»: Netflix, Spotify, SoundCloud, Reddit, LinkedIn, Pinterest, Snapchat, Signal, Viber, Medium, Patreon, Perplexity, Copilot, Notion, Figma",
+                "Свои списки: создайте список сайтов («Работа», «Игры»), включайте, меняйте и удаляйте",
+                "«Проверить сайт» показывает, в каком своём списке сайт",
+            ),
+        ),
+        Release(
             "1.9.0", 24, "28 октября 2026",
             listOf(
                 "Обратный отсчёт до конца подписки: «Осталось 12 дней 4 ч»",

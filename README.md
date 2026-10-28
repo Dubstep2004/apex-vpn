@@ -7,7 +7,7 @@
 <p>
 <a href="https://github.com/Dubstep2004/apex-vpn/releases/latest"><b>⬇️ Скачать APK</b></a>
 &nbsp;&nbsp;·&nbsp;&nbsp;
-<a href="#-что-нового"><b>🆕 Что нового в 1.9.0</b></a>
+<a href="#-что-нового"><b>🆕 Что нового в 1.9.1</b></a>
 &nbsp;&nbsp;·&nbsp;&nbsp;
 <a href="#setup"><b>🚀 Как установить</b></a>
 </p>
@@ -238,7 +238,7 @@
 
 ### 🧭 Маршрутизация
 - **Умный режим**: российские сайты и IP идут напрямую
-- **Сервисы через VPN**: YouTube, Instagram, Telegram, ChatGPT, Discord и другие
+- **Сервисы через VPN**: 26 готовых (YouTube, Instagram, Telegram, ChatGPT, Netflix, Spotify…) и **свои списки** сайтов
 - **Для опытных**: свои правила, FakeDNS, стратегия доменов, DoH / DoT / DoQ
 - **Банки не увидят VPN**, выбор приложений
 
@@ -383,6 +383,10 @@ core/apexcore/          Go: разбор подписки → конфиги sin
 </details>
 
 ## 📝 Что нового
+
+**1.9.1**
+- 15 новых сервисов «Через VPN» (Netflix, Spotify, Reddit, Signal, Viber, Notion, Figma и другие)
+- Свои списки сайтов: создать, включить, изменить, удалить
 
 **1.9.0**
 - Обратный отсчёт до конца подписки: «Осталось 12 дней 4 ч»

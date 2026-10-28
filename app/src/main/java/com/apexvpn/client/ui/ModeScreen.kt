@@ -91,6 +91,10 @@ fun ModeScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit) {
         }
         Caption("Выключенные идут напрямую, без VPN")
 
+        // Свои списки «Через VPN»: создать, включить/выключить, изменить, удалить
+        SectionLabel("Свои списки", trailing = s.customLists.size.takeIf { it > 0 }?.toString())
+        CustomListsSection(s.customLists, viewModel)
+
         SectionLabel("Свои сайты")
         SiteLists(s.customDomains, s.directDomains, viewModel)
 
@@ -230,4 +234,172 @@ private fun SiteLists(viaVpn: List<String>, direct: List<String>, viewModel: Mai
             "Добавленные сайты всегда идут через VPN, вместе с их поддоменами."
         },
     )
+}
+
+private val listColors = listOf(0xFF7B6CFF, 0xFF22D3EE, 0xFF34D399, 0xFFF59E0B, 0xFFEC4899, 0xFFEF4444, 0xFF3B82F6, 0xFF8B5CF6)
+
+/** Свои списки «Через VPN»: название + домены/IP по одному на строку. */
+@Composable
+private fun CustomListsSection(lists: List<com.apexvpn.client.data.CustomList>, viewModel: MainViewModel) {
+    var editing by remember { mutableStateOf<com.apexvpn.client.data.CustomList?>(null) }
+    Group {
+        lists.forEachIndexed { i, l ->
+            if (i > 0) GroupDivider()
+            ListRow(
+                title = l.name.ifBlank { "Без названия" },
+                subtitle = if (l.items.isEmpty()) "Пустой — нажмите, чтобы добавить сайты"
+                else l.items.take(3).joinToString(", ") + if (l.items.size > 3) " и ещё ${l.items.size - 3}" else "",
+                leading = { GlyphTile(l.name.trim().firstOrNull()?.uppercase() ?: "★", Color(l.color)) },
+                onClick = { editing = l },
+            ) {
+                ApexSwitch(l.enabled, { v ->
+                    viewModel.change { copy(customLists = customLists.map { if (it.id == l.id) it.copy(enabled = v) else it }) }
+                })
+            }
+        }
+        if (lists.isNotEmpty()) GroupDivider()
+        ListRow(
+            title = "Новый список",
+            subtitle = "Например «Работа» или «Игры» — свои сайты через VPN",
+            leading = { IconTile(Apex.AccentSoft) { Icon(Icons.Rounded.Add, null, tint = Apex.AccentText) } },
+            onClick = {
+                editing = com.apexvpn.client.data.CustomList(
+                    id = java.util.UUID.randomUUID().toString(),
+                    name = "",
+                    items = emptyList(),
+                    color = listColors[lists.size % listColors.size],
+                )
+            },
+        )
+    }
+    Caption("Нажмите на список, чтобы изменить или удалить его. Можно писать домены (example.com), IP и подсети, keyword:слово.")
+
+    editing?.let { l ->
+        CustomListEditor(
+            list = l,
+            isNew = lists.none { it.id == l.id },
+            viewModel = viewModel,
+            onDismiss = { editing = null },
+        )
+    }
+}
+
+@Composable
+private fun CustomListEditor(
+    list: com.apexvpn.client.data.CustomList,
+    isNew: Boolean,
+    viewModel: MainViewModel,
+    onDismiss: () -> Unit,
+) {
+    var name by rememberSaveable(list.id) { mutableStateOf(list.name) }
+    var text by rememberSaveable(list.id) { mutableStateOf(list.items.joinToString("\n")) }
+    var color by rememberSaveable(list.id) { mutableStateOf(list.color) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var confirmDelete by remember { mutableStateOf(false) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Apex.Dialog,
+        title = { Text(if (isNew) "Новый список" else "Список", color = Apex.Text) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                Text("Название", color = Apex.TextDim, fontSize = 13.sp)
+                Spacer(Modifier.height(4.dp))
+                EditorField(name, "Например, Работа", singleLine = true) { name = it; error = null }
+                Spacer(Modifier.height(12.dp))
+                Text("Сайты — по одному на строку", color = Apex.TextDim, fontSize = 13.sp)
+                Spacer(Modifier.height(4.dp))
+                EditorField(text, "example.com\nnews.example.org\n10.8.0.0/16", singleLine = false) { text = it; error = null }
+                Spacer(Modifier.height(12.dp))
+                Text("Цвет", color = Apex.TextDim, fontSize = 13.sp)
+                Spacer(Modifier.height(6.dp))
+                Row {
+                    listColors.forEach { c ->
+                        Box(
+                            Modifier
+                                .padding(end = 8.dp)
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(Color(c))
+                                .border(3.dp, if (c == color) Apex.Text else Color.Transparent, CircleShape)
+                                .clickable { color = c },
+                        )
+                    }
+                }
+                error?.let {
+                    Spacer(Modifier.height(10.dp))
+                    Text(it, color = Apex.Bad, fontSize = 13.sp)
+                }
+                if (!isNew) {
+                    Spacer(Modifier.height(16.dp))
+                    androidx.compose.material3.TextButton(onClick = { confirmDelete = true }) {
+                        Icon(Icons.Rounded.Close, null, tint = Apex.Bad)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Удалить список", color = Apex.Bad)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = {
+                val items = text.lines().map { it.trim().removePrefix("https://").removePrefix("http://").trimEnd('/') }
+                    .filter { it.isNotEmpty() }.distinct()
+                val bad = items.firstNotNullOfOrNull { viewModel.validateUserRule(it) }
+                when {
+                    name.isBlank() -> error = "Введите название"
+                    items.isEmpty() -> error = "Добавьте хотя бы один сайт"
+                    bad != null -> error = bad
+                    else -> {
+                        val updated = list.copy(name = name.trim(), items = items, color = color)
+                        viewModel.change {
+                            copy(customLists = if (customLists.any { it.id == list.id }) customLists.map { if (it.id == list.id) updated else it } else customLists + updated)
+                        }
+                        viewModel.showMessage(if (isNew) "Список «${updated.name}» добавлен" else "Список сохранён")
+                        onDismiss()
+                    }
+                }
+            }) { Text("Сохранить", color = Apex.Accent, fontWeight = FontWeight.SemiBold) }
+        },
+        dismissButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Отмена", color = Apex.TextDim) } },
+    )
+    if (confirmDelete) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            containerColor = Apex.Dialog,
+            title = { Text("Удалить «${list.name}»?", color = Apex.Text) },
+            text = { Text("Сайты из этого списка пойдут по общим правилам.", color = Apex.TextDim) },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    viewModel.change { copy(customLists = customLists.filterNot { it.id == list.id }) }
+                    viewModel.showMessage("Список удалён")
+                    confirmDelete = false
+                    onDismiss()
+                }) { Text("Удалить", color = Apex.Bad) }
+            },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { confirmDelete = false }) { Text("Отмена", color = Apex.TextDim) } },
+        )
+    }
+}
+
+@Composable
+private fun EditorField(value: String, hint: String, singleLine: Boolean, onChange: (String) -> Unit) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(Apex.Surface)
+            .border(1.dp, Apex.Outline, RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+            .then(if (singleLine) Modifier else Modifier.height(140.dp)),
+    ) {
+        if (value.isEmpty()) Text(hint, color = Apex.TextDim, fontSize = 15.sp)
+        BasicTextField(
+            value = value,
+            onValueChange = onChange,
+            singleLine = singleLine,
+            textStyle = TextStyle(color = Apex.Text, fontSize = 15.sp),
+            cursorBrush = SolidColor(Apex.Accent),
+            keyboardOptions = KeyboardOptions(keyboardType = if (singleLine) KeyboardType.Text else KeyboardType.Uri),
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
 }

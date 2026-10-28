@@ -101,3 +101,20 @@ func TestAdsCounterDNS(t *testing.T) {
 		t.Fatalf("нет DNS счётчика рекламы:\n%s", cfg)
 	}
 }
+
+func TestCustomLists(t *testing.T) {
+	nodes := parseNodes(t, "vless://"+testUUID+"@1.2.3.4:443?type=tcp&security=tls&sni=a.example.com#A")
+	opts, _ := json.Marshal(map[string]any{
+		"mode":        "selected",
+		"services":    []string{"netflix", "figma"},
+		"customLists": []map[string]any{{"name": "Работа", "items": []string{"jira.example.com", "10.8.0.0/16", "keyword:corp"}}},
+	})
+	cfg := checkAll(t, nodes, string(opts))
+	if !strings.Contains(cfg, `"jira.example.com"`) || !strings.Contains(cfg, `"10.8.0.0/16"`) || !strings.Contains(cfg, `"nflxvideo.net"`) {
+		t.Fatalf("нет своих списков или новых сервисов:\n%s", cfg)
+	}
+	out, _ := MatchRoute(string(opts), "jira.example.com")
+	if !strings.Contains(out, "Работа") {
+		t.Fatalf("проверка сайта: %s", out)
+	}
+}

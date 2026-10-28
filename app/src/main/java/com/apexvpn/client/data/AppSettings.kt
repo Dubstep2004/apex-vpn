@@ -14,6 +14,10 @@ data class Settings(
     // Маршрутизация
     val mode: RouteMode = RouteMode.Smart,
     val services: Set<String> = ServiceCatalog.defaultEnabled,
+    /** Сервисы, которые приложение уже показывало: новые из каталога включаются сами */
+    val knownServices: Set<String> = ServiceCatalog.all.map { it.id }.toSet(),
+    /** Свои списки «Через VPN» */
+    val customLists: List<CustomList> = emptyList(),
     val customDomains: List<String> = emptyList(),   // всегда через VPN
     val directDomains: List<String> = emptyList(),   // всегда напрямую
     val hideFromBanks: Boolean = true,
@@ -135,6 +139,9 @@ object AppSettings {
         val s = _state.value
         put("mode", s.mode.id)
         put("services", JSONArray(s.services.toList()))
+        put("customLists", JSONArray(s.customLists.filter { it.enabled && it.items.isNotEmpty() }.map {
+            JSONObject().put("name", it.name).put("items", JSONArray(it.items))
+        }))
         put("customDomains", JSONArray(s.customDomains))
         put("directDomains", JSONArray(s.directDomains))
         put("rulesDir", rulesDir ?: "")
@@ -187,7 +194,10 @@ object AppSettings {
     private fun list(v: Collection<String>) = JSONArray(v.toList())
 
     private fun toJson(s: Settings) = JSONObject().apply {
-        put("mode", s.mode.id); put("services", list(s.services))
+        put("mode", s.mode.id); put("services", list(s.services)); put("knownServices", list(s.knownServices))
+        put("customLists", JSONArray(s.customLists.map {
+            JSONObject().put("id", it.id).put("name", it.name).put("items", JSONArray(it.items)).put("enabled", it.enabled).put("color", it.color)
+        }))
         put("custom", list(s.customDomains)); put("direct", list(s.directDomains))
         put("banks", s.hideFromBanks); put("adBlock", s.adBlock)
         put("appsMode", s.appsMode.id); put("apps", list(s.apps))
@@ -213,7 +223,25 @@ object AppSettings {
         fun arr(k: String, def: Collection<String>) = o.optJSONArray(k)?.strings() ?: def.toList()
         return Settings(
             mode = RouteMode.of(o.optString("mode", d.mode.id)),
-            services = arr("services", d.services).toSet(),
+            // Новые сервисы каталога включаются сами (иначе их сайты пошли бы напрямую)
+            services = run {
+                val known = o.optJSONArray("knownServices")?.strings()?.toSet() ?: KNOWN_BEFORE_CATALOG
+                arr("services", d.services).toSet() + (ServiceCatalog.defaultEnabled - known)
+            },
+            knownServices = d.knownServices,
+            customLists = o.optJSONArray("customLists")?.let { a ->
+                List(a.length()) { i ->
+                    a.getJSONObject(i).let { c ->
+                        CustomList(
+                            id = c.optString("id").ifBlank { java.util.UUID.randomUUID().toString() },
+                            name = c.optString("name"),
+                            items = c.optJSONArray("items")?.strings() ?: emptyList(),
+                            enabled = c.optBoolean("enabled", true),
+                            color = c.optLong("color", 0xFF7B6CFF),
+                        )
+                    }
+                }
+            } ?: d.customLists,
             customDomains = arr("custom", d.customDomains),
             directDomains = arr("direct", d.directDomains),
             hideFromBanks = o.optBoolean("banks", d.hideFromBanks),
@@ -271,3 +299,8 @@ object AppSettings {
         )
     }
 }
+
+/** Сервисы, которые были в каталоге до появления «новых» (1.9.1) — для тех, кто обновился. */
+private val KNOWN_BEFORE_CATALOG = setOf(
+    "youtube", "instagram", "telegram", "whatsapp", "tiktok", "discord", "chatgpt", "gemini", "claude", "x", "twitch", "cloudflare",
+)

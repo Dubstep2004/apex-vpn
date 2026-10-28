@@ -65,6 +65,26 @@ var services = map[string]service{
 		"twitch.tv", "ttvnw.net", "jtvnw.net", "twitchcdn.net", "twitchsvc.net",
 		"twitch.a2z.com", "ext-twitch.tv",
 	}},
+	// Новые сервисы
+	"netflix": {domains: []string{
+		"netflix.com", "netflix.net", "nflxvideo.net", "nflximg.net", "nflximg.com", "nflxext.com", "nflxso.net",
+	}},
+	"spotify": {domains: []string{
+		"spotify.com", "scdn.co", "spotifycdn.com", "spotifycdn.net", "pscdn.co", "spotify.design", "spoti.fi",
+	}},
+	"linkedin":   {domains: []string{"linkedin.com", "licdn.com", "lnkd.in"}},
+	"reddit":     {domains: []string{"reddit.com", "redd.it", "redditmedia.com", "redditstatic.com", "reddituploads.com", "reddit.app.link"}},
+	"signal":     {domains: []string{"signal.org", "whispersystems.org", "signal.art", "signal.group", "signal.me", "signal.link"}},
+	"viber":      {domains: []string{"viber.com", "viber.io", "vbrpl.io"}},
+	"snapchat":   {domains: []string{"snapchat.com", "snap.com", "sc-cdn.net", "sc-static.net", "snapkit.com", "snap-dev.net", "feelinsonice-hrd.appspot.com"}},
+	"pinterest":  {domains: []string{"pinterest.com", "pinimg.com", "pin.it", "pinterest.ru"}},
+	"soundcloud": {domains: []string{"soundcloud.com", "sndcdn.com", "soundcloud.cloud"}},
+	"medium":     {domains: []string{"medium.com", "medium.engineering", "miro.medium.com"}},
+	"patreon":    {domains: []string{"patreon.com", "patreonusercontent.com"}},
+	"perplexity": {domains: []string{"perplexity.ai", "pplx.ai", "perplexity.com"}},
+	"copilot":    {domains: []string{"copilot.microsoft.com", "sydney.bing.com", "edgeservices.bing.com", "copilot.cloud.microsoft"}},
+	"notion":     {domains: []string{"notion.so", "notion.site", "notion.com", "notion-static.com", "notionusercontent.com"}},
+	"figma":      {domains: []string{"figma.com", "figma.net", "figma-alpha-api.s3.us-west-2.amazonaws.com"}},
 	"cloudflare": {cidrs: []string{
 		"173.245.48.0/20", "103.21.244.0/22", "103.22.200.0/22", "103.31.4.0/22",
 		"141.101.64.0/18", "108.162.192.0/18", "190.93.240.0/20", "188.114.96.0/20",

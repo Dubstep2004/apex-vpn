@@ -91,6 +91,8 @@ func MatchRoute(optionsJSON string, rawDomain string) (string, error) {
 	case userMatch(opts.UserRules, domain) != "":
 		act := userMatch(opts.UserRules, domain)
 		res.Outbound, res.Reason = act, map[string]string{"block": "Своё правило: блокировать", "proxy": "Своё правило: через VPN", "direct": "Своё правило: напрямую"}[act]
+	case customListMatch(opts.CustomLists, domain) != "":
+		res.Outbound, res.Reason = "proxy", "Список «"+customListMatch(opts.CustomLists, domain)+"»: через VPN"
 	case opts.AdBlock && matchSet(opts.rulesFile(fileAds), domain):
 		res.Outbound, res.Reason = "block", "Реклама или трекер — заблокировано"
 	case opts.Kids && (matchSet(opts.rulesFile(filePorn), domain) || matchSet(opts.rulesFile(fileBetting), domain) ||

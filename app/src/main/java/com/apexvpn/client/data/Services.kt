@@ -37,6 +37,22 @@ object ServiceCatalog {
         ServiceItem("claude", "Claude", "Нейросеть Anthropic", 0xFFD97757, "✺"),
         ServiceItem("x", "X", "Бывший Twitter", 0xFF1F1F24, "𝕏"),
         ServiceItem("twitch", "Twitch", "Стримы", 0xFF9146FF, "▣"),
+        // Новые сервисы
+        ServiceItem("netflix", "Netflix", "Фильмы и сериалы", 0xFFE50914, "N"),
+        ServiceItem("spotify", "Spotify", "Музыка и подкасты", 0xFF1DB954, "♫"),
+        ServiceItem("soundcloud", "SoundCloud", "Музыка", 0xFFFF5500, "☁"),
+        ServiceItem("reddit", "Reddit", "Форумы и сообщества", 0xFFFF4500, "◕"),
+        ServiceItem("linkedin", "LinkedIn", "Работа и резюме", 0xFF0A66C2, "in"),
+        ServiceItem("pinterest", "Pinterest", "Идеи и картинки", 0xFFE60023, "P"),
+        ServiceItem("snapchat", "Snapchat", "Сообщения и истории", 0xFFE6D800, "✿"),
+        ServiceItem("signal", "Signal", "Защищённый мессенджер", 0xFF3A76F0, "✉"),
+        ServiceItem("viber", "Viber", "Звонки и сообщения", 0xFF7360F2, "☎"),
+        ServiceItem("medium", "Medium", "Статьи и блоги", 0xFF1F1F24, "M"),
+        ServiceItem("patreon", "Patreon", "Подписки на авторов", 0xFFF96854, "◐"),
+        ServiceItem("perplexity", "Perplexity", "Поиск с нейросетью", 0xFF20808D, "✲"),
+        ServiceItem("copilot", "Copilot", "Нейросеть Microsoft", 0xFF0078D4, "❖"),
+        ServiceItem("notion", "Notion", "Заметки и документы", 0xFF2F2F33, "N"),
+        ServiceItem("figma", "Figma", "Дизайн", 0xFFA259FF, "◈"),
         ServiceItem("cloudflare", "Cloudflare", "Сайты, которые не открываются", 0xFFF38020, "☁", defaultOn = false),
     )
 
@@ -152,3 +168,12 @@ enum class Design(val id: String, val title: String, val subtitle: String) {
         fun of(id: String) = entries.firstOrNull { it.id == id } ?: Classic
     }
 }
+
+/** Свой список «Через VPN»: название, домены/IP (по одному на строку) и включён ли он. */
+data class CustomList(
+    val id: String,
+    val name: String,
+    val items: List<String>,
+    val enabled: Boolean = true,
+    val color: Long = 0xFF7B6CFF,
+)

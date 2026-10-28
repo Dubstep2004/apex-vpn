@@ -274,3 +274,29 @@ func ValidateUserRule(value string) string {
 	}
 	return ""
 }
+
+// CustomList — свой список «Через VPN»: название и домены, IP или подсети (как в своих правилах).
+type CustomList struct {
+	Name  string   `json:"name"`
+	Items []string `json:"items"`
+}
+
+func customListRules(lists []CustomList) []UserRule {
+	var out []UserRule
+	for _, l := range lists {
+		for _, it := range l.Items {
+			out = append(out, UserRule{Value: it, Action: "proxy"})
+		}
+	}
+	return out
+}
+
+// customListMatch — название списка, в который входит домен ("" — ни в один).
+func customListMatch(lists []CustomList, domain string) string {
+	for _, l := range lists {
+		if userMatch(customListRules([]CustomList{l}), domain) == "proxy" {
+			return l.Name
+		}
+	}
+	return ""
+}

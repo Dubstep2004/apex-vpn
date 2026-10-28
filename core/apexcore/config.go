@@ -87,6 +87,8 @@ type routeOptions struct {
 	Warp *WarpConfig `json:"warp"`
 	// 24. LogFile — журнал ядра для отчёта в поддержку (только предупреждения и ошибки)
 	LogFile string `json:"logFile"`
+	// Свои списки «Через VPN» (создаёт пользователь): название и домены/IP, как в своих правилах
+	CustomLists []CustomList `json:"customLists"`
 	// 197. AdsDNSPort — локальный DNS приложения, который отвечает «нет такого адреса»
 	// рекламным доменам и считает блокировки (0 — просто отказ в ядре)
 	AdsDNSPort int `json:"adsDnsPort"`
@@ -325,6 +327,12 @@ func buildAll(nodesJSON string, selectedTag string, optionsJSON string) (string,
 	if r := userSets["direct"].rule(map[string]any{"outbound": "direct"}); r != nil {
 		rules = append(rules, r)
 	}
+	// Свои списки «Через VPN» — после своих правил, до сервисов
+	listSets, _ := groupUserRules(customListRules(opts.CustomLists))
+	if r := listSets["proxy"].rule(map[string]any{"outbound": "proxy"}); r != nil {
+		rules = append(rules, r)
+	}
+	rules = append(rules, listSets["proxy"].portRules(map[string]any{"outbound": "proxy"})...)
 	// 35. Свои правила по портам: например, игры по UDP напрямую
 	rules = append(rules, userSets["block"].portRules(map[string]any{"action": "reject"})...)
 	rules = append(rules, userSets["proxy"].portRules(map[string]any{"outbound": "proxy"})...)
@@ -390,6 +398,9 @@ func buildAll(nodesJSON string, selectedTag string, optionsJSON string) (string,
 		}
 		if len(userSets["direct"].cidr) > 0 {
 			rules = append(rules, map[string]any{"ip_cidr": userSets["direct"].cidr, "outbound": "direct"})
+		}
+		if len(listSets["proxy"].cidr) > 0 {
+			rules = append(rules, map[string]any{"ip_cidr": listSets["proxy"].cidr, "outbound": "proxy"})
 		}
 		if len(onCIDR) > 0 {
 			rules = append(rules, map[string]any{"ip_cidr": onCIDR, "outbound": "proxy"})
@@ -461,6 +472,9 @@ func buildAll(nodesJSON string, selectedTag string, optionsJSON string) (string,
 		dnsRules = append(dnsRules, r)
 	}
 	if r := userSets["direct"].domainOnly().rule(map[string]any{"server": directDNS}); r != nil {
+		dnsRules = append(dnsRules, r)
+	}
+	if r := listSets["proxy"].domainOnly().rule(map[string]any{"server": "remote"}); r != nil {
 		dnsRules = append(dnsRules, r)
 	}
 	if len(custom) > 0 || len(onDomains) > 0 {
