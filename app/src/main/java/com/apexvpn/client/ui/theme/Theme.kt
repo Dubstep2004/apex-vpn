@@ -22,7 +22,7 @@ import com.apexvpn.client.data.Design
 import com.apexvpn.client.data.ThemeMode
 
 /** Чем закрашен фон экранов. */
-enum class Backdrop { Solid, Glass, Aurora, Neon, Terminal, Pastel, Apex2 }
+enum class Backdrop { Solid, Glass, Aurora, Neon, Terminal, Pastel, Apex2, Steampunk, Synthwave }
 
 /** Всё, что определяет внешний вид: цвета, форма карточек, фон, шрифт, раскладка главного экрана. */
 data class Palette(
@@ -217,6 +217,61 @@ private fun apex2Palette(accent: Color, dark: Boolean, amoled: Boolean): Palette
     )
 }
 
+/** 351. Стимпанк — латунь и медь на тёмном дереве, шестерёнки на фоне. */
+private fun steampunkPalette(): Palette {
+    val brass = Color(0xFFD4A24C)
+    return Palette(
+        dark = true,
+        bg = Color.Transparent,
+        base = Color(0xFF140D07),
+        surface = Color(0xFF241810).copy(alpha = 0.92f),
+        surfaceHigh = Color(0xFF34241A),
+        outline = Color(0xFF5A4027),
+        divider = Color(0xFF3A2A1C),
+        text = Color(0xFFF3E3C3),
+        textDim = Color(0xFFB59B74),
+        accent = brass,
+        accentSoft = Color(0xFF4A3418),
+        accentText = Color(0xFFF0C878),
+        selectedCard = Color(0xFF2E2012),
+        heroCard = Color(0xFF2C1E12),
+        brand1 = Color(0xFFB8732E),
+        brand2 = Color(0xFFE8C36A),
+        radius = 14.dp,
+        cardBorder = brass.copy(alpha = 0.35f),
+        backdrop = Backdrop.Steampunk,
+        design = Design.Steampunk,
+    )
+}
+
+/** 387. Синтвейв — секретная тема: неоновый закат, розовый и бирюзовый. */
+private fun synthwavePalette(): Palette {
+    val pink = Color(0xFFFF2E97)
+    return Palette(
+        dark = true,
+        bg = Color.Transparent,
+        base = Color(0xFF12002A),
+        surface = Color(0xFF1C0638).copy(alpha = 0.82f),
+        surfaceHigh = Color(0xFF2B0B52),
+        outline = Color(0xFF4B1D7A),
+        divider = Color(0xFF2E0F55),
+        text = Color(0xFFFFF0FA),
+        textDim = Color(0xFFC79BDB),
+        accent = pink,
+        accentSoft = pink.copy(alpha = 0.2f),
+        accentText = Color(0xFFFF8AC6),
+        selectedCard = Color(0xFF2A0A4A),
+        heroCard = Color(0xFF240844),
+        brand1 = pink,
+        brand2 = Color(0xFF2DE2E6),
+        radius = 20.dp,
+        cardBorder = pink.copy(alpha = 0.35f),
+        glow = true,
+        backdrop = Backdrop.Synthwave,
+        design = Design.Synthwave,
+    )
+}
+
 /** Д7. Ретро-терминал — зелёный моноширинный текст на чёрном. */
 private fun terminalPalette(): Palette {
     val green = Color(0xFF39FF6A)
@@ -366,6 +421,41 @@ fun paletteFor(
             .copy(radius = 26.dp, bento = true, design = Design.Bento)
         Design.Terminal -> terminalPalette()
         Design.Pastel -> pastelPalette()
+        Design.Steampunk -> steampunkPalette()
+        Design.Synthwave -> synthwavePalette()
+    }
+}
+
+/** 313. Наклон телефона (−1…1) для бликов Liquid Glass 2.0. */
+object Tilt {
+    var x by androidx.compose.runtime.mutableFloatStateOf(0f)
+    var y by androidx.compose.runtime.mutableFloatStateOf(0f)
+}
+
+/** Слушает датчик гравитации, пока включён Liquid Glass и не «Плавный режим». */
+@Composable
+fun TiltSensor(enabled: Boolean) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    androidx.compose.runtime.DisposableEffect(enabled) {
+        if (!enabled) {
+            Tilt.x = 0f; Tilt.y = 0f
+            return@DisposableEffect onDispose { }
+        }
+        val sm = context.getSystemService(android.content.Context.SENSOR_SERVICE) as? android.hardware.SensorManager
+        val sensor = sm?.getDefaultSensor(android.hardware.Sensor.TYPE_GRAVITY)
+            ?: sm?.getDefaultSensor(android.hardware.Sensor.TYPE_ACCELEROMETER)
+        val listener = object : android.hardware.SensorEventListener {
+            override fun onSensorChanged(e: android.hardware.SensorEvent) {
+                val tx = (-e.values[0] / 9.81f).coerceIn(-1f, 1f)
+                val ty = ((e.values[1] / 9.81f - 0.6f) * 2f).coerceIn(-1f, 1f)
+                // Сглаживание, чтобы блик плыл, а не дрожал
+                Tilt.x += (tx - Tilt.x) * 0.12f
+                Tilt.y += (ty - Tilt.y) * 0.12f
+            }
+            override fun onAccuracyChanged(s: android.hardware.Sensor?, a: Int) = Unit
+        }
+        if (sensor != null) sm.registerListener(listener, sensor, android.hardware.SensorManager.SENSOR_DELAY_UI)
+        onDispose { sm?.unregisterListener(listener) }
     }
 }
 

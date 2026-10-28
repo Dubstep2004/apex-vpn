@@ -39,6 +39,8 @@ fun DesignBackground(modifier: Modifier = Modifier) {
         Backdrop.Terminal -> Canvas(modifier.fillMaxSize()) { drawTerminal(p) }
         Backdrop.Pastel -> Canvas(modifier.fillMaxSize()) { drawPastel(p) }
         Backdrop.Apex2 -> Canvas(modifier.fillMaxSize()) { drawApex2(p) }
+        Backdrop.Steampunk -> SteampunkBackground(modifier, p)
+        Backdrop.Synthwave -> SynthwaveBackground(modifier, p)
     }
 }
 
@@ -51,9 +53,12 @@ private fun DrawScope.drawGlass(p: Palette) {
     val w = size.width
     val h = size.height
     val a = if (p.dark) 0.55f else 0.45f
-    blob(p.accent.copy(alpha = a), Offset(w * 0.1f, h * 0.12f), w * 0.75f)
-    blob(Color(0xFF22D3EE).copy(alpha = a * 0.8f), Offset(w * 0.95f, h * 0.38f), w * 0.7f)
-    blob(Color(0xFFF472B6).copy(alpha = a * 0.7f), Offset(w * 0.25f, h * 0.85f), w * 0.8f)
+    // 313. Пятна за стеклом чуть смещаются при наклоне — объём
+    val px = Tilt.x * w * 0.06f
+    val py = Tilt.y * h * 0.03f
+    blob(p.accent.copy(alpha = a), Offset(w * 0.1f - px, h * 0.12f - py), w * 0.75f)
+    blob(Color(0xFF22D3EE).copy(alpha = a * 0.8f), Offset(w * 0.95f + px, h * 0.38f), w * 0.7f)
+    blob(Color(0xFFF472B6).copy(alpha = a * 0.7f), Offset(w * 0.25f - px * 0.5f, h * 0.85f + py), w * 0.8f)
 }
 
 @Composable
@@ -124,4 +129,91 @@ private fun DrawScope.drawPastel(p: Palette) {
     drawRect(Brush.verticalGradient(listOf(Color(0xFFFFF1E8), Color(0xFFF6EEFF), Color(0xFFEFF7FF))))
     blob(p.brand1.copy(alpha = 0.35f), Offset(size.width * 0.9f, size.height * 0.1f), size.width * 0.7f)
     blob(p.brand2.copy(alpha = 0.30f), Offset(0f, size.height * 0.6f), size.width * 0.8f)
+}
+
+// ─── 351. Стимпанк: медленно вращающиеся латунные шестерёнки ───────────
+
+@Composable
+private fun SteampunkBackground(modifier: Modifier, p: Palette) {
+    val angle = if (Apex.feel.smooth) 0f else {
+        val t = rememberInfiniteTransition(label = "gears")
+        t.animateFloat(0f, 360f, infiniteRepeatable(tween(60000, easing = LinearEasing)), label = "gearAngle").value
+    }
+    Canvas(modifier.fillMaxSize()) {
+        drawRect(Brush.verticalGradient(listOf(Color(0xFF1E140B), p.base, Color(0xFF0E0905))))
+        val w = size.width
+        val h = size.height
+        val brass = Color(0xFFD4A24C)
+        val copper = Color(0xFFB8732E)
+        // Пары сцепленных шестерёнок крутятся в разные стороны
+        gear(Offset(w * 0.86f, h * 0.10f), w * 0.30f, 16, angle, brass.copy(alpha = 0.10f))
+        gear(Offset(w * 0.40f, h * 0.06f), w * 0.17f, 10, -angle * 1.7f + 9f, copper.copy(alpha = 0.10f))
+        gear(Offset(w * 0.06f, h * 0.62f), w * 0.26f, 14, -angle * 1.1f, brass.copy(alpha = 0.08f))
+        gear(Offset(w * 0.95f, h * 0.88f), w * 0.22f, 12, angle * 1.3f, copper.copy(alpha = 0.09f))
+        gear(Offset(w * 0.62f, h * 0.97f), w * 0.13f, 8, -angle * 2.1f, brass.copy(alpha = 0.08f))
+        // Тёплая лампа сверху и виньетка
+        blob(Color(0xFFFFB45A).copy(alpha = 0.10f), Offset(w * 0.5f, 0f), w * 0.9f)
+        drawRect(Brush.radialGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.45f)), Offset(w / 2, h / 2), maxOf(w, h) * 0.75f))
+    }
+}
+
+private fun DrawScope.gear(c: Offset, r: Float, teeth: Int, angleDeg: Float, color: Color) {
+    val path = androidx.compose.ui.graphics.Path()
+    val inner = r * 0.84f
+    val steps = teeth * 4
+    for (i in 0..steps) {
+        val a = Math.toRadians((angleDeg + i * 360.0 / steps)).toFloat()
+        val rr = if ((i % 4) == 1 || (i % 4) == 2) r else inner
+        val pt = Offset(c.x + rr * cos(a), c.y + rr * sin(a))
+        if (i == 0) path.moveTo(pt.x, pt.y) else path.lineTo(pt.x, pt.y)
+    }
+    path.close()
+    val stroke = androidx.compose.ui.graphics.drawscope.Stroke(width = r * 0.05f)
+    drawPath(path, color, style = stroke)
+    drawCircle(color, r * 0.62f, c, style = stroke)
+    drawCircle(color, r * 0.16f, c, style = stroke)
+    for (k in 0 until 5) {
+        val a = Math.toRadians((angleDeg + k * 72.0)).toFloat()
+        drawLine(color, Offset(c.x + r * 0.16f * cos(a), c.y + r * 0.16f * sin(a)), Offset(c.x + r * 0.62f * cos(a), c.y + r * 0.62f * sin(a)), r * 0.045f)
+    }
+}
+
+// ─── 387. Синтвейв: неоновое солнце и бегущая сетка ────────────────────
+
+@Composable
+private fun SynthwaveBackground(modifier: Modifier, p: Palette) {
+    val scroll = if (Apex.feel.smooth) 0f else {
+        val t = rememberInfiniteTransition(label = "grid")
+        t.animateFloat(0f, 1f, infiniteRepeatable(tween(2400, easing = LinearEasing)), label = "gridScroll").value
+    }
+    Canvas(modifier.fillMaxSize()) {
+        val w = size.width
+        val h = size.height
+        val horizon = h * 0.62f
+        drawRect(Brush.verticalGradient(0f to Color(0xFF0B0020), 0.5f to Color(0xFF3A0A5E), 1f to Color(0xFFB0186E), endY = horizon), size = androidx.compose.ui.geometry.Size(w, horizon))
+        // Солнце с полосами
+        val sunC = Offset(w / 2, horizon - w * 0.02f)
+        val sunR = w * 0.30f
+        drawCircle(Brush.verticalGradient(listOf(Color(0xFFFFE066), Color(0xFFFF7A3D), Color(0xFFFF2E97)), sunC.y - sunR, sunC.y), sunR, sunC)
+        var y = sunC.y - sunR * 0.35f
+        var gap = sunR * 0.035f
+        while (y < sunC.y) {
+            drawRect(Color(0xFF8A1068), Offset(sunC.x - sunR, y), androidx.compose.ui.geometry.Size(sunR * 2, gap))
+            y += gap * 3.2f
+            gap *= 1.25f
+        }
+        // Пол с сеткой
+        drawRect(Brush.verticalGradient(listOf(Color(0xFF1A0033), Color(0xFF07000F)), horizon, h), Offset(0f, horizon), androidx.compose.ui.geometry.Size(w, h - horizon))
+        val line = p.brand1.copy(alpha = 0.55f)
+        for (k in -10..10) {
+            val xBottom = w / 2 + k * w * 0.18f
+            drawLine(line, Offset(w / 2 + k * w * 0.02f, horizon), Offset(xBottom, h), 1.5f)
+        }
+        for (k in 0 until 12) {
+            val f = ((k + scroll) / 12f)
+            val yy = horizon + (h - horizon) * f * f
+            drawLine(line.copy(alpha = 0.55f * f + 0.1f), Offset(0f, yy), Offset(w, yy), 1.5f)
+        }
+        drawLine(Color(0xFFFF8AC6), Offset(0f, horizon), Offset(w, horizon), 2f)
+    }
 }

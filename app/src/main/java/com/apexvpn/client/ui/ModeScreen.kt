@@ -28,6 +28,8 @@ import androidx.compose.material.icons.rounded.Block
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -113,6 +115,14 @@ fun ModeScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit) {
                 leading = { IconTile(Color(0xFF1F8A5B)) { Icon(Icons.Rounded.AccountBalance, null, tint = Color.White) } },
                 onClick = { viewModel.change { copy(hideFromBanks = !hideFromBanks) } },
             ) { ApexSwitch(s.hideFromBanks, { v -> viewModel.change { copy(hideFromBanks = v) } }) }
+            GroupDivider()
+            // 349. Свой список приложений, которые не увидят VPN
+            ListRow(
+                title = "Скрыть VPN от приложений",
+                subtitle = if (s.hiddenApps.isEmpty()) "Выберите приложения — они пойдут мимо VPN и не увидят его" else "Скрыт от ${s.hiddenApps.size} прил.",
+                leading = { IconTile(Color(0xFF6B5BD6)) { Icon(Icons.Rounded.VisibilityOff, null, tint = Color.White) } },
+                onClick = { onOpenPage(Page.HideApps) },
+            ) { Icon(androidx.compose.material.icons.Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = Apex.TextDim) }
             GroupDivider()
             ListRow(
                 title = "Проверить сайт",

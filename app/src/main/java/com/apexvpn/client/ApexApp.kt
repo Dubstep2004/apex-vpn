@@ -98,6 +98,8 @@ class ApexApp : Application() {
                     (last == com.apexvpn.client.vpn.VpnStatus.Starting || last == com.apexvpn.client.vpn.VpnStatus.Stopped)
                 ) {
                     com.apexvpn.client.data.ConnectFeedback.onConnected(this@ApexApp)
+                    // 382. Конфетти на первом и юбилейных подключениях
+                    com.apexvpn.client.data.Celebrate.onConnected()
                     // 220. Задача «Видео»: на автопилоте сами подбираем самый быстрый сервер
                     if (AppSettings.value.task == "video" && Prefs.selectedTag == com.apexvpn.client.data.AUTO_TAG) {
                         appScope.launch {

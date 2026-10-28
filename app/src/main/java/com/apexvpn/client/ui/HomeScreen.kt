@@ -57,6 +57,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
@@ -111,6 +113,13 @@ fun HomeScreen(
 
     // 157. Своё фото за щитом (из галереи)
     if (settings.shieldBackdrop == "photo") PhotoBackdrop(settings.backdropStamp)
+    // 354. Фото дня страны сервера (автопилот — ваша страна)
+    if (settings.shieldBackdrop == "country") {
+        val sel = sub.nodes.find { it.tag == sub.selectedTag }
+        val code = sel?.let { flagCode(ServerInfo.flag(it.name)) }?.takeIf { com.apexvpn.client.data.CountryPhoto.supports(it) }
+            ?: userCountry(context)
+        CountryPhotoBackdrop(code)
+    }
 
     Column(
         Modifier
@@ -185,22 +194,25 @@ fun HomeScreen(
                 Text(it, color = Apex.Bad, fontSize = 14.sp, modifier = Modifier.apexCard(Apex.Bad.copy(alpha = 0.12f)).padding(horizontal = 14.dp, vertical = 9.dp))
             }
         } else {
-        if (settings.homeStyle == "map") {
+        if (settings.homeStyle == "map" || settings.homeStyle == "globe") {
             // Главный экран «Карта»: дуга от вас до сервера
             val pings by viewModel.pings.collectAsStateWithLifecycle()
             val target = if (auto) {
                 sub.nodes.filter { !it.ads }.mapNotNull { n -> pings[n.tag]?.takeIf { it > 0 }?.let { n to it } }.minByOrNull { it.second }?.first
             } else selected
             Spacer(Modifier.height(16.dp))
-            WorldMapCard(
-                status = status,
-                serverCountry = target?.let { flagCode(ServerInfo.flag(it.name)) },
-                serverTitle = when {
-                    !auto -> ServerInfo.title(selected!!.name)
-                    target != null -> "Автопилот · ${ServerInfo.title(target.name)}"
-                    else -> "Автопилот"
-                },
-            )
+            val mapTitle = when {
+                !auto -> ServerInfo.title(selected!!.name)
+                target != null -> "Автопилот · ${ServerInfo.title(target.name)}"
+                else -> "Автопилот"
+            }
+            val mapCountry = target?.let { flagCode(ServerInfo.flag(it.name)) }
+            if (settings.homeStyle == "globe") {
+                // 353. 3D-глобус поворачивается к стране сервера
+                GlobeCard(status = status, serverCountry = mapCountry, serverTitle = mapTitle)
+            } else {
+                WorldMapCard(status = status, serverCountry = mapCountry, serverTitle = mapTitle)
+            }
             Spacer(Modifier.height(14.dp))
             Box(Modifier.fillMaxWidth().swipeServers(onSwipe), contentAlignment = Alignment.Center) {
                 ShieldAmbient(settings.shieldBackdrop, status == VpnStatus.Started, Modifier.matchParentSize())
@@ -295,10 +307,13 @@ fun HomeScreen(
                 title = if (auto) "Автопилот" else ServerInfo.title(selected!!.name),
                 subtitle = if (auto) "Самый быстрый из ${sub.nodes.size} серверов" else "Сервер выбран вручную",
                 leading = {
-                    if (auto) {
-                        IconTile(Apex.AccentSoft) { Icon(Icons.Rounded.Bolt, null, tint = Apex.AccentText) }
-                    } else {
-                        FlagCircle(ServerInfo.flag(selected!!.name), 44.dp)
+                    // 383. Флаг переворачивается, как карточка, при смене страны
+                    FlipFlag(if (auto) "auto" else (ServerInfo.flag(selected!!.name) ?: "🌐")) { k ->
+                        if (k == "auto") {
+                            IconTile(Apex.AccentSoft) { Icon(Icons.Rounded.Bolt, null, tint = Apex.AccentText) }
+                        } else {
+                            FlagCircle(k, 44.dp)
+                        }
                     }
                 },
                 onClick = onOpenServers,
@@ -786,6 +801,46 @@ private fun PhotoBackdrop(stamp: Long) {
                     listOf(base.copy(alpha = 0.55f), base.copy(alpha = 0.25f), base.copy(alpha = 0.85f)),
                 ),
             ),
+        )
+    }
+}
+
+/** 354. Фото дня страны на весь экран, с затемнением и подписью. */
+@Composable
+private fun CountryPhotoBackdrop(code: String) {
+    val context = LocalContext.current
+    val photo by androidx.compose.runtime.produceState<com.apexvpn.client.data.CountryPhoto.Photo?>(null, code) {
+        value = com.apexvpn.client.data.CountryPhoto.load(context, code)
+    }
+    val p = photo ?: return
+    val img = remember(p) { p.bitmap.asImageBitmap() }
+    val base = Apex.Base
+    // Плавное появление
+    val alpha = remember(p) { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(p) { alpha.animateTo(1f, androidx.compose.animation.core.tween(700)) }
+    Box(Modifier.fillMaxSize().graphicsLayer { this.alpha = alpha.value }) {
+        androidx.compose.foundation.Image(
+            img, null,
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+        )
+        Box(
+            Modifier.fillMaxSize().background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(
+                    listOf(base.copy(alpha = 0.6f), base.copy(alpha = 0.3f), base.copy(alpha = 0.9f)),
+                ),
+            ),
+        )
+        Text(
+            "📷 " + p.caption,
+            color = Color.White.copy(alpha = 0.8f),
+            fontSize = 11.sp,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(10.dp)
+                .clip(RoundedCornerShape(50))
+                .background(Color.Black.copy(alpha = 0.35f))
+                .padding(horizontal = 8.dp, vertical = 3.dp),
         )
     }
 }

@@ -36,6 +36,9 @@ import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material.icons.rounded.QrCode2
+import androidx.compose.material.icons.rounded.DeleteSweep
+import androidx.compose.ui.graphics.graphicsLayer
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.material.icons.rounded.Refresh
@@ -373,6 +376,42 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
         }
         Caption("Новый телефон: установите APEX VPN, нажмите «Сканировать QR-код» и наведите камеру на QR переноса. Настройки сохраняются при обновлении приложения. Файл нужен, если приложение пришлось удалить. В нём ссылка подписки — не отправляйте его другим. Ещё настройки попадают в резервную копию Android, если она включена на телефоне.")
 
+        // ── 379. Очистить данные ──
+        var confirmClear by remember { mutableStateOf(false) }
+        SectionLabel("Данные")
+        Group {
+            ListRow(
+                "Очистить данные",
+                "Всё, кроме подписки: настройки, списки, история, журналы, кэш",
+                leading = { tile(Icons.Rounded.DeleteSweep, Apex.Bad) },
+                titleColor = Apex.Bad,
+                onClick = { confirmClear = true },
+            ) { Chevron() }
+        }
+        if (confirmClear) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { confirmClear = false },
+                containerColor = Apex.Dialog,
+                title = { Text("Очистить данные?", color = Apex.Text) },
+                text = {
+                    Text(
+                        "Сбросятся все настройки, свои списки, правила, избранное, история тестов скорости, журналы, отчёты о сбоях, фото фона и кэш. " +
+                            "Подписка и выбранный сервер останутся. Отменить нельзя — сначала можно сохранить резервную копию.",
+                        color = Apex.TextDim,
+                    )
+                },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(onClick = {
+                        confirmClear = false
+                        com.apexvpn.client.data.DataCleaner.clear(context)
+                        viewModel.change { this }
+                        viewModel.showMessage("Данные очищены, подписка сохранена")
+                    }) { Text("Очистить", color = Apex.Bad, fontWeight = FontWeight.SemiBold) }
+                },
+                dismissButton = { androidx.compose.material3.TextButton(onClick = { confirmClear = false }) { Text("Отмена", color = Apex.TextDim) } },
+            )
+        }
+
         // ── О приложении ──
         SectionLabel("О приложении")
         Group {
@@ -380,7 +419,7 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
                 Modifier.fillMaxWidth().clickable { onOpenPage(Page.Changelog) }.padding(18.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                ApexLogo(52.dp)
+                SecretLogo(viewModel)
                 Spacer(Modifier.width(16.dp))
                 Column {
                     Text("APEX VPN", color = Apex.Text, fontWeight = FontWeight.Bold, fontSize = 18.sp)
@@ -549,7 +588,64 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
 
 @Composable
 private fun tile(icon: ImageVector, tint: Color = Apex.Text) {
-    IconTile(Apex.SurfaceHigh) { Icon(icon, null, tint = tint) }
+    // 386. Значки «оживают» при открытии: выпрыгивают с лёгким поворотом, у каждого своя задержка
+    val smooth = Apex.feel.smooth
+    val anim = remember { androidx.compose.animation.core.Animatable(if (smooth) 1f else 0f) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        if (anim.value >= 1f) return@LaunchedEffect
+        kotlinx.coroutines.delay((kotlin.math.abs(icon.name.hashCode()) % 7) * 45L)
+        anim.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.42f, stiffness = 260f))
+    }
+    IconTile(Apex.SurfaceHigh) {
+        Icon(
+            icon, null, tint = tint,
+            modifier = Modifier.graphicsLayer {
+                val v = anim.value
+                scaleX = 0.4f + 0.6f * v
+                scaleY = 0.4f + 0.6f * v
+                rotationZ = (1f - v) * -35f
+                alpha = v.coerceIn(0f, 1f)
+            },
+        )
+    }
+}
+
+/** 387. Пасхалка: 7 быстрых нажатий на логотип открывают секретную тему «Синтвейв». */
+@Composable
+private fun SecretLogo(viewModel: MainViewModel) {
+    var taps by remember { mutableStateOf(0) }
+    var last by remember { mutableStateOf(0L) }
+    val wobble = remember { androidx.compose.animation.core.Animatable(0f) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    androidx.compose.foundation.layout.Box(
+        Modifier
+            .graphicsLayer { rotationZ = wobble.value; scaleX = 1f + kotlin.math.abs(wobble.value) / 120f; scaleY = scaleX }
+            .clickable(
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = null,
+            ) {
+                val now = System.currentTimeMillis()
+                taps = if (now - last < 1500) taps + 1 else 1
+                last = now
+                scope.launch {
+                    wobble.snapTo(if (taps % 2 == 0) 14f else -14f)
+                    wobble.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.3f, stiffness = 700f))
+                }
+                when {
+                    taps >= 7 -> {
+                        taps = 0
+                        val first = !viewModel.settings.value.secretUnlocked
+                        ThemeReveal.run {
+                            viewModel.change(reload = false) { copy(secretUnlocked = true, design = com.apexvpn.client.data.Design.Synthwave) }
+                        }
+                        com.apexvpn.client.data.Celebrate.fire(
+                            if (first) "🕹 Секретная тема «Синтвейв» открыта! Она теперь есть в Оформлении" else "🕹 Синтвейв включён",
+                        )
+                    }
+                    taps >= 4 -> viewModel.showMessage("Ещё ${7 - taps}…")
+                }
+            },
+    ) { ApexLogo(52.dp) }
 }
 
 @Composable

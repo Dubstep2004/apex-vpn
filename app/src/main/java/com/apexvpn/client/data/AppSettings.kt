@@ -84,6 +84,10 @@ data class Settings(
     val animatedFlags: Boolean = true,
     // 220. Задача: games | video | calls ("" — не выбрана)
     val task: String = "",
+    // 349. Приложения, от которых VPN скрыт (идут мимо туннеля, как банки)
+    val hiddenApps: Set<String> = emptySet(),
+    // 387. Секретная тема открыта
+    val secretUnlocked: Boolean = false,
 ) {
     /** Цвет акцента с учётом «Своего». */
     val accentArgb: Long get() = if (accent == AccentColor.Custom) customAccent else accent.argb
@@ -139,6 +143,14 @@ object AppSettings {
         Prefs.updateIntervalHours = _state.value.refreshHours
         save()
         return true
+    }
+
+    /** 379. Все настройки по умолчанию; иконку оставляем, чтобы она не пропала с рабочего стола. */
+    fun reset() {
+        val keepIcon = _state.value.appIcon
+        _state.value = Settings(refreshHours = 12, appIcon = keepIcon, sharePass = randomPassword())
+        Prefs.updateIntervalHours = 12
+        save()
     }
 
     /** Возвращает null при успехе или текст ошибки. */
@@ -243,7 +255,7 @@ object AppSettings {
         put("domainStrategy", s.domainStrategy); put("fakeDns", s.fakeDns)
         put("remoteDns", s.remoteDns.json()); put("directDns", s.directDns.json()); put("rulesSource", s.rulesSource)
         put("warp", s.warp); put("warpConfig", s.warpConfig); put("shieldBackdrop", s.shieldBackdrop); put("backdropStamp", s.backdropStamp)
-        put("iconStatus", s.iconStatus); put("animatedFlags", s.animatedFlags); put("task", s.task)
+        put("iconStatus", s.iconStatus); put("animatedFlags", s.animatedFlags); put("task", s.task); put("hiddenApps", list(s.hiddenApps)); put("secret", s.secretUnlocked)
     }
 
     private fun fromJson(o: JSONObject): Settings {
@@ -330,6 +342,8 @@ object AppSettings {
             iconStatus = o.optBoolean("iconStatus", d.iconStatus),
             animatedFlags = o.optBoolean("animatedFlags", d.animatedFlags),
             task = o.optString("task", d.task),
+            hiddenApps = arr("hiddenApps", d.hiddenApps).toSet(),
+            secretUnlocked = o.optBoolean("secret", d.secretUnlocked),
         )
     }
 }

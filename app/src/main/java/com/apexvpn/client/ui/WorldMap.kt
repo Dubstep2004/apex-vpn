@@ -151,7 +151,7 @@ fun userCountry(context: Context): String = runCatching {
         .firstOrNull { it in WorldMap.coords }
 }.getOrNull() ?: "ru"
 
-private fun countryName(code: String): String =
+internal fun countryName(code: String): String =
     Locale("", code.uppercase(Locale.ROOT)).getDisplayCountry(Locale("ru")).ifBlank { code.uppercase(Locale.ROOT) }
 
 object WorldMap {

@@ -28,6 +28,12 @@ object AdCounter {
     private val sp by lazy { appContext.getSharedPreferences("adcounter", Context.MODE_PRIVATE) }
     private fun day() = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
 
+    /** 379. Обнулить счётчик (очистка данных). */
+    fun reset() {
+        _today.value = 0
+        if (::appContext.isInitialized) sp.edit().clear().apply()
+    }
+
     fun init(context: Context) {
         appContext = context.applicationContext
         _today.value = if (sp.getString("day", "") == day()) sp.getInt("count", 0) else 0

@@ -286,7 +286,8 @@ class ApexVpnService : VpnService(), PlatformInterface, CommandServerHandler {
 
     private fun overrideOptions() = OverrideOptions().apply {
         val s = AppSettings.value
-        val banks = if (s.hideFromBanks) BankApps.packages else emptyList()
+        // 349. Свой список приложений, от которых VPN скрыт, — так же, как банки
+        val banks = ((if (s.hideFromBanks) BankApps.packages else emptyList()) + s.hiddenApps).distinct()
         autoRedirect = false
         when (s.appsMode) {
             AppsMode.Include -> {

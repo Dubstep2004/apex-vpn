@@ -31,10 +31,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -173,7 +175,33 @@ fun Modifier.apexCard(color: Color = Apex.Surface, radius: Dp = Apex.Radius): Mo
         .then(if (glow) Modifier.shadow(14.dp, shape, ambientColor = glowColor, spotColor = glowColor) else Modifier)
         .clip(shape)
         .background(color)
+        .then(if (Apex.palette.design == com.apexvpn.client.data.Design.Glass) Modifier.glassGlare() else Modifier)
         .then(if (Apex.CardBorder != Color.Transparent) Modifier.border(1.dp, Apex.CardBorder, shape) else Modifier)
+}
+
+/** 313. Liquid Glass 2.0: по стеклу карточки проходит блик, который двигается при наклоне телефона. */
+private fun Modifier.glassGlare(): Modifier = this.drawWithContent {
+    drawContent()
+    val tx = com.apexvpn.client.ui.theme.Tilt.x
+    val ty = com.apexvpn.client.ui.theme.Tilt.y
+    val c = androidx.compose.ui.geometry.Offset(size.width * (0.5f + 0.55f * tx), size.height * (0.3f + 0.6f * ty))
+    val d = androidx.compose.ui.geometry.Offset(size.width, size.height * 0.8f) * 0.7f
+    drawRect(
+        Brush.linearGradient(
+            0f to Color.Transparent,
+            0.42f to Color.Transparent,
+            0.5f to Color.White.copy(alpha = 0.14f),
+            0.58f to Color.Transparent,
+            1f to Color.Transparent,
+            start = c - d,
+            end = c + d,
+        ),
+    )
+    // Светлая кромка сверху — как у толстого стекла
+    drawRect(
+        Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.10f + 0.06f * (1f - ty).coerceIn(0f, 1f)), Color.Transparent), 0f, 18f),
+        size = androidx.compose.ui.geometry.Size(size.width, 18f),
+    )
 }
 
 @Composable
@@ -262,6 +290,28 @@ fun Tag(text: String, color: Color = Apex.AccentText, background: Color = Apex.A
             )
             .padding(horizontal = 9.dp, vertical = 3.dp),
     )
+}
+
+/**
+ * 383. Переворот «карточкой»: старое содержимое поворачивается ребром,
+ * на обороте — новое. [key] — что показывать сейчас.
+ */
+@Composable
+fun FlipFlag(key: String, content: @Composable (String) -> Unit) {
+    var shown by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(key) }
+    val rot = remember { androidx.compose.animation.core.Animatable(0f) }
+    androidx.compose.runtime.LaunchedEffect(key) {
+        if (key == shown) return@LaunchedEffect
+        if (Apex.feel.smooth) {
+            shown = key
+            return@LaunchedEffect
+        }
+        rot.animateTo(90f, androidx.compose.animation.core.tween(170, easing = androidx.compose.animation.core.FastOutLinearInEasing))
+        shown = key
+        rot.snapTo(-90f)
+        rot.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.55f, stiffness = 500f))
+    }
+    Box(Modifier.graphicsLayer { rotationY = rot.value; cameraDistance = 14f * density }) { content(shown) }
 }
 
 /** Круглый флаг страны: картинка из assets/flags, иначе эмодзи. */

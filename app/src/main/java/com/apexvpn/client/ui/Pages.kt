@@ -87,7 +87,7 @@ import java.net.NetworkInterface
 import java.util.Locale
 
 /** Дополнительные страницы, открываются поверх вкладок. */
-enum class Page { Apps, SpeedTest, SiteCheck, Wifi, Share, Dns, Profile, Appearance, Changelog, Advanced }
+enum class Page { Apps, SpeedTest, SiteCheck, Wifi, Share, Dns, Profile, Appearance, Changelog, Advanced, HideApps }
 
 @Composable
 fun PageHost(page: Page, viewModel: MainViewModel, onBack: () -> Unit) {
@@ -102,6 +102,7 @@ fun PageHost(page: Page, viewModel: MainViewModel, onBack: () -> Unit) {
         Page.Appearance -> AppearancePage(viewModel, onBack)
         Page.Changelog -> ChangelogPage(onBack)
         Page.Advanced -> AdvancedPage(viewModel, onBack)
+        Page.HideApps -> HideAppsPage(viewModel, onBack)
     }
 }
 
@@ -187,6 +188,54 @@ private fun AppsPage(viewModel: MainViewModel, onBack: () -> Unit) {
             }
         } else {
             Caption("Выберите режим выше, чтобы отметить отдельные приложения.")
+        }
+        Spacer(Modifier.height(12.dp))
+    }
+}
+
+// ─── 349. Скрыть VPN от приложений ──────────────────────────────────────
+
+@Composable
+private fun HideAppsPage(viewModel: MainViewModel, onBack: () -> Unit) {
+    val s by viewModel.settings.collectAsStateWithLifecycle()
+    val appList by viewModel.apps.collectAsStateWithLifecycle()
+    var query by rememberSaveable { mutableStateOf("") }
+    LaunchedEffect(Unit) { viewModel.loadApps() }
+    PageScaffold("Скрыть VPN", onBack, scroll = false) {
+        Caption("Отмеченные приложения работают мимо VPN — для них соединение обычное, и они не видят, что VPN включён. Как «Банки не увидят VPN», только список ваш: госуслуги, маркетплейсы, игры с защитой от VPN.")
+        Spacer(Modifier.height(12.dp))
+        SearchField(query, "Поиск приложения") { query = it }
+        Spacer(Modifier.height(10.dp))
+        val list = appList
+        if (list == null) {
+            Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = Apex.Accent)
+            }
+        } else {
+            val filtered = list.filter { query.isBlank() || it.label.contains(query, true) || it.packageName.contains(query, true) }
+                .sortedByDescending { it.packageName in s.hiddenApps }
+            LazyColumn(
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Apex.Surface),
+            ) {
+                items(filtered, key = { it.packageName }) { app ->
+                    val on = app.packageName in s.hiddenApps
+                    val icon = remember(app.packageName) { runCatching { app.icon?.toBitmap(96, 96)?.asImageBitmap() }.getOrNull() }
+                    ListRow(
+                        title = app.label,
+                        subtitle = if (on) "VPN скрыт" else app.packageName,
+                        leading = {
+                            if (icon != null) Image(icon, null, Modifier.size(40.dp)) else GlyphTile(app.label.take(1), Apex.Accent)
+                        },
+                        onClick = { viewModel.change { copy(hiddenApps = if (on) hiddenApps - app.packageName else hiddenApps + app.packageName) } },
+                    ) {
+                        ApexSwitch(on, { v -> viewModel.change { copy(hiddenApps = if (v) hiddenApps + app.packageName else hiddenApps - app.packageName) } })
+                    }
+                }
+            }
         }
         Spacer(Modifier.height(12.dp))
     }
@@ -748,19 +797,19 @@ private fun AppearancePage(viewModel: MainViewModel, onBack: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     PageScaffold("Оформление", onBack) {
         SectionLabel("Дизайн 2026")
-        val designs = Design.entries
+        val designs = Design.entries.filter { it != Design.Synthwave || s.secretUnlocked }
         designs.chunked(3).forEach { row ->
             Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 row.forEach { d ->
                     DesignPreview(d, s.theme, s.accent, s.customAccent, selected = s.design == d, modifier = Modifier.weight(1f)) {
-                        viewModel.change(reload = false) { copy(design = d) }
+                        ThemeReveal.run { viewModel.change(reload = false) { copy(design = d) } }
                     }
                 }
                 repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
         Caption(s.design.subtitle + when (s.design) {
-            Design.Neon, Design.Terminal -> ". Всегда тёмный."
+            Design.Neon, Design.Terminal, Design.Steampunk, Design.Synthwave -> ". Всегда тёмный."
             Design.Pastel -> ". Всегда светлый."
             Design.Expressive -> ". Цвет берётся из обоев (Android 12+)."
             else -> "."
@@ -770,13 +819,13 @@ private fun AppearancePage(viewModel: MainViewModel, onBack: () -> Unit) {
         Group {
             ThemeMode.entries.forEachIndexed { i, t ->
                 if (i > 0) GroupDivider()
-                ChoiceRow(t.title, null, s.theme == t) { viewModel.change(reload = false) { copy(theme = t) } }
+                ChoiceRow(t.title, null, s.theme == t) { ThemeReveal.run { viewModel.change(reload = false) { copy(theme = t) } } }
             }
         }
         // Главный экран: «Кнопка» или «Карта»
         SectionLabel("Главный экран")
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            listOf("button" to "Кнопка", "map" to "Карта").forEach { (id, title) ->
+            listOf("button" to "Кнопка", "map" to "Карта", "globe" to "Глобус").forEach { (id, title) ->
                 val on = s.homeStyle == id
                 Column(
                     Modifier
@@ -788,7 +837,12 @@ private fun AppearancePage(viewModel: MainViewModel, onBack: () -> Unit) {
                         .padding(12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    HomeStylePreview(id == "map")
+                    if (id == "globe") {
+                        // 353. Живой мини-глобус
+                        Globe(Modifier.fillMaxWidth().height(72.dp), from = WorldMap.coords["ru"], to = WorldMap.coords["de"], connected = true, spin = false)
+                    } else {
+                        HomeStylePreview(id == "map")
+                    }
                     Spacer(Modifier.height(8.dp))
                     Text(title, color = if (on) Apex.Text else Apex.TextDim, fontWeight = FontWeight.SemiBold)
                 }
@@ -798,9 +852,10 @@ private fun AppearancePage(viewModel: MainViewModel, onBack: () -> Unit) {
 
         // 17. Фон за щитом
         SectionLabel("Фон за щитом")
-        ChipRow(listOf("none" to "Нет", "waves" to "Волны", "particles" to "Частицы", "stars" to "Звёзды"), s.shieldBackdrop) {
+        ChipRow(listOf("none" to "Нет", "waves" to "Волны", "particles" to "Частицы", "stars" to "Звёзды", "country" to "Страна"), s.shieldBackdrop) {
             viewModel.change(reload = false) { copy(shieldBackdrop = it) }
         }
+        if (s.shieldBackdrop == "country") Caption("Фото дня: каждый день новое фото города страны сервера (на автопилоте — вашей страны). Фото из Википедии, загружается раз в день.")
         // 157. Своё фото из галереи
         val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
             if (uri != null) {
@@ -835,7 +890,7 @@ private fun AppearancePage(viewModel: MainViewModel, onBack: () -> Unit) {
             AccentColor.entries.forEach { a ->
                 val on = s.accent == a
                 Column(
-                    Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).clickable { viewModel.change(reload = false) { copy(accent = a) } }.padding(vertical = 8.dp),
+                    Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).clickable { ThemeReveal.run { viewModel.change(reload = false) { copy(accent = a) } } }.padding(vertical = 8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Box(
@@ -866,7 +921,7 @@ private fun AppearancePage(viewModel: MainViewModel, onBack: () -> Unit) {
         // 216. Свой цвет: оттенок, насыщенность и яркость
         if (s.accent == AccentColor.Custom) {
             Spacer(Modifier.height(8.dp))
-            AccentPicker(s.customAccent) { argb -> viewModel.change(reload = false) { copy(customAccent = argb) } }
+            AccentPicker(s.customAccent) { argb -> ThemeReveal.run { viewModel.change(reload = false) { copy(customAccent = argb) } } }
         }
 
         // Ощущения
@@ -1095,6 +1150,8 @@ private fun DesignPreview(
                 .height(118.dp)
                 .background(
                     when (design) {
+                        Design.Steampunk -> androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xFF3A2614), p.base))
+                        Design.Synthwave -> androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xFF3A0A5E), Color(0xFFB0186E), Color(0xFF1A0033)))
                         Design.Apex2 -> androidx.compose.ui.graphics.Brush.verticalGradient(listOf(p.brand1.copy(alpha = if (p.dark) 0.35f else 0.2f), p.base, p.base))
                         Design.Glass, Design.Aurora -> androidx.compose.ui.graphics.Brush.linearGradient(listOf(p.accent.copy(alpha = 0.7f), p.base, Color(0xFF22D3EE).copy(alpha = 0.6f)))
                         Design.Pastel -> androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xFFFFF1E8), Color(0xFFF6EEFF)))

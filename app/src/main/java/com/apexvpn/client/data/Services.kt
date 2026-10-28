@@ -158,14 +158,17 @@ enum class CoreMode(val id: String, val title: String, val subtitle: String) {
 enum class Design(val id: String, val title: String, val subtitle: String) {
     Apex2("apex2", "APEX 2.0", "Новый облик 2026: крупные карточки и мягкое свечение"),
     Classic("classic", "Классика", "Строгий тёмный APEX"),
-    Glass("glass", "Liquid Glass", "Стеклянные карточки на цветном фоне"),
+    Glass("glass", "Liquid Glass 2.0", "Настоящее стекло: блики двигаются при наклоне телефона"),
     Expressive("expressive", "Material Expressive", "Цвета от обоев, крупные формы"),
     Neon("neon", "Neon Cyber", "Неоновое свечение на чёрном"),
     Minimal("minimal", "Минимализм", "Чёрно-белый, ничего лишнего"),
     Aurora("aurora", "Aurora", "Живой переливающийся фон"),
     Bento("bento", "Бенто", "Главный экран из плиток"),
     Terminal("terminal", "Ретро-терминал", "Зелёный моноширинный текст"),
-    Pastel("pastel", "Пастель", "Мягкие тёплые цвета");
+    Pastel("pastel", "Пастель", "Мягкие тёплые цвета"),
+    Steampunk("steampunk", "Стимпанк", "Латунь, медь и шестерёнки"),
+    /** 387. Секретная тема — открывается 7 нажатиями на логотип */
+    Synthwave("synthwave", "Синтвейв", "Секретная тема: неоновый закат 80-х");
 
     companion object {
         fun of(id: String) = entries.firstOrNull { it.id == id } ?: Classic

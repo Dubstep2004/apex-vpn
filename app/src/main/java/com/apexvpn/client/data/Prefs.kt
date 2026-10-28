@@ -107,6 +107,16 @@ object Prefs {
             sp.edit { putString("device_id", it) }
         }
 
+    /** 320. Знакомство с приложением уже показано */
+    var onboarded: Boolean
+        get() = sp.getBoolean("onboarded", false)
+        set(v) = sp.edit { putBoolean("onboarded", v) }
+
+    /** 382. Сколько раз VPN успешно подключался (для конфетти на юбилеях) */
+    var connectCount: Int
+        get() = sp.getInt("connect_count", 0)
+        set(v) = sp.edit { putInt("connect_count", v) }
+
     fun clearSubscription() = sp.edit {
         remove("sub_url"); remove("nodes"); remove("selected"); remove("title")
         remove("used"); remove("total"); remove("expire"); remove("updated")

@@ -180,8 +180,19 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    Box(Modifier.fillMaxSize()) {
-                        if (sub.url.isEmpty()) {
+                    val st by viewModel.settings.collectAsStateWithLifecycle()
+                    val tv = remember { isTv(this@MainActivity) }
+                    // 313. Блики Liquid Glass 2.0 следуют за наклоном телефона
+                    com.apexvpn.client.ui.theme.TiltSensor(st.design == com.apexvpn.client.data.Design.Glass && !st.smoothMode)
+                    var onboarded by remember { mutableStateOf(com.apexvpn.client.data.Prefs.onboarded) }
+                    ThemeRevealHost {
+                        if (sub.url.isEmpty() && !onboarded) {
+                            // 320. Знакомство при первом запуске
+                            Onboarding {
+                                com.apexvpn.client.data.Prefs.onboarded = true
+                                onboarded = true
+                            }
+                        } else if (sub.url.isEmpty()) {
                             SetupScreen(viewModel, onScanQr = { scanQr() })
                         } else {
                             BackHandler(enabled = page == null && tab != Tab.Home) { tab = Tab.Home }
@@ -203,7 +214,10 @@ class MainActivity : ComponentActivity() {
                                     label = "tab",
                                 ) { current ->
                                     when (current) {
-                                        Tab.Home -> HomeScreen(
+                                        Tab.Home -> if (tv) {
+                                            // 343. Android TV 2.0
+                                            TvHomeScreen(viewModel, onToggle = { toggleVpn() })
+                                        } else HomeScreen(
                                             viewModel = viewModel,
                                             onToggle = { toggleVpn() },
                                             onOpenServers = { serversOpen = true },
@@ -238,6 +252,8 @@ class MainActivity : ComponentActivity() {
                             snackbar,
                             Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 80.dp),
                         )
+                        // 382. Конфетти
+                        ConfettiOverlay { text -> viewModel.showMessage(text) }
                         // 63. Анимированная заставка
                         AnimatedVisibility(visible = splash, exit = fadeOut()) {
                             SplashScreen { splash = false }
