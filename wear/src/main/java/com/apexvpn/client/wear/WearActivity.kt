@@ -33,6 +33,9 @@ import androidx.wear.compose.material.Button
 import androidx.wear.compose.material.ButtonDefaults
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
+import androidx.wear.compose.material.Chip
+import androidx.wear.compose.material.ChipDefaults
+import androidx.wear.compose.material.ScalingLazyColumn
 import com.google.android.gms.wearable.DataClient
 import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
@@ -46,6 +49,17 @@ data class PhoneState(val status: String = "", val server: String = "", val ping
 
 class WearActivity : ComponentActivity(), DataClient.OnDataChangedListener {
 
+    /** На часах обычно нет браузера — ссылка открывается на сопряжённом телефоне. */
+    private fun openOnPhone(url: String) {
+        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+            .addCategory(android.content.Intent.CATEGORY_BROWSABLE)
+        val helper = androidx.wear.remote.interactions.RemoteActivityHelper(this, java.util.concurrent.Executors.newSingleThreadExecutor())
+        runCatching { helper.startRemoteActivity(intent, null) }
+            .onSuccess { android.widget.Toast.makeText(this, "Открыто на телефоне", android.widget.Toast.LENGTH_SHORT).show() }
+            .onFailure { android.widget.Toast.makeText(this, "Не удалось открыть на телефоне", android.widget.Toast.LENGTH_SHORT).show() }
+    }
+
+
     private var state by mutableStateOf(PhoneState())
     private var linked by mutableStateOf(true)
 
@@ -53,7 +67,7 @@ class WearActivity : ComponentActivity(), DataClient.OnDataChangedListener {
         super.onCreate(savedInstanceState)
         setContent {
             MaterialTheme {
-                WearScreen(state, linked, onToggle = { send("/apex/toggle") })
+                WearScreen(state, linked, onToggle = { send("/apex/toggle") }, onOpenLink = { openOnPhone(it) })
             }
             LaunchedEffect(Unit) { loadCurrent() }
         }
@@ -105,8 +119,14 @@ class WearActivity : ComponentActivity(), DataClient.OnDataChangedListener {
     }
 }
 
+/** Наши ссылки. Telegram пустой — кнопка не показывается (появится, когда будет канал). */
+object Links {
+    const val GITHUB = "https://github.com/Dubstep2004/apex-vpn"
+    const val TELEGRAM = ""
+}
+
 @Composable
-private fun WearScreen(s: PhoneState, linked: Boolean, onToggle: () -> Unit) {
+private fun WearScreen(s: PhoneState, linked: Boolean, onToggle: () -> Unit, onOpenLink: (String) -> Unit) {
     val on = s.status == "started"
     val label = when (s.status) {
         "started" -> "Защищено"
@@ -117,36 +137,53 @@ private fun WearScreen(s: PhoneState, linked: Boolean, onToggle: () -> Unit) {
         "stopped" -> "Выключен"
         else -> if (linked) "Нет данных" else "Нет связи с телефоном"
     }
-    Column(
-        Modifier.fillMaxSize().background(Color(0xFF0A0A0D)).padding(12.dp),
+    // Список с «изгибом» под круглый экран: сверху щит, ниже — ссылки (крутите колёсико или листайте)
+    ScalingLazyColumn(
+        Modifier.fillMaxSize().background(Color(0xFF0A0A0D)),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
     ) {
-        Text("APEX Watch", color = Color(0xFF8E8E9A), fontSize = 12.sp)
-        Spacer(Modifier.height(6.dp))
-        Button(
-            onClick = onToggle,
-            modifier = Modifier.size(76.dp),
-            colors = ButtonDefaults.buttonColors(backgroundColor = Color.Transparent),
-        ) {
-            Box(
-                Modifier
-                    .size(76.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (on) Brush.linearGradient(listOf(Color(0xFF7C3AED), Color(0xFF22D3EE)))
-                        else Brush.linearGradient(listOf(Color(0xFF26262E), Color(0xFF3A3A44))),
-                    ),
-                contentAlignment = Alignment.Center,
-            ) { Text("⏻", color = Color.White, fontSize = 30.sp) }
+        item { Text("APEX Watch", color = Color(0xFF8E8E9A), fontSize = 12.sp) }
+        item {
+            Button(
+                onClick = onToggle,
+                modifier = Modifier.size(76.dp),
+                colors = ButtonDefaults.buttonColors(backgroundColor = Color.Transparent),
+            ) {
+                Box(
+                    Modifier
+                        .size(76.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (on) Brush.linearGradient(listOf(Color(0xFF7C3AED), Color(0xFF22D3EE)))
+                            else Brush.linearGradient(listOf(Color(0xFF26262E), Color(0xFF3A3A44))),
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) { Text("⏻", color = Color.White, fontSize = 30.sp) }
+            }
         }
-        Spacer(Modifier.height(6.dp))
-        Text(label, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+        item { Text(label, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center) }
         if (s.server.isNotEmpty()) {
-            Text(s.server, color = Color(0xFF8E8E9A), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+            item { Text(s.server, color = Color(0xFF8E8E9A), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center) }
         }
         if (on && s.ping > 0) {
-            Text("${s.ping} мс · ${s.down}", color = Color(0xFF5BD69A), fontSize = 12.sp)
+            item { Text("${s.ping} мс · ${s.down}", color = Color(0xFF5BD69A), fontSize = 12.sp) }
+        }
+        // Наши ссылки: открываются на телефоне
+        item { Spacer(Modifier.height(8.dp)) }
+        item { LinkChip("GitHub", "Исходный код и версии") { onOpenLink(Links.GITHUB) } }
+        if (Links.TELEGRAM.isNotEmpty()) {
+            item { LinkChip("Telegram", "Наш канал") { onOpenLink(Links.TELEGRAM) } }
         }
     }
+}
+
+@Composable
+private fun LinkChip(title: String, subtitle: String, onClick: () -> Unit) {
+    Chip(
+        onClick = onClick,
+        label = { Text(title, fontWeight = FontWeight.SemiBold) },
+        secondaryLabel = { Text(subtitle, color = Color(0xFF8E8E9A)) },
+        colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF1C1C24), contentColor = Color.White),
+        modifier = Modifier.padding(horizontal = 8.dp),
+    )
 }

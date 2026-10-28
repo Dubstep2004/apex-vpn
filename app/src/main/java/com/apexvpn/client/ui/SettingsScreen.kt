@@ -37,6 +37,8 @@ import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material.icons.rounded.QrCode2
 import androidx.compose.material.icons.rounded.DeleteSweep
+import androidx.compose.material.icons.rounded.Code
+import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.ui.graphics.graphicsLayer
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.aspectRatio
@@ -452,6 +454,23 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
                 leading = { tile(Icons.Rounded.NewReleases) },
                 onClick = { onOpenPage(Page.Changelog) },
             ) { Chevron() }
+            // Наши ссылки
+            GroupDivider()
+            ListRow(
+                "GitHub",
+                "Исходный код, все версии и инструкции",
+                leading = { tile(Icons.Rounded.Code) },
+                onClick = { openLink(context, com.apexvpn.client.data.Links.GITHUB) },
+            ) { Chevron() }
+            if (com.apexvpn.client.data.Links.TELEGRAM.isNotEmpty()) {
+                GroupDivider()
+                ListRow(
+                    "Telegram-канал",
+                    "Новости и обновления APEX VPN",
+                    leading = { tile(Icons.AutoMirrored.Rounded.Send) },
+                    onClick = { openLink(context, com.apexvpn.client.data.Links.TELEGRAM) },
+                ) { Chevron() }
+            }
             GroupDivider()
             // 24. Поддержка: отчёт с журналом одной кнопкой
             ListRow(
@@ -721,4 +740,10 @@ private fun TransferQrDialog(bitmap: android.graphics.Bitmap, onDismiss: () -> U
         },
         confirmButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Готово", color = Apex.Accent) } },
     )
+}
+
+private fun openLink(context: android.content.Context, url: String) {
+    runCatching {
+        context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
 }

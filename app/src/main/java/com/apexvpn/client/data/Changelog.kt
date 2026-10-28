@@ -25,6 +25,13 @@ private fun d(text: String) = Change(ChangeKind.Removed, text)  // Удален�
 object Changelog {
     val releases = listOf(
         Release(
+            "2.2.2", 36, "28 октября 2026",
+            listOf(
+                n("Настройки → О приложении: ссылка на наш GitHub"),
+                n("APEX Watch: кнопка «GitHub» — ссылка открывается на телефоне; список на часах листается колёсиком"),
+            ),
+        ),
+        Release(
             "2.2.1", 35, "28 октября 2026",
             listOf(
                 c("Приложение для часов теперь называется «APEX Watch» и получило свою иконку: циферблат и щит"),

@@ -7,7 +7,7 @@
 <p>
 <a href="https://github.com/Dubstep2004/apex-vpn/releases/latest"><b>⬇️ Скачать APK</b></a>
 &nbsp;&nbsp;·&nbsp;&nbsp;
-<a href="#-что-нового"><b>🆕 Что нового в 2.2.1</b></a>
+<a href="#-что-нового"><b>🆕 Что нового в 2.2.2</b></a>
 &nbsp;&nbsp;·&nbsp;&nbsp;
 <a href="#setup"><b>🚀 Как установить</b></a>
 </p>
@@ -278,6 +278,7 @@ APEX сам настроит профиль и выбор сервера под 
 1. Откройте [последнюю версию](https://github.com/Dubstep2004/apex-vpn/releases/latest) и скачайте **`apex-watch-<версия>.apk`**.
 2. Установите его на часы (например, через приложение «Wear Installer» или `adb install` по Wi-Fi).
 3. На часах появится **APEX Watch** со своей иконкой — циферблат и щит.
+4. Пролистайте вниз (колёсиком или пальцем) — там кнопка **GitHub**: ссылка откроется на телефоне.
 
 Телефон и часы должны быть сопряжены, а APEX VPN — установлен на телефоне.
 
@@ -683,16 +684,26 @@ core/apexcore/          Go: разбор подписки → конфиги sin
 
 <img src="docs/img/tags/new.svg" alt="Новое" height="22"> <img src="docs/img/tags/improved.svg" alt="Улучшено" height="22"> <img src="docs/img/tags/changed.svg" alt="Изменено" height="22"> <img src="docs/img/tags/fixed.svg" alt="Исправлено" height="22"> <img src="docs/img/tags/removed.svg" alt="Удалено" height="22">
 
-### 2.2.1 · 28 октября 2026
+### 2.2.2 · 28 октября 2026
+
+<img src="docs/img/tags/new.svg" alt="Новое" height="22">
+
+- Настройки → О приложении: ссылка на наш GitHub
+- APEX Watch: кнопка «GitHub» — ссылка открывается на телефоне; список на часах листается колёсиком
+
+#### 📚 Все версии (36)
+
+Каждая версия — отдельная вкладка.
+
+<details>
+<summary><b>2.2.1</b> · 28 октября 2026</summary>
 
 <img src="docs/img/tags/changed.svg" alt="Изменено" height="22">
 
 - Приложение для часов теперь называется «APEX Watch» и получило свою иконку: циферблат и щит
 - Файл для часов на странице версии: apex-watch-<версия>.apk
 
-#### 📚 Все версии (35)
-
-Каждая версия — отдельная вкладка.
+</details>
 
 <details>
 <summary><b>2.2.0</b> · 28 октября 2026</summary>

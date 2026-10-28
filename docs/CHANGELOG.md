@@ -2,6 +2,13 @@
 
 <img src="img/tags/new.svg" height="22"> <img src="img/tags/improved.svg" height="22"> <img src="img/tags/changed.svg" height="22"> <img src="img/tags/fixed.svg" height="22"> <img src="img/tags/removed.svg" height="22">
 
+## 2.2.2 · 28 октября 2026
+
+<img src="img/tags/new.svg" alt="Новое" height="22">
+
+- Настройки → О приложении: ссылка на наш GitHub
+- APEX Watch: кнопка «GitHub» — ссылка открывается на телефоне; список на часах листается колёсиком
+
 ## 2.2.1 · 28 октября 2026
 
 <img src="img/tags/changed.svg" alt="Изменено" height="22">
