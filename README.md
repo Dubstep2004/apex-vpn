@@ -267,7 +267,7 @@ APEX сам настроит профиль и выбор сервера под 
 <details>
 <summary><b>⌚ APEX Watch — часы Wear OS</b></summary>
 
-<img src="docs/img/apex-watch.png" width="120" align="right">
+<img src="docs/img/apex-watch.webp" width="120" align="right">
 
 **APEX Watch** — пульт VPN на часах: кнопка включить/выключить, сервер, пинг и скорость. Работает вместе с APEX VPN на телефоне.
 
