@@ -6,6 +6,13 @@ data class Release(val version: String, val code: Int, val date: String, val cha
 object Changelog {
     val releases = listOf(
         Release(
+            "1.4.1", 8, "28 октября 2026",
+            listOf(
+                "Исправлено: приложение закрывалось при открытии списка серверов",
+                "Пинг Hysteria 2 и TUIC без VPN — по QUIC-рукопожатию, в том числе с обфускацией",
+            ),
+        ),
+        Release(
             "1.4.0", 7, "28 октября 2026",
             listOf(
                 "Второе ядро Xray (как в Happ): XHTTP, mKCP, VLESS Encryption",

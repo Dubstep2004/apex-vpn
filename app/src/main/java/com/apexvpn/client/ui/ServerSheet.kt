@@ -247,7 +247,7 @@ fun ServerSheet(viewModel: MainViewModel, onDismiss: () -> Unit) {
                     }
                 }
             }
-            Caption("★ — добавить в избранное. Метки протоколов выбирают конкретное подключение. Пинг — настоящая задержка через сервер.")
+            Caption("★ — добавить в избранное. Метки протоколов выбирают конкретное подключение. Пинг — время соединения с сервером; при включённом VPN — задержка через сервер.")
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -323,6 +323,7 @@ private fun GroupRow(
             val text = when (ping) {
                 null -> "…"
                 Pinger.UNREACHABLE -> "нет ответа"
+                Pinger.UNKNOWN -> "—"
                 else -> "$ping мс"
             }
             Text(text, color = pingColor(ping ?: -1), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 10.dp))

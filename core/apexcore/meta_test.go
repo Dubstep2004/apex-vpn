@@ -68,15 +68,3 @@ func TestDescriptionAdsMetaCore(t *testing.T) {
 	}
 	checkAll(t, n, `{"clashApi":9095,"xrayAuth":"sec"}`)
 }
-
-func TestUrlTestUnreachable(t *testing.T) {
-	nodes := parseNodes(t, "socks5://127.0.0.1:1#dead\nhysteria2://pw@127.0.0.1:2?sni=x.example.com#deadudp")
-	data, _ := json.Marshal(nodes)
-	out, err := UrlTest(string(data), 1500)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if out != `{"node-1":-1,"node-2":-1}` {
-		t.Fatalf("unexpected %s", out)
-	}
-}

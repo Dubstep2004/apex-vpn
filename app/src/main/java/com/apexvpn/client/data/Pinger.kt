@@ -18,17 +18,18 @@ import java.net.URL
 import java.net.URLEncoder
 
 /**
- * Замер задержки — настоящий, через сам протокол сервера (как «Проверить пинг» в Happ).
- * Работает и для UDP (Hysteria, TUIC, WireGuard): раньше там было «UDP».
- *  • VPN включён — спрашиваем работающее ядро (Clash API на 127.0.0.1).
- *  • VPN выключен — временное ядро замера (Apexcore.urlTest).
- *  • Серверы только для Xray при выключенном VPN — время TCP-соединения.
+ * Замер задержки (раньше у Hysteria и TUIC было «UDP»):
+ *  • VPN включён — настоящая задержка через сервер от работающего ядра (Clash API на 127.0.0.1).
+ *  • VPN выключен — время соединения с сервером: TCP для обычных протоколов,
+ *    QUIC-рукопожатие для Hysteria, Hysteria 2 и TUIC (Apexcore.udpPing).
+ *  • WireGuard без VPN не измерить — показываем «—».
  */
 object Pinger {
     private const val TIMEOUT_MS = 5000
     private const val TEST_URL = "https://www.gstatic.com/generate_204"
 
     const val UNREACHABLE = -1
+    const val UNKNOWN = -2
 
     /** tag → задержка в мс или UNREACHABLE */
     suspend fun pingAll(nodes: List<Node>): Map<String, Int> = withContext(Dispatchers.IO) {
@@ -39,11 +40,15 @@ object Pinger {
             if (viaCore != null) return@withContext viaCore
         }
         val result = mutableMapOf<String, Int>()
-        runCatching {
-            val json = JSONObject(Apexcore.urlTest(Prefs.nodesJson, TIMEOUT_MS))
-            json.keys().forEach { k -> result[k] = json.getInt(k) }
+        val udpNodes = nodes.filter { it.udp }
+        if (udpNodes.isNotEmpty()) {
+            runCatching {
+                val json = JSONObject(Apexcore.udpPing(Prefs.nodesJson, 3000))
+                json.keys().forEach { k -> result[k] = json.getInt(k) }
+            }
+            udpNodes.forEach { if (it.tag !in result) result[it.tag] = UNKNOWN }
         }
-        // Остальное (Xray-серверы при выключенном VPN) — TCP-соединение мимо туннеля
+        // Остальные — время TCP-соединения мимо туннеля
         val rest = nodes.filter { it.tag !in result }
         val limit = Semaphore(8)
         rest.map { node -> async { limit.withPermit { node.tag to tcpPing(node.server, node.port) } } }
