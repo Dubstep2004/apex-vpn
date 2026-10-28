@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.sp
 import com.apexvpn.client.ui.theme.Apex
 import com.apexvpn.client.vpn.VpnStatus
 import kotlin.math.PI
+import kotlinx.coroutines.launch
 import kotlin.math.acos
 import kotlin.math.cos
 import kotlin.math.sin
@@ -126,8 +127,8 @@ fun Globe(
         while (target - lon.value > 180f) target -= 360f
         while (target - lon.value < -180f) target += 360f
         kotlinx.coroutines.coroutineScope {
-            kotlinx.coroutines.launch { lat.animateTo((focus.first - 12f).coerceIn(-60f, 60f), spec) }
-            kotlinx.coroutines.launch { lon.animateTo(target, spec) }
+            launch { lat.animateTo((focus.first - 12f).coerceIn(-60f, 60f), spec) }
+            launch { lon.animateTo(target, spec) }
         }
     }
     val t = rememberInfiniteTransition(label = "globe")

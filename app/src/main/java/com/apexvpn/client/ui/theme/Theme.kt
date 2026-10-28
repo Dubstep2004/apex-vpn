@@ -454,7 +454,7 @@ fun TiltSensor(enabled: Boolean) {
             }
             override fun onAccuracyChanged(s: android.hardware.Sensor?, a: Int) = Unit
         }
-        if (sensor != null) sm.registerListener(listener, sensor, android.hardware.SensorManager.SENSOR_DELAY_UI)
+        if (sensor != null) sm?.registerListener(listener, sensor, android.hardware.SensorManager.SENSOR_DELAY_UI)
         onDispose { sm?.unregisterListener(listener) }
     }
 }
