@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
     tags: ["v*"]
+    # Правка README, картинок и скриптов VPS не пересобирает приложение
+    paths-ignore: ["**.md", "docs/**", "server/**"]
   pull_request:
   workflow_dispatch:
 

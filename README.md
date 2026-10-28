@@ -4,11 +4,13 @@
 
 <br>
 
-<a href="https://github.com/Dubstep2004/apex-vpn/releases/latest"><img src="https://img.shields.io/github/v/release/Dubstep2004/apex-vpn?style=for-the-badge&label=версия&color=7B6CFF&labelColor=16161B" alt="Версия"></a>
-<a href="https://github.com/Dubstep2004/apex-vpn/actions"><img src="https://img.shields.io/github/actions/workflow/status/Dubstep2004/apex-vpn/build.yml?style=for-the-badge&label=сборка&labelColor=16161B" alt="Сборка"></a>
-<img src="https://img.shields.io/badge/Android-7.0%2B-34D399?style=for-the-badge&logo=android&logoColor=white&labelColor=16161B" alt="Android 7+">
-<img src="https://img.shields.io/badge/sing--box-1.13-22D3EE?style=for-the-badge&labelColor=16161B" alt="sing-box">
-<img src="https://img.shields.io/badge/Xray-26-F472B6?style=for-the-badge&labelColor=16161B" alt="Xray">
+<p>
+<a href="https://github.com/Dubstep2004/apex-vpn/releases/latest"><b>⬇️ Скачать APK</b></a>
+&nbsp;&nbsp;·&nbsp;&nbsp;
+<a href="#-что-нового"><b>🆕 Что нового в 1.6.0</b></a>
+&nbsp;&nbsp;·&nbsp;&nbsp;
+<a href="server/README.md"><b>🖥️ Свой сервер</b></a>
+</p>
 
 <h3>Быстрый и умный VPN-клиент для Android</h3>
 
