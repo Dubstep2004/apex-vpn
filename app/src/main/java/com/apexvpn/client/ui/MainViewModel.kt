@@ -276,6 +276,30 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { _apps.value = InstalledApps.load(getApplication<Application>()) }
     }
 
+    // ─── 31. WARP ─────────────────────────────────────────────────────────
+
+    private val _warpBusy = MutableStateFlow(false)
+    val warpBusy = _warpBusy.asStateFlow()
+
+    /** Включить WARP: при первом включении регистрирует бесплатный аккаунт Cloudflare. */
+    fun setWarp(on: Boolean) {
+        if (!on) { change { copy(warp = false) }; return }
+        if (AppSettings.value.warpConfig.isNotBlank()) { change { copy(warp = true) }; return }
+        if (_warpBusy.value) return
+        viewModelScope.launch {
+            _warpBusy.value = true
+            runCatching { com.apexvpn.client.data.Warp.register() }
+                .onSuccess { cfg ->
+                    change { copy(warp = true, warpConfig = cfg) }
+                    _message.value = "WARP подключён: сайты увидят IP Cloudflare"
+                }
+                .onFailure { _message.value = it.message ?: "Не удалось подключить WARP" }
+            _warpBusy.value = false
+        }
+    }
+
+    fun resetWarp() = change { copy(warp = false, warpConfig = "") }
+
     fun validateUserRule(value: String): String? =
         runCatching { Apexcore.validateUserRule(value).ifBlank { null } }.getOrElse { it.message ?: "Неверное правило" }
 

@@ -12,9 +12,11 @@
 #   apex status                     что сейчас выпущено
 #   apex                            меню (установка, резервные копии, сертификат, обновление скрипта…)
 #   apex backup | restore <файл> | update-script | uninstall
+#   apex auto on|off|run           автопубликация новых версий с GitHub
+#   apex stats [дней] | health | maintain
 set -euo pipefail
 
-APEX_SCRIPT_VERSION="1.6.0"
+APEX_SCRIPT_VERSION="1.7.0"
 CONFIG="${APEX_CONFIG:-/etc/apexvpn/config}"
 # shellcheck disable=SC1090
 [[ -f "$CONFIG" ]] && source "$CONFIG"
@@ -62,10 +64,11 @@ download_release() { # <версия> <папка>
 cmd_publish() {
   need_config
   need jq; need apksigner; need sha256sum
-  local src="" code="" name="" mandatory=false
+  local src="" code="" name="" mandatory=false auto=false
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --mandatory) mandatory=true ;;
+      --auto) auto=true ;;
       --code) code="$2"; shift ;;
       --name) name="$2"; shift ;;
       *) src="$1" ;;
@@ -97,6 +100,7 @@ cmd_publish() {
   # Сборка должна знать адрес этого сервера, иначе приложение не найдёт обновления и новости
   if command -v unzip >/dev/null && ! unzip -p "$apk" 'classes*.dex' 2>/dev/null | grep -aqF "$BASE_URL"; then
     echo "⚠️  В этой сборке нет адреса $BASE_URL — приложение не увидит обновления, новости и не пришлёт сбои."
+    [[ $auto == true ]] && die "автопубликация пропущена: в сборке нет адреса сервера (задайте SERVER_URL в GitHub)"
     echo "    Задайте в GitHub переменную SERVER_URL=$BASE_URL и пересоберите. Продолжить всё равно? [y/N]"
     read -r answer
     [[ "$answer" == "y" || "$answer" == "Y" ]] || die "отменено"
@@ -120,10 +124,14 @@ cmd_publish() {
       && echo "   Часы Wear OS: $BASE_URL/apex-vpn-wear-latest.apk"
   fi
 
+  # 83. Зеркала: тот же подписанный APK ещё в одном-двух местах (проверяется по sha256)
+  local mirrors; mirrors="$(publish_mirrors "$out" "$name")"
+
   jq -n --argjson code "$code" --arg name "$name" --arg url "$BASE_URL/apex-vpn-$name.apk" --arg sha "$sha" \
-    --arg notes "$changelog" --argjson mandatory "$mandatory" \
+    --arg notes "$changelog" --argjson mandatory "$mandatory" --argjson mirrors "$mirrors" \
     '{versionCode:$code, versionName:$name, apkUrl:$url, sha256:$sha, changelog:$notes,
-      mandatory:$mandatory, minSupportedVersionCode:(if $mandatory then $code else 0 end)}' \
+      mandatory:$mandatory, minSupportedVersionCode:(if $mandatory then $code else 0 end)}
+      + (if ($mirrors | length) > 0 then {mirrors:$mirrors} else {} end)' \
     | write_json "$WEB_DIR/update.json"
   update_page "$name"
 
@@ -132,6 +140,52 @@ cmd_publish() {
   echo "✅ Выпущена версия $name (сборка $code)$([[ $mandatory == true ]] && echo ', обязательная')"
   echo "   Приложения предложат обновиться при следующем запуске."
   echo "   Ссылка для первой установки: $BASE_URL/apex-vpn-latest.apk"
+}
+
+# ─── 83. Зеркала APK ────────────────────────────────────────────────────
+# В /etc/apexvpn/config:
+#   MIRROR_SYNC="root@второй-сервер:/var/www/apexvpn"   копировать APK по ssh (rsync/scp)
+#   MIRROR_URLS="https://второй-сервер/apexvpn"         откуда его скачивать приложению
+#   MIRROR_GITHUB="yes"                                 загрузить APK в релиз GitHub (нужен GITHUB_TOKEN с записью)
+publish_mirrors() { # <apk> <версия> → JSON-массив ссылок (печатает в stdout, сообщения — в stderr)
+  local apk="$1" ver="$2" file; file="$(basename "$apk")"
+  local -a urls=()
+  if [[ -n "${MIRROR_SYNC:-}" ]]; then
+    local dest
+    for dest in $MIRROR_SYNC; do
+      if { command -v rsync >/dev/null && rsync -q -e "ssh -o BatchMode=yes -o ConnectTimeout=10" "$apk" "$dest/"; } \
+         || scp -q -o BatchMode=yes -o ConnectTimeout=10 "$apk" "$dest/"; then
+        echo "   зеркало: скопировано в $dest" >&2
+      else
+        echo "⚠️  зеркало $dest недоступно — пропускаю" >&2
+      fi
+    done
+  fi
+  local u
+  for u in ${MIRROR_URLS:-}; do urls+=("${u%/}/$file"); done
+  if [[ "${MIRROR_GITHUB:-}" == "yes" && -n "${GITHUB_TOKEN:-}" ]]; then
+    local gh_url; gh_url="$(github_upload "$apk" "$ver" || true)"
+    [[ -n "$gh_url" ]] && urls+=("$gh_url")
+  fi
+  if [[ ${#urls[@]} -eq 0 ]]; then echo '[]'; else printf '%s\n' "${urls[@]}" | jq -R . | jq -s .; fi
+}
+
+github_upload() { # загрузить подписанный APK в релиз v<версия>; печатает ссылку, если репозиторий публичный
+  local apk="$1" ver="$2" name="apex-vpn-$2-signed.apk" api="https://api.github.com/repos/$REPO" rel id old
+  rel="$(curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" "$api/releases/tags/v$ver")" || { echo "⚠️  нет релиза v$ver на GitHub" >&2; return 1; }
+  id="$(jq -r .id <<<"$rel")"
+  old="$(jq -r --arg n "$name" '.assets[] | select(.name==$n) | .id' <<<"$rel")"
+  [[ -n "$old" ]] && curl -fsS -X DELETE -H "Authorization: Bearer $GITHUB_TOKEN" "$api/releases/assets/$old" >/dev/null
+  curl -fsS -H "Authorization: Bearer $GITHUB_TOKEN" -H "Content-Type: application/vnd.android.package-archive" \
+    --data-binary @"$apk" "https://uploads.github.com/repos/$REPO/releases/$id/assets?name=$name" >/dev/null \
+    || { echo "⚠️  не удалось загрузить APK на GitHub (нужен токен с правом записи Contents)" >&2; return 1; }
+  echo "   зеркало: APK загружен в релиз v$ver на GitHub" >&2
+  # приватный репозиторий приложение скачать не сможет — тогда ссылку не добавляем
+  if [[ "$(curl -s -o /dev/null -w '%{http_code}' "$api")" == "200" ]]; then
+    echo "https://github.com/$REPO/releases/download/v$ver/$name"
+  else
+    echo "   (репозиторий приватный — ссылка GitHub в update.json не добавлена)" >&2
+  fi
 }
 
 update_page() { # простая страница для скачивания
@@ -304,6 +358,7 @@ cmd_update_script() {
   install -m 755 "$server/apex" /usr/local/bin/apex
   install -m 755 "$server/crash-receiver.py" /usr/local/lib/apexvpn/crash-receiver.py 2>/dev/null \
     && systemctl restart apexvpn-crash 2>/dev/null || true
+  /usr/local/bin/apex setup-units >/dev/null 2>&1 || true
   echo "✅ Скрипт обновлён: $APEX_SCRIPT_VERSION → $new. Запустите apex снова."
   exit 0
 }
@@ -329,6 +384,221 @@ cmd_uninstall() {
   exit 0
 }
 
+# ─── 52. Автопубликация, 55. сводка, 79. здоровье, 80. обслуживание ─────
+
+STATE_DIR="${STATE_DIR:-/var/lib/apexvpn}"
+ACCESS_LOG="${ACCESS_LOG:-/var/log/caddy/apexvpn-access.log}"
+
+latest_release() { # последняя версия на GitHub без «v»
+  local auth=() json
+  [[ -n "${GITHUB_TOKEN:-}" ]] && auth=(-H "Authorization: Bearer $GITHUB_TOKEN")
+  json="$(curl -fsSL "${auth[@]}" "https://api.github.com/repos/$REPO/releases/latest")" || return 1
+  jq -r '.tag_name // empty' <<<"$json" | sed 's/^v//'
+}
+
+ver_gt() { # $1 > $2 (версии вида 1.7.0)
+  [[ "$1" != "$2" && "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -n1)" == "$1" ]]
+}
+
+cmd_auto() { # on | off | run | status
+  need_config
+  case "${1:-status}" in
+    on)
+      need_root; setup_units
+      systemctl enable --now apexvpn-auto.timer >/dev/null
+      echo "🤖 Автопубликация включена: каждые 30 минут сервер проверяет GitHub и сам выпускает новую версию."
+      echo "   Журнал: $STATE_DIR/auto.log" ;;
+    off)
+      need_root
+      systemctl disable --now apexvpn-auto.timer >/dev/null 2>&1 || true
+      echo "Автопубликация выключена." ;;
+    run)
+      local latest current
+      latest="$(latest_release)" || die "GitHub недоступен"
+      [[ -n "$latest" ]] || die "на GitHub нет релизов"
+      current="$(jq -r '.versionName // "0"' "$WEB_DIR/update.json" 2>/dev/null || echo 0)"
+      if ver_gt "$latest" "$current"; then
+        echo "$(date '+%F %T') новая версия $latest (было $current) — выпускаю"
+        cmd_publish "$latest" --auto
+      else
+        echo "$(date '+%F %T') новых версий нет ($current)"
+      fi ;;
+    status)
+      if systemctl is-enabled apexvpn-auto.timer >/dev/null 2>&1; then
+        echo "Автопубликация: включена"
+        tail -n 5 "$STATE_DIR/auto.log" 2>/dev/null || true
+      else
+        echo "Автопубликация: выключена (apex auto on)"
+      fi ;;
+    *) die "apex auto on | off | run | status" ;;
+  esac
+}
+
+cmd_stats() { # [дней] — сколько устройств проверяли обновления и какие версии
+  need jq
+  local days="${1:-1}"
+  [[ -f "$ACCESS_LOG" ]] || { echo "Журнала ещё нет ($ACCESS_LOG). Он появится после первых проверок обновлений."; return; }
+  local since; since=$(( $(date +%s) - days * 86400 ))
+  local rows
+  rows="$(zcat -f "${ACCESS_LOG%.log}"*.log* 2>/dev/null | jq -c --argjson since "$since" '
+      select(.ts >= $since and (.request.uri // "" | test("^/apexvpn/")))
+      | {ip: (.request.client_ip // .request.remote_ip), uri: .request.uri, status: .status,
+         ver: ((.request.headers["User-Agent"][0] // "") | (capture("APEX VPN/(?<v>[0-9][0-9.]*)").v // "—"))}' 2>/dev/null)"
+  local period="за сутки"; [[ "$days" != 1 ]] && period="за $days дн."
+  echo "📊 Сводка $period"
+  if [[ -z "$rows" ]]; then echo "   запросов не было"; return; fi
+  echo "   Устройств проверяли обновления: $(jq -r 'select(.uri=="/apexvpn/update.json") | .ip' <<<"$rows" | sort -u | wc -l)"
+  echo "   Проверок обновлений: $(jq -r 'select(.uri=="/apexvpn/update.json") | .ip' <<<"$rows" | wc -l)"
+  echo "   Скачиваний APK: $(jq -r 'select((.uri|test("\\.apk$")) and .status==200) | .ip' <<<"$rows" | wc -l)"
+  echo "   Отчётов о сбоях: $(jq -r 'select(.uri=="/apexvpn/crash") | .ip' <<<"$rows" | wc -l)"
+  echo "   Версии приложения (устройств):"
+  jq -r 'select(.uri=="/apexvpn/update.json") | "\(.ver) \(.ip)"' <<<"$rows" | sort -u | awk '{print $1}' | sort | uniq -c | sort -rn \
+    | awk '{printf "     %-10s %s\n", $2, $1}'
+  echo "   ${D:-}Устройства считаются по IP — за одним роутером может быть несколько телефонов.${N:-}"
+}
+
+cert_days() { # дней до конца сертификата (пусто — не удалось узнать)
+  local domain port end
+  domain="$(domain_now || true)"; [[ -n "$domain" ]] || return 0
+  port="$(echo "$BASE_URL" | sed -nE 's#https://[^/:]+:([0-9]+).*#\1#p')"; port="${port:-443}"
+  end="$(echo | timeout 10 openssl s_client -connect "$domain:$port" -servername "$domain" 2>/dev/null | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2)"
+  [[ -n "$end" ]] && echo $(( ($(date -d "$end" +%s) - $(date +%s)) / 86400 ))
+}
+
+cmd_health() {
+  echo "🩺 Здоровье сервера"
+  echo "   Работает: $(uptime -p 2>/dev/null | sed 's/^up //')"
+  echo "   Нагрузка: $(cut -d' ' -f1-3 /proc/loadavg)  (ядер: $(nproc))"
+  free -m | awk '/^Mem:/ {printf "   Память: занято %d из %d МБ (%d%%)\n", $3, $2, $3*100/$2}'
+  df -P / | awk 'NR==2 {gsub("%","",$5); printf "   Диск: занято %s%% (свободно %d ГБ)\n", $5, $4/1048576}'
+  local svc
+  for svc in caddy apexvpn-crash; do
+    printf "   %-15s %s\n" "$svc:" "$(systemctl is-active "$svc" 2>/dev/null || echo нет)"
+  done
+  local d; d="$(cert_days || true)"
+  if [[ -n "$d" ]]; then
+    if (( d < 14 )); then echo "   ⚠️  Сертификат: осталось $d дн."; else echo "   Сертификат: ещё $d дн."; fi
+  else
+    echo "   ⚠️  Сертификат: не удалось проверить"
+  fi
+  if [[ -n "$BASE_URL" ]]; then
+    local code; code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$BASE_URL/news.json" || true)"
+    echo "   Сайт снаружи: $([[ "$code" == 200 ]] && echo "отвечает" || echo "⚠️  ответ $code")"
+  fi
+  echo "   Размер APK на сервере: $(du -sh "$WEB_DIR" 2>/dev/null | cut -f1)"
+}
+
+cmd_maintain() { # еженедельное обслуживание; отчёт в $STATE_DIR/report.txt
+  need_root
+  mkdir -p "$STATE_DIR"
+  local report="$STATE_DIR/report.txt" problems=0
+  {
+    echo "Обслуживание $(date '+%F %T')"
+    # службы
+    local svc
+    for svc in caddy apexvpn-crash; do
+      if ! systemctl is-active --quiet "$svc"; then
+        systemctl restart "$svc" && echo "• $svc был остановлен — перезапущен" || { echo "• ❌ $svc не запускается"; problems=1; }
+      fi
+    done
+    # сертификат (Caddy продлевает сам; если скоро конец — перезагружаем Caddy)
+    local d; d="$(cert_days || true)"
+    if [[ -z "$d" ]]; then echo "• ⚠️  сертификат не проверен"; problems=1
+    elif (( d < 14 )); then systemctl reload caddy || true; echo "• ⚠️  сертификат: осталось $d дн. — Caddy перезагружен"; problems=1
+    else echo "• сертификат: ещё $d дн."; fi
+    # диск
+    local used; used="$(df -P / | awk 'NR==2 {gsub("%","",$5); print $5}')"
+    if (( used > 90 )); then echo "• ⚠️  диск занят на $used%"; problems=1; else echo "• диск: $used%"; fi
+    # старые отчёты о сбоях
+    local old; old="$(find "$CRASH_DIR" -name '*.txt' -mtime +90 2>/dev/null | wc -l)"
+    find "$CRASH_DIR" -name '*.txt' -mtime +90 -delete 2>/dev/null || true
+    (( old > 0 )) && echo "• удалено старых отчётов о сбоях: $old"
+    # обновление скрипта
+    local tmp server new
+    tmp="$(mktemp -d)"
+    if server="$(fetch_repo "$tmp" 2>/dev/null)"; then
+      new="$(grep -m1 '^APEX_SCRIPT_VERSION=' "$server/apex" | cut -d'"' -f2)"
+      if [[ -n "$new" ]] && ver_gt "$new" "$APEX_SCRIPT_VERSION" && bash -n "$server/apex"; then
+        install -m 755 "$server/apex" /usr/local/bin/apex
+        install -m 755 "$server/crash-receiver.py" /usr/local/lib/apexvpn/crash-receiver.py 2>/dev/null && systemctl restart apexvpn-crash || true
+        echo "• скрипт обновлён: $APEX_SCRIPT_VERSION → $new"
+      else
+        echo "• скрипт: последняя версия ($APEX_SCRIPT_VERSION)"
+      fi
+    else
+      echo "• скрипт: GitHub недоступен, обновление пропущено"
+    fi
+    rm -rf "$tmp"
+    (( problems )) && echo "ИТОГ: есть проблемы" || echo "ИТОГ: всё в порядке"
+  } > "$report.tmp" 2>&1
+  mv -f "$report.tmp" "$report"
+  cat "$report"
+}
+
+ensure_access_log() { # 55. журнал запросов Caddy для сводки (без лишних данных, хранится 7 дней)
+  local f=/etc/caddy/apexvpn.caddy
+  [[ -f "$f" ]] || return 0
+  grep -q apexvpn-access "$f" && return 0
+  cp -f "$f" "$f.bak"
+  awk 'NR==1 {print; print "\tlog {\n\t\toutput file /var/log/caddy/apexvpn-access.log {\n\t\t\troll_size 10MiB\n\t\t\troll_keep 5\n\t\t\troll_keep_for 168h\n\t\t}\n\t\tformat json\n\t}"; next} {print}' "$f.bak" > "$f"
+  mkdir -p /var/log/caddy && chown caddy:caddy /var/log/caddy 2>/dev/null || true
+  if caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1; then
+    systemctl reload caddy 2>/dev/null || true
+  else
+    mv -f "$f.bak" "$f"
+  fi
+}
+
+setup_units() { # таймеры: автопубликация (по включению) и еженедельное обслуживание
+  need_root
+  mkdir -p "$STATE_DIR"
+  cat > /etc/systemd/system/apexvpn-auto.service <<'EOF'
+[Unit]
+Description=APEX VPN: автопубликация новой версии с GitHub
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c '/usr/bin/flock -n /run/apexvpn-publish.lock /usr/local/bin/apex auto run >> /var/lib/apexvpn/auto.log 2>&1'
+EOF
+  cat > /etc/systemd/system/apexvpn-auto.timer <<'EOF'
+[Unit]
+Description=APEX VPN: проверка новой версии каждые 30 минут
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=30min
+RandomizedDelaySec=2min
+
+[Install]
+WantedBy=timers.target
+EOF
+  cat > /etc/systemd/system/apexvpn-maintain.service <<'EOF'
+[Unit]
+Description=APEX VPN: еженедельное обслуживание
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/apex maintain
+EOF
+  cat > /etc/systemd/system/apexvpn-maintain.timer <<'EOF'
+[Unit]
+Description=APEX VPN: обслуживание раз в неделю
+
+[Timer]
+OnCalendar=Mon *-*-* 04:20:00
+Persistent=true
+RandomizedDelaySec=30min
+
+[Install]
+WantedBy=timers.target
+EOF
+  systemctl daemon-reload
+  systemctl enable --now apexvpn-maintain.timer >/dev/null 2>&1 || true
+  ensure_access_log
+}
+
 # ─── Меню ────────────────────────────────────────────────────────────────
 
 if [[ -t 1 ]]; then B=$'\e[1m'; D=$'\e[2m'; V=$'\e[38;5;141m'; C=$'\e[38;5;80m'; G=$'\e[32m'; R=$'\e[31m'; N=$'\e[0m'
@@ -347,6 +617,9 @@ banner() {
     local rel="не выпущено"
     [[ -f "$WEB_DIR/update.json" ]] && rel="$(jq -r '.versionName' "$WEB_DIR/update.json" 2>/dev/null || echo ?)"
     echo "  ${D}Адрес:${N} $BASE_URL   ${D}Версия приложения:${N} $rel"
+    local auto="выкл"; systemctl is-enabled apexvpn-auto.timer >/dev/null 2>&1 && auto="${G}вкл${N}"
+    local last="ещё не было"; [[ -f "$STATE_DIR/report.txt" ]] && last="$(tail -n1 "$STATE_DIR/report.txt" | sed 's/^ИТОГ: //') ($(date -r "$STATE_DIR/report.txt" '+%d.%m'))"
+    echo "  ${D}Автопубликация:${N} $auto   ${D}Обслуживание:${N} $last"
   else
     echo "  ${R}Сервер ещё не установлен${N} — выберите 1"
   fi
@@ -379,6 +652,12 @@ menu() {
     item 14 "Журналы"
     item 15 "Проверить обновления скрипта"
     item 16 "Удалить сервер APEX"
+    echo "  ${D}── Автоматика и наблюдение${N}"
+    item 17 "Автопубликация с GitHub (вкл / выкл)"
+    item 18 "Сводка: устройства и версии"
+    item 19 "Здоровье сервера"
+    item 20 "Обслуживание сейчас"
+    item 21 "Зеркала APK"
     echo
     item 0  "Выход"
     echo
@@ -408,6 +687,22 @@ menu() {
       15) ( cmd_update_script )
           if [[ -x /usr/local/bin/apex ]] && ! grep -q "^APEX_SCRIPT_VERSION=\"$APEX_SCRIPT_VERSION\"" /usr/local/bin/apex; then exec /usr/local/bin/apex; fi ;;
       16) ( cmd_uninstall ); [[ -f /usr/local/bin/apex ]] || exit 0 ;;
+      17) ( cmd_auto status; echo
+            if systemctl is-enabled apexvpn-auto.timer >/dev/null 2>&1; then
+              read -r -p "Выключить? [y/N] " a; [[ "$a" == [yY] ]] && cmd_auto off
+            else
+              read -r -p "Включить? [Y/n] " a; [[ "$a" == [nN] ]] || cmd_auto on
+            fi
+            read -r -p "Проверить GitHub прямо сейчас? [y/N] " a; [[ "$a" == [yY] ]] && cmd_auto run ) ;;
+      18) local n; read -r -p "За сколько дней [1]: " n; ( cmd_stats "${n:-1}" ) ;;
+      19) ( cmd_health ) ;;
+      20) ( cmd_maintain ) ;;
+      21) ( echo "Зеркала задаются в $CONFIG:"
+            echo "  MIRROR_SYNC=\"root@второй-сервер:/var/www/apexvpn\"   — куда копировать APK по ssh"
+            echo "  MIRROR_URLS=\"https://второй-сервер/apexvpn\"         — откуда его скачает приложение"
+            echo "  MIRROR_GITHUB=\"yes\"                                 — загрузить APK в релиз GitHub"
+            echo; echo "Сейчас: SYNC=${MIRROR_SYNC:-—}  URLS=${MIRROR_URLS:-—}  GITHUB=${MIRROR_GITHUB:-нет}"
+            echo "Если основной сервер недоступен, приложение скачает APK с зеркала и проверит его по sha256." ) ;;
       0|q|exit) exit 0 ;;
       *) echo "Нет такого пункта" ;;
     esac
@@ -429,7 +724,12 @@ case "${1:-menu}" in
   logs) cmd_logs ;;
   update-script) cmd_update_script ;;
   uninstall) cmd_uninstall ;;
+  auto) shift; cmd_auto "$@" ;;
+  stats) shift; cmd_stats "$@" ;;
+  health) cmd_health ;;
+  maintain) cmd_maintain ;;
+  setup-units) setup_units ;;
   -v|--version|version) echo "apex $APEX_SCRIPT_VERSION" ;;
-  *) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *) awk 'NR>1 && /^#/ {sub(/^# ?/, ""); print; next} NR>1 {exit}' "$0" ;;
 esac
 

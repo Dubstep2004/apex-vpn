@@ -17,22 +17,37 @@ object AppIcons {
         Icon("terminal", "Терминал", "com.apexvpn.client.ui.LauncherTerminal", R.drawable.ic_launcher_terminal_background, R.drawable.ic_launcher_terminal_foreground),
     )
 
-    /** Включает выбранный ярлык и выключает остальные. Приложение при этом не закрывается. */
-    fun apply(context: Context, id: String) {
+    /**
+     * Включает выбранный ярлык и выключает остальные. Приложение при этом не закрывается.
+     * [vpnOn] — 20. вариант той же иконки с зелёной точкой (если включено «Иконка показывает статус»).
+     */
+    fun apply(context: Context, id: String, vpnOn: Boolean = false) {
         val pm = context.packageManager
         val chosen = all.firstOrNull { it.id == id } ?: all.first()
-        // Сначала включаем новый — чтобы на мгновение не остаться без иконки
-        pm.setComponentEnabledSetting(
-            ComponentName(context.packageName, chosen.alias),
-            PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
-            PackageManager.DONT_KILL_APP,
-        )
-        all.filter { it != chosen }.forEach {
-            pm.setComponentEnabledSetting(
-                ComponentName(context.packageName, it.alias),
-                PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-                PackageManager.DONT_KILL_APP,
-            )
+        val target = if (vpnOn) chosen.alias + "On" else chosen.alias
+        val every = all.flatMap { listOf(it.alias, it.alias + "On") }
+        runCatching {
+            val current = ComponentName(context.packageName, target)
+            if (pm.getComponentEnabledSetting(current) == PackageManager.COMPONENT_ENABLED_STATE_ENABLED &&
+                every.filter { it != target }.none {
+                    pm.getComponentEnabledSetting(ComponentName(context.packageName, it)) == PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                }
+            ) return
+            // Сначала включаем новый — чтобы на мгновение не остаться без иконки
+            pm.setComponentEnabledSetting(current, PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP)
+            every.filter { it != target }.forEach {
+                pm.setComponentEnabledSetting(
+                    ComponentName(context.packageName, it),
+                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                    PackageManager.DONT_KILL_APP,
+                )
+            }
         }
+    }
+
+    /** 20. Обновить иконку по состоянию VPN. */
+    fun syncStatus(context: Context, vpnOn: Boolean) {
+        val s = AppSettings.value
+        apply(context, s.appIcon, vpnOn = s.iconStatus && vpnOn)
     }
 }

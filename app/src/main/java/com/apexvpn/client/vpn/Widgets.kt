@@ -32,14 +32,47 @@ class ApexWidgetInfo : AppWidgetProvider() {
     }
 }
 
+/** 44. Виджет 4×2: кнопка VPN и четыре сервера (автопилот и избранные). */
+class ApexWidgetServers : AppWidgetProvider() {
+    override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
+        NewWidgets.update(context)
+    }
+    override fun onReceive(context: Context, intent: Intent) {
+        when (intent.action) {
+            NewWidgets.ACTION_TOGGLE -> VpnToggle.toggle(context.applicationContext)
+            NewWidgets.ACTION_SELECT -> {
+                val tag = intent.getStringExtra(NewWidgets.EXTRA_TAG) ?: return
+                Subscription.select(tag)
+                if (VpnState.isOn) ApexVpnService.reload(context.applicationContext)
+                NewWidgets.update(context)
+            }
+            else -> super.onReceive(context, intent)
+        }
+    }
+}
+
 object NewWidgets {
     const val ACTION_TOGGLE = "com.apexvpn.client.WIDGET2_TOGGLE"
+    const val ACTION_SELECT = "com.apexvpn.client.WIDGET_SELECT"
+    const val EXTRA_TAG = "tag"
+    private val cells = intArrayOf(R.id.srv_0, R.id.srv_1, R.id.srv_2, R.id.srv_3)
+
+    /** Автопилот и три сервера: избранные, иначе первые без рекламы. */
+    private fun widgetServers(): List<Pair<String, String>> {
+        val sub = Subscription.state.value
+        val fav = com.apexvpn.client.data.AppSettings.value.favorites
+        val pool = sub.nodes.filter { it.name in fav }.ifEmpty { sub.nodes.filter { !it.ads } }
+        return listOf(AUTO_TAG to "⚡ Автопилот") + pool.take(3).map { n ->
+            n.tag to listOfNotNull(ServerInfo.flag(n.name), ServerInfo.title(n.name)).joinToString(" ")
+        }
+    }
 
     private fun ids(context: Context, cls: Class<*>): IntArray =
         AppWidgetManager.getInstance(context).getAppWidgetIds(ComponentName(context, cls))
 
     /** Есть ли на экране виджеты со скоростью и пингом — тогда сервис их обновляет. */
-    fun anyLive(context: Context) = ids(context, ApexWidgetRound::class.java).isNotEmpty() || ids(context, ApexWidgetInfo::class.java).isNotEmpty()
+    fun anyLive(context: Context) = ids(context, ApexWidgetRound::class.java).isNotEmpty() ||
+        ids(context, ApexWidgetInfo::class.java).isNotEmpty() || ids(context, ApexWidgetServers::class.java).isNotEmpty()
 
     private fun toggle(context: Context, cls: Class<*>) = PendingIntent.getBroadcast(
         context, cls.name.hashCode(),
@@ -63,6 +96,48 @@ object NewWidgets {
                 setImageViewResource(R.id.round_button, icon)
                 setTextViewText(R.id.round_ping, pingText)
                 setOnClickPendingIntent(R.id.round_root, toggle(context, ApexWidgetRound::class.java))
+            }
+            list.forEach { manager.updateAppWidget(it, v) }
+        }
+
+        ids(context, ApexWidgetServers::class.java).takeIf { it.isNotEmpty() }?.let { list ->
+            val sub = Subscription.state.value
+            val servers = widgetServers()
+            val v = RemoteViews(context.packageName, R.layout.widget_servers).apply {
+                setTextViewText(
+                    R.id.srv_status,
+                    when (status) {
+                        VpnStatus.Started -> "Защищено"
+                        VpnStatus.Paused -> "Пауза"
+                        VpnStatus.Starting -> "Подключение…"
+                        VpnStatus.Stopping -> "Отключение…"
+                        VpnStatus.Blocked -> "Блокировка"
+                        VpnStatus.Stopped -> "Выключен"
+                    },
+                )
+                setTextViewText(R.id.srv_ping, if (pingText.isNotEmpty()) "Пинг $pingText" else "APEX VPN")
+                setImageViewResource(R.id.srv_button, icon)
+                setOnClickPendingIntent(R.id.srv_button, toggle(context, ApexWidgetServers::class.java))
+                setOnClickPendingIntent(R.id.srv_header, PendingIntent.getActivity(
+                    context, 32, Intent(context, com.apexvpn.client.ui.MainActivity::class.java),
+                    PendingIntent.FLAG_IMMUTABLE,
+                ))
+                cells.forEachIndexed { i, id ->
+                    val item = servers.getOrNull(i)
+                    if (item == null) {
+                        setViewVisibility(id, android.view.View.INVISIBLE)
+                    } else {
+                        setViewVisibility(id, android.view.View.VISIBLE)
+                        setTextViewText(id, item.second)
+                        val chosen = item.first == sub.selectedTag || (item.first == AUTO_TAG && sub.nodes.none { it.tag == sub.selectedTag })
+                        setInt(id, "setBackgroundResource", if (chosen) R.drawable.widget_cell_on else R.drawable.widget_cell)
+                        setOnClickPendingIntent(id, PendingIntent.getBroadcast(
+                            context, 400 + i,
+                            Intent(context, ApexWidgetServers::class.java).setAction(ACTION_SELECT).putExtra(EXTRA_TAG, item.first),
+                            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                        ))
+                    }
+                }
             }
             list.forEach { manager.updateAppWidget(it, v) }
         }

@@ -67,6 +67,12 @@ data class Settings(
     val remoteDns: DnsSpec = DnsSpec(),
     val directDns: DnsSpec = DnsSpec(),
     val rulesSource: String = "",                     // свой адрес баз сайтов (*.srs)
+    val warp: Boolean = false,                        // 31. WARP-цепочка
+    val warpConfig: String = "",                      // данные аккаунта WARP (JSON из ядра)
+    // 17. Фон за щитом: none | waves | particles | stars
+    val shieldBackdrop: String = "none",
+    // 20. Иконка на рабочем столе показывает, включён ли VPN
+    val iconStatus: Boolean = false,
 )
 
 /** Своё правило маршрутизации: домен/IP и действие proxy | direct | block. */
@@ -145,6 +151,8 @@ object AppSettings {
         put("fakeDns", s.fakeDns)
         if (s.remoteDns.isSet) put("remoteDns", s.remoteDns.json())
         if (s.directDns.isSet) put("directDns", s.directDns.json())
+        runCatching { put("logFile", Diagnostics.coreLog(com.apexvpn.client.ApexApp.instance).path) }
+        if (s.warp && s.warpConfig.isNotBlank()) runCatching { put("warp", JSONObject(s.warpConfig)) }
         put("autoProtocols", JSONArray(if (s.protocol.isEmpty()) emptyList() else listOf(s.protocol)))
         put(
             "share",
@@ -191,6 +199,8 @@ object AppSettings {
         put("userRules", JSONArray(s.userRules.map { JSONObject().put("value", it.value).put("action", it.action) }))
         put("domainStrategy", s.domainStrategy); put("fakeDns", s.fakeDns)
         put("remoteDns", s.remoteDns.json()); put("directDns", s.directDns.json()); put("rulesSource", s.rulesSource)
+        put("warp", s.warp); put("warpConfig", s.warpConfig); put("shieldBackdrop", s.shieldBackdrop)
+        put("iconStatus", s.iconStatus)
     }
 
     private fun fromJson(o: JSONObject): Settings {
@@ -247,6 +257,10 @@ object AppSettings {
             remoteDns = DnsSpec.from(o.optJSONObject("remoteDns")),
             directDns = DnsSpec.from(o.optJSONObject("directDns")),
             rulesSource = o.optString("rulesSource", d.rulesSource),
+            warp = o.optBoolean("warp", d.warp),
+            warpConfig = o.optString("warpConfig", d.warpConfig),
+            shieldBackdrop = o.optString("shieldBackdrop", d.shieldBackdrop),
+            iconStatus = o.optBoolean("iconStatus", d.iconStatus),
         )
     }
 }

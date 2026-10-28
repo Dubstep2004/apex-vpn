@@ -271,6 +271,7 @@ class ApexVpnService : VpnService(), PlatformInterface, CommandServerHandler {
 
     /** Собирает конфиги, запускает/перезапускает Xray при необходимости, возвращает конфиг sing-box. */
     private fun prepareConfig(): String {
+        com.apexvpn.client.data.Diagnostics.trimCoreLog(this)
         val (singBox, xray) = Subscription.buildConfigs(this)
         XrayCore.apply(this, xray)
         return singBox

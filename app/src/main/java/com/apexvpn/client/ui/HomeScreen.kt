@@ -153,6 +153,20 @@ fun HomeScreen(
 
         val selected = sub.nodes.find { it.tag == sub.selectedTag }
         val auto = sub.selectedTag == AUTO_TAG || selected == null
+        // 12. Свайп по щиту: избранные серверы (если их 2+), иначе все без рекламы
+        val cycle = remember(sub.nodes, settings.favorites) {
+            val fav = sub.nodes.filter { it.name in settings.favorites }
+            listOf(AUTO_TAG) + (if (fav.size >= 2) fav else sub.nodes.filter { !it.ads }).map { it.tag }
+        }
+        val onSwipe: (Int) -> Unit = { dir ->
+            if (cycle.size > 1) {
+                val i = cycle.indexOf(if (auto) AUTO_TAG else sub.selectedTag).coerceAtLeast(0)
+                val next = cycle[(i + dir + cycle.size) % cycle.size]
+                viewModel.select(next)
+                val n = sub.nodes.find { it.tag == next }
+                viewModel.showMessage(if (n == null) "Автопилот" else ServerInfo.title(n.name))
+            }
+        }
         if (Apex.palette.bento) {
             // Д6. Бенто: главный экран из плиток
             Spacer(Modifier.height(16.dp))
@@ -194,10 +208,16 @@ fun HomeScreen(
                 },
             )
             Spacer(Modifier.height(14.dp))
-            ShieldButton(status, onToggle, diameter = 150.dp)
+            Box(Modifier.fillMaxWidth().swipeServers(onSwipe), contentAlignment = Alignment.Center) {
+                ShieldAmbient(settings.shieldBackdrop, status == VpnStatus.Started, Modifier.matchParentSize())
+                ShieldButton(status, onToggle, diameter = 150.dp)
+            }
         } else {
             Spacer(Modifier.height(18.dp))
-            ShieldButton(status, onToggle)
+            Box(Modifier.fillMaxWidth().swipeServers(onSwipe), contentAlignment = Alignment.Center) {
+                ShieldAmbient(settings.shieldBackdrop, status == VpnStatus.Started, Modifier.matchParentSize())
+                ShieldButton(status, onToggle)
+            }
         }
 
         val label = when (status) {
@@ -215,7 +235,7 @@ fun HomeScreen(
             status == VpnStatus.Paused -> Text("Доверенная сеть Wi-Fi — VPN не нужен", color = Apex.TextDim, fontSize = 15.sp)
             status == VpnStatus.Blocked -> Text("VPN переподключается, без него интернет закрыт", color = Apex.Warn, fontSize = 15.sp)
             else -> Text(
-                if (status == VpnStatus.Stopped) "Нажмите на щит, чтобы подключиться" else " ",
+                if (status == VpnStatus.Stopped) "Нажмите на щит · свайп — другой сервер" else " ",
                 color = Apex.TextDim,
                 fontSize = 15.sp,
             )

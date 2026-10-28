@@ -39,6 +39,8 @@ data class UpdateInfo(
     val sha256: String?,
     val changelog: String,
     val mandatory: Boolean,
+    /** 83. Запасные адреса APK (только при наличии sha256 — файл всё равно проверяется) */
+    val mirrors: List<String> = emptyList(),
 )
 
 sealed interface UpdateState {
@@ -134,52 +136,63 @@ object UpdateManager {
         val dir = updatesDir()
         dir.listFiles()?.forEach { it.delete() }
         val target = File(dir, "apex-vpn-${info.versionName}.apk")
-        try {
-            val conn = open(info.apkUrl)
+        // 83. Основной адрес, затем зеркала: если сервер недоступен, APK скачается с запасного
+        val urls = listOf(info.apkUrl) + info.mirrors
+        var lastError: Exception? = null
+        for (url in urls) {
             try {
-                if (conn.responseCode != HttpURLConnection.HTTP_OK) {
-                    error("Сервер обновлений ответил кодом ${conn.responseCode}")
-                }
-                val total = conn.contentLengthLong
-                val digest = MessageDigest.getInstance("SHA-256")
-                var done = 0L
-                var lastReported = 0f
-                conn.inputStream.use { input ->
-                    target.outputStream().use { output ->
-                        val buf = ByteArray(64 * 1024)
-                        while (true) {
-                            ensureActive()
-                            val n = input.read(buf)
-                            if (n < 0) break
-                            output.write(buf, 0, n)
-                            digest.update(buf, 0, n)
-                            done += n
-                            if (total > 0) {
-                                val p = done.toFloat() / total
-                                if (p - lastReported >= 0.01f) {
-                                    lastReported = p
-                                    _state.value = UpdateState.Downloading(info, p)
-                                }
+                fetchApk(url, info, target)
+                _state.value = UpdateState.ReadyToInstall(info, target)
+                if (autoInstall) launchInstaller(context, target)
+                return@withContext
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                target.delete()
+                throw e
+            } catch (e: Exception) {
+                target.delete()
+                lastError = e
+            }
+        }
+        _state.value = UpdateState.Failed(lastError?.message ?: "Ошибка загрузки", info)
+    }
+
+    private suspend fun fetchApk(url: String, info: UpdateInfo, target: File) = withContext(Dispatchers.IO) {
+        val conn = open(url)
+        try {
+            if (conn.responseCode != HttpURLConnection.HTTP_OK) {
+                error("Сервер обновлений ответил кодом ${conn.responseCode}")
+            }
+            val total = conn.contentLengthLong
+            val digest = MessageDigest.getInstance("SHA-256")
+            var done = 0L
+            var lastReported = 0f
+            conn.inputStream.use { input ->
+                target.outputStream().use { output ->
+                    val buf = ByteArray(64 * 1024)
+                    while (true) {
+                        ensureActive()
+                        val n = input.read(buf)
+                        if (n < 0) break
+                        output.write(buf, 0, n)
+                        digest.update(buf, 0, n)
+                        done += n
+                        if (total > 0) {
+                            val p = done.toFloat() / total
+                            if (p - lastReported >= 0.01f) {
+                                lastReported = p
+                                _state.value = UpdateState.Downloading(info, p)
                             }
                         }
                     }
                 }
-                val expected = info.sha256?.lowercase()?.takeIf { it.isNotBlank() }
-                if (expected != null) {
-                    val actual = digest.digest().joinToString("") { "%02x".format(it) }
-                    if (actual != expected) {
-                        target.delete()
-                        error("Файл обновления повреждён (контрольная сумма не совпала)")
-                    }
-                }
-            } finally {
-                conn.disconnect()
             }
-            _state.value = UpdateState.ReadyToInstall(info, target)
-            if (autoInstall) launchInstaller(context, target)
-        } catch (e: Exception) {
-            target.delete()
-            _state.value = UpdateState.Failed(e.message ?: "Ошибка загрузки", info)
+            val expected = info.sha256?.lowercase()?.takeIf { it.isNotBlank() }
+            if (expected != null) {
+                val actual = digest.digest().joinToString("") { "%02x".format(it) }
+                if (actual != expected) error("Файл обновления повреждён (контрольная сумма не совпала)")
+            }
+        } finally {
+            conn.disconnect()
         }
     }
 
@@ -250,13 +263,18 @@ object UpdateManager {
             val apkUrl = json.getString("apkUrl")
             require(apkUrl.startsWith("https://")) { "Ссылка на APK должна быть https" }
             val minSupported = json.optInt("minSupportedVersionCode", 0)
+            val sha = json.optString("sha256").takeIf { it.isNotBlank() }
+            val mirrors = if (sha == null) emptyList() else json.optJSONArray("mirrors")?.let { a ->
+                List(a.length()) { a.optString(it) }.filter { it.startsWith("https://") && it != apkUrl }
+            }.orEmpty()
             UpdateInfo(
                 versionCode = json.getInt("versionCode"),
                 versionName = json.getString("versionName"),
                 apkUrl = apkUrl,
-                sha256 = json.optString("sha256").takeIf { it.isNotBlank() },
+                sha256 = sha,
                 changelog = json.optString("changelog"),
                 mandatory = json.optBoolean("mandatory", false) || BuildConfig.VERSION_CODE < minSupported,
+                mirrors = mirrors,
             )
         } finally {
             conn.disconnect()

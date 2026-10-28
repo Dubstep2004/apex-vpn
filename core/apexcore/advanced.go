@@ -20,6 +20,7 @@ import (
 //	keyword:google       — домены, где есть слово
 //	regexp:^ads\.        — регулярное выражение
 //	1.2.3.4, 10.0.0.0/8  — IP-адрес или подсеть
+//	port:443, udp:27000-27100, tcp:25565 — порт или диапазон (35. обход по портам)
 type UserRule struct {
 	Value  string `json:"value"`
 	Action string `json:"action"`
@@ -120,10 +121,68 @@ func ValidateDNSSpec(typ, server, ip string) string {
 
 type userRuleSet struct {
 	suffix, full, keyword, regex, cidr []string
+	ports                              []portSpec
+}
+
+// portSpec — порт или диапазон; network: "" (любой), "tcp" или "udp".
+type portSpec struct {
+	network string
+	port    int
+	rng     string // "27000:27100"
 }
 
 func (s *userRuleSet) empty() bool {
 	return len(s.suffix)+len(s.full)+len(s.keyword)+len(s.regex)+len(s.cidr) == 0
+}
+
+// portRules — отдельные правила для портов (по одному на сеть), не смешиваются с доменами.
+func (s *userRuleSet) portRules(extra map[string]any) []any {
+	byNet := map[string]map[string]any{}
+	var order []string
+	for _, p := range s.ports {
+		r, ok := byNet[p.network]
+		if !ok {
+			r = map[string]any{}
+			if p.network != "" {
+				r["network"] = p.network
+			}
+			for k, v := range extra {
+				r[k] = v
+			}
+			byNet[p.network] = r
+			order = append(order, p.network)
+		}
+		if p.rng != "" {
+			list, _ := r["port_range"].([]string)
+			r["port_range"] = append(list, p.rng)
+		} else {
+			list, _ := r["port"].([]int)
+			r["port"] = append(list, p.port)
+		}
+	}
+	out := make([]any, 0, len(order))
+	for _, n := range order {
+		out = append(out, byNet[n])
+	}
+	return out
+}
+
+// parsePort разбирает «443» или «27000-27100».
+func parsePort(v string) (int, string, bool) {
+	v = strings.TrimSpace(v)
+	if a, b, ok := strings.Cut(v, "-"); ok {
+		x, e1 := strconv.Atoi(strings.TrimSpace(a))
+		y, e2 := strconv.Atoi(strings.TrimSpace(b))
+		if e1 != nil || e2 != nil || x < 1 || y > 65535 || x > y {
+			return 0, "", false
+		}
+		return 0, fmt.Sprintf("%d:%d", x, y), true
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 1 || n > 65535 {
+		return 0, "", false
+	}
+	return n, "", true
 }
 
 // rule — правило sing-box для этих значений (nil, если пусто).
@@ -173,6 +232,17 @@ func groupUserRules(list []UserRule) (map[string]*userRuleSet, []string) {
 		switch {
 		case v == "":
 			continue
+		case strings.HasPrefix(low, "port:") || strings.HasPrefix(low, "udp:") || strings.HasPrefix(low, "tcp:"):
+			network, rest, _ := strings.Cut(low, ":")
+			if network == "port" {
+				network = ""
+			}
+			n, rng, ok := parsePort(rest)
+			if !ok {
+				bad = append(bad, v+": неверный порт (1–65535 или 1000-2000)")
+				continue
+			}
+			set.ports = append(set.ports, portSpec{network: network, port: n, rng: rng})
 		case strings.HasPrefix(low, "keyword:"):
 			set.keyword = append(set.keyword, strings.TrimSpace(v[len("keyword:"):]))
 		case strings.HasPrefix(low, "regexp:"):

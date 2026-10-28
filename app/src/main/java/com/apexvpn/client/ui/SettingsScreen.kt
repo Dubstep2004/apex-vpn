@@ -43,6 +43,7 @@ import androidx.compose.material.icons.rounded.SettingsEthernet
 import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material.icons.rounded.Storage
+import androidx.compose.material.icons.rounded.SupportAgent
 import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material.icons.rounded.Update
 import androidx.compose.material.icons.rounded.Wifi
@@ -313,6 +314,18 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
                 leading = { tile(Icons.Rounded.NewReleases) },
                 onClick = { onOpenPage(Page.Changelog) },
             ) { Chevron() }
+            GroupDivider()
+            // 24. Поддержка: отчёт с журналом одной кнопкой
+            ListRow(
+                "Написать в поддержку",
+                "Отчёт с журналом — без ссылки подписки и IP",
+                leading = { tile(Icons.Rounded.SupportAgent) },
+                onClick = {
+                    runCatching { com.apexvpn.client.data.Diagnostics.share(context) }
+                        .onFailure { viewModel.showMessage("Не удалось собрать отчёт") }
+                    if (sub.supportUrl.isNotBlank()) viewModel.showMessage("Отправьте файл в чат поддержки — кнопка «Поддержка» на карточке подписки")
+                },
+            ) { Chevron() }
         }
         Spacer(Modifier.height(24.dp))
     }
@@ -400,7 +413,7 @@ private fun tile(icon: ImageVector, tint: Color = Apex.Text) {
 }
 
 @Composable
-private fun Chevron() {
+internal fun Chevron() {
     Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = Apex.TextDim)
 }
 

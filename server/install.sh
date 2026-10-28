@@ -42,7 +42,7 @@ SITE="$DOMAIN"; [[ $PORT == 443 ]] || SITE="$DOMAIN:$PORT"
 BASE_URL="https://$SITE/apexvpn"
 
 echo "==> папки"
-mkdir -p /var/www/apexvpn /var/lib/apexvpn/crashes /etc/apexvpn /usr/local/lib/apexvpn
+mkdir -p /var/www/apexvpn /var/lib/apexvpn/crashes /etc/apexvpn /usr/local/lib/apexvpn /var/log/caddy
 [[ -f /var/www/apexvpn/news.json ]] || echo '[]' > /var/www/apexvpn/news.json
 chmod 755 /var/www/apexvpn; chmod 644 /var/www/apexvpn/news.json
 
@@ -56,15 +56,25 @@ if [[ ! -f /etc/apexvpn/apex.jks ]]; then
 fi
 chmod 600 /etc/apexvpn/apex.jks /etc/apexvpn/keypass
 
-# Токен GitHub сохраняем при переустановке и смене домена
+# Токен GitHub и зеркала сохраняем при переустановке и смене домена
 OLD_TOKEN=""
-[[ -f /etc/apexvpn/config ]] && OLD_TOKEN="$(sed -nE 's/^GITHUB_TOKEN="(.*)"$/\1/p' /etc/apexvpn/config)"
+OLD_SYNC=""; OLD_URLS=""; OLD_GH=""
+if [[ -f /etc/apexvpn/config ]]; then
+  OLD_TOKEN="$(sed -nE 's/^GITHUB_TOKEN="(.*)"$/\1/p' /etc/apexvpn/config)"
+  OLD_SYNC="$(sed -nE 's/^MIRROR_SYNC="(.*)"$/\1/p' /etc/apexvpn/config)"
+  OLD_URLS="$(sed -nE 's/^MIRROR_URLS="(.*)"$/\1/p' /etc/apexvpn/config)"
+  OLD_GH="$(sed -nE 's/^MIRROR_GITHUB="(.*)"$/\1/p' /etc/apexvpn/config)"
+fi
 cat > /etc/apexvpn/config <<EOF
 # Настройки команды apex
 BASE_URL="$BASE_URL"
 REPO="Dubstep2004/apex-vpn"
 # Для приватного репозитория: токен GitHub с доступом на чтение (Contents: Read)
 GITHUB_TOKEN="$OLD_TOKEN"
+# Зеркала APK (пункт 21 меню): копировать по ssh, откуда скачивать, загружать ли в релиз GitHub
+MIRROR_SYNC="$OLD_SYNC"
+MIRROR_URLS="$OLD_URLS"
+MIRROR_GITHUB="$OLD_GH"
 EOF
 chmod 600 /etc/apexvpn/config
 
@@ -96,8 +106,17 @@ systemctl enable --now apexvpn-crash >/dev/null
 systemctl restart apexvpn-crash
 
 echo "==> Caddy: $SITE"
+chown caddy:caddy /var/log/caddy 2>/dev/null || true
 cat > /etc/caddy/apexvpn.caddy <<EOF
 $SITE {
+	log {
+		output file /var/log/caddy/apexvpn-access.log {
+			roll_size 10MiB
+			roll_keep 5
+			roll_keep_for 168h
+		}
+		format json
+	}
 	handle /apexvpn/crash {
 		request_body {
 			max_size 64KB
@@ -126,6 +145,8 @@ systemctl enable caddy >/dev/null
 systemctl reload caddy 2>/dev/null || systemctl restart caddy
 
 install -m 755 "$HERE/apex" /usr/local/bin/apex
+# Таймеры: еженедельное обслуживание (сразу) и автопубликация (включается в меню, пункт 17)
+/usr/local/bin/apex setup-units || true
 
 echo
 echo "✅ Готово. Адрес сервера:"

@@ -59,3 +59,36 @@ func TestAdvancedRouting(t *testing.T) {
 		t.Fatalf("site check: %s", out)
 	}
 }
+
+func TestPortRulesAndWarp(t *testing.T) {
+	if e := ValidateUserRule("udp:27000-27100"); e != "" {
+		t.Fatal(e)
+	}
+	if e := ValidateUserRule("port:70000"); e == "" {
+		t.Fatal("порт 70000 должен быть ошибкой")
+	}
+	kp, err := WarpKeypair()
+	if err != nil {
+		t.Fatal(err)
+	}
+	priv, _, _ := strings.Cut(kp, " ")
+	resp := `{"config":{"client_id":"AQID","peers":[{"public_key":"bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=","endpoint":{"v4":"162.159.192.7:0","host":"engage.cloudflareclient.com:2408"}}],"interface":{"addresses":{"v4":"172.16.0.2","v6":"2606:4700:110:8a36::1"}}}}`
+	wj, err := WarpParse(resp, priv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var w WarpConfig
+	_ = json.Unmarshal([]byte(wj), &w)
+	if w.Host != "162.159.192.7" || w.Port != 2408 || len(w.Reserved) != 3 || w.Reserved[2] != 3 {
+		t.Fatalf("WARP разобран неверно: %+v", w)
+	}
+	opts, _ := json.Marshal(map[string]any{
+		"userRules": []map[string]string{{"value": "udp:27000-27100", "action": "direct"}, {"value": "tcp:25565", "action": "proxy"}},
+		"warp":      w,
+	})
+	nodes := parseNodes(t, "vless://"+testUUID+"@1.2.3.4:443?type=tcp&security=tls&sni=a.example.com#A")
+	cfg := checkAll(t, nodes, string(opts))
+	if !strings.Contains(cfg, `"27000:27100"`) || !strings.Contains(cfg, `"tag": "warp"`) || !strings.Contains(cfg, `"final": "warp"`) {
+		t.Fatalf("нет правил по портам или WARP:\n%s", cfg)
+	}
+}

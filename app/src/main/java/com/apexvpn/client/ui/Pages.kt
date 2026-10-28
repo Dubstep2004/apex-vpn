@@ -604,6 +604,12 @@ private fun AppearancePage(viewModel: MainViewModel, onBack: () -> Unit) {
         }
         if (s.design == Design.Bento) Caption("В дизайне «Бенто» главный экран всегда из плиток.")
 
+        // 17. Фон за щитом
+        SectionLabel("Фон за щитом")
+        ChipRow(listOf("none" to "Нет", "waves" to "Волны", "particles" to "Частицы", "stars" to "Звёзды"), s.shieldBackdrop) {
+            viewModel.change(reload = false) { copy(shieldBackdrop = it) }
+        }
+
         SectionLabel("Цвет")
         Row(Modifier.fillMaxWidth()) {
             AccentColor.entries.forEach { a ->
@@ -676,6 +682,22 @@ private fun AppearancePage(viewModel: MainViewModel, onBack: () -> Unit) {
             }
         }
 
+        // 43. Живые обои
+        SectionLabel("Живые обои")
+        Group {
+            ListRow("Обои APEX", "Карта мира, дуга до сервера и статус VPN на рабочем столе", onClick = {
+                val intent = android.content.Intent(android.app.WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).putExtra(
+                    android.app.WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
+                    android.content.ComponentName(context, com.apexvpn.client.vpn.ApexWallpaper::class.java),
+                )
+                runCatching { context.startActivity(intent) }.onFailure {
+                    runCatching { context.startActivity(android.content.Intent(android.app.WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER)) }
+                        .onFailure { viewModel.showMessage("Телефон не поддерживает живые обои") }
+                }
+            }) { Chevron() }
+        }
+        Caption("Анимация идёт, только когда обои видны и VPN включён.")
+
         // 20. Иконка приложения
         SectionLabel("Иконка приложения")
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
@@ -687,7 +709,6 @@ private fun AppearancePage(viewModel: MainViewModel, onBack: () -> Unit) {
                         .clickable {
                             if (!on) {
                                 viewModel.change(reload = false) { copy(appIcon = icon.id) }
-                                com.apexvpn.client.data.AppIcons.apply(context, icon.id)
                                 viewModel.showMessage("Иконка сменится на рабочем столе через несколько секунд")
                             }
                         }
@@ -708,7 +729,13 @@ private fun AppearancePage(viewModel: MainViewModel, onBack: () -> Unit) {
                 }
             }
         }
-        Caption("Некоторые рабочие столы обновляют иконку не сразу. Ярлыки на рабочем столе после смены иконки, возможно, придётся добавить заново.")
+        Spacer(Modifier.height(10.dp))
+        Group {
+            ListRow("Иконка показывает статус", "Зелёная точка на иконке, пока VPN включён") {
+                ApexSwitch(s.iconStatus, { v -> viewModel.change(reload = false) { copy(iconStatus = v) } })
+            }
+        }
+        Caption("Некоторые рабочие столы обновляют иконку не сразу, а иконку на рабочем столе после смены иногда приходится добавить заново. Если со «статусом» иконка пропадает с рабочего стола — выключите его.")
         Spacer(Modifier.height(24.dp))
     }
 }
@@ -922,7 +949,7 @@ private fun AdvancedPage(viewModel: MainViewModel, onBack: () -> Unit) {
             }
         }
         ruleError?.let { Text(it, color = Apex.Bad, fontSize = 13.sp, modifier = Modifier.padding(start = 4.dp, top = 6.dp)) }
-        Caption("Домен — вместе с поддоменами. full: — только этот домен, keyword: — по слову, regexp: — выражение, IP или подсеть. Свои правила важнее остальных.")
+        Caption("Домен — вместе с поддоменами. full: — только этот домен, keyword: — по слову, regexp: — выражение, IP или подсеть. Порты: port:443, udp:27000-27100 (игры напрямую), tcp:25565. Свои правила важнее остальных.")
 
         // ── Настройки доменов
         SectionLabel("Настройки доменов")
@@ -938,6 +965,28 @@ private fun AdvancedPage(viewModel: MainViewModel, onBack: () -> Unit) {
                 ChoiceRow(t.first, t.second, s.domainStrategy == id) { viewModel.change { copy(domainStrategy = id) } }
             }
         }
+
+        // ── 31. WARP-цепочка
+        SectionLabel("WARP-цепочка")
+        val warpBusy by viewModel.warpBusy.collectAsStateWithLifecycle()
+        Group {
+            ListRow(
+                "Выход через Cloudflare WARP",
+                when {
+                    warpBusy -> "Регистрирую бесплатный аккаунт…"
+                    s.warp -> "Вы → сервер VPN → WARP → сайт"
+                    else -> "Сайты увидят IP Cloudflare, а не сервера"
+                },
+            ) {
+                if (warpBusy) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp, color = Apex.Accent)
+                else ApexSwitch(s.warp, { v -> viewModel.setWarp(v) })
+            }
+            if (s.warpConfig.isNotBlank()) {
+                GroupDivider()
+                ListRow("Новый аккаунт WARP", "Если WARP перестал работать", onClick = { viewModel.resetWarp(); viewModel.setWarp(true) })
+            }
+        }
+        Caption("Помогает, когда сайт не открывается с IP сервера (капча, «недоступно в вашей стране»). Скорость может быть ниже. Нужен сервер с поддержкой UDP.")
 
         // ── DNS
         DnsEditor("Удалённый DNS (через VPN)", "https://dns.google/dns-query", s.remoteDns, viewModel) { d -> viewModel.change { copy(remoteDns = d) } }

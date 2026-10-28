@@ -18,6 +18,18 @@
     <!-- «Ощущения»: вибрация при подключении -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- 47. Android TV: сенсорный экран, камера и GPS не обязательны -->
+    <uses-feature android:name="android.software.leanback" android:required="false" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+    <uses-feature android:name="android.hardware.location" android:required="false" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <uses-feature android:name="android.hardware.wifi" android:required="false" />
+    <uses-feature android:name="android.hardware.telephony" android:required="false" />
+    <!-- 43. Живые обои -->
+    <uses-feature android:name="android.software.live_wallpaper" android:required="false" />
+
     <!-- Список приложений для выбора «какие идут через VPN» -->
     <queries>
         <intent>
@@ -29,6 +41,7 @@
     <application
         android:name=".ApexApp"
         android:allowBackup="false"
+        android:banner="@drawable/tv_banner"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
@@ -41,6 +54,11 @@
             android:exported="true"
             android:launchMode="singleTask"
             android:windowSoftInputMode="adjustResize">
+            <!-- 47. Значок на главном экране Android TV -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
             <!-- Ссылка-приглашение: apexvpn://import?url=https://sub.knownhosts.ru/… -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
@@ -134,6 +152,83 @@
                 android:resource="@xml/shortcuts" />
         </activity-alias>
 
+        <!-- 20. Те же иконки с зелёной точкой — когда VPN включён -->
+        <activity-alias
+            android:name=".ui.LauncherClassicOn"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_on"
+            android:roundIcon="@mipmap/ic_launcher_on"
+            android:targetActivity=".ui.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias
+            android:name=".ui.LauncherNeonOn"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_neon_on"
+            android:roundIcon="@mipmap/ic_launcher_neon_on"
+            android:targetActivity=".ui.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias
+            android:name=".ui.LauncherLightOn"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_light_on"
+            android:roundIcon="@mipmap/ic_launcher_light_on"
+            android:targetActivity=".ui.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias
+            android:name=".ui.LauncherGoldOn"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_gold_on"
+            android:roundIcon="@mipmap/ic_launcher_gold_on"
+            android:targetActivity=".ui.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias
+            android:name=".ui.LauncherTerminalOn"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_terminal_on"
+            android:roundIcon="@mipmap/ic_launcher_terminal_on"
+            android:targetActivity=".ui.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity-alias>
+
         <service
             android:name=".vpn.ApexTileService"
             android:exported="true"
@@ -183,6 +278,33 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_info" />
         </receiver>
+
+        <!-- 44. Виджет 4×2: кнопка и выбор сервера -->
+        <receiver
+            android:name=".vpn.ApexWidgetServers"
+            android:exported="false"
+            android:label="APEX · серверы">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_servers_info" />
+        </receiver>
+
+        <!-- 43. Живые обои: карта и статус VPN -->
+        <service
+            android:name=".vpn.ApexWallpaper"
+            android:exported="true"
+            android:label="APEX VPN"
+            android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.wallpaper"
+                android:resource="@xml/wallpaper" />
+        </service>
 
         <!-- 11. Команды от часов Wear OS -->
         <service

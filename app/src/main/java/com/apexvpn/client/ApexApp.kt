@@ -81,6 +81,15 @@ class ApexApp : Application() {
                 }
         }
 
+        // 20. Иконка с зелёной точкой, пока VPN включён
+        appScope.launch {
+            combine(VpnState.status, AppSettings.state) { st, set ->
+                (st == com.apexvpn.client.vpn.VpnStatus.Started || st == com.apexvpn.client.vpn.VpnStatus.Paused) to (set.iconStatus to set.appIcon)
+            }
+                .distinctUntilChanged()
+                .collect { (on, _) -> com.apexvpn.client.data.AppIcons.syncStatus(this@ApexApp, on) }
+        }
+
         // «Ощущения»: звук и вибрация при подключении
         appScope.launch {
             var last = VpnState.status.value

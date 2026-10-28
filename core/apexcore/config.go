@@ -83,6 +83,10 @@ type routeOptions struct {
 	FakeDNS        bool       `json:"fakeDns"`        // поддельные IP вместо настоящих для сайтов через VPN
 	RemoteDNS      *DNSSpec   `json:"remoteDns"`      // удалённый DNS (через VPN), вместо выбора из списка
 	DirectDNS      *DNSSpec   `json:"directDns"`      // домашний DNS (напрямую), вместо системного
+	// 31. WARP-цепочка: сайты через VPN выходят в интернет с IP Cloudflare
+	Warp *WarpConfig `json:"warp"`
+	// 24. LogFile — журнал ядра для отчёта в поддержку (только предупреждения и ошибки)
+	LogFile string `json:"logFile"`
 }
 
 // профиль подключения: как часто проверять серверы и рвать ли соединения при смене
@@ -318,6 +322,10 @@ func buildAll(nodesJSON string, selectedTag string, optionsJSON string) (string,
 	if r := userSets["direct"].rule(map[string]any{"outbound": "direct"}); r != nil {
 		rules = append(rules, r)
 	}
+	// 35. Свои правила по портам: например, игры по UDP напрямую
+	rules = append(rules, userSets["block"].portRules(map[string]any{"action": "reject"})...)
+	rules = append(rules, userSets["proxy"].portRules(map[string]any{"outbound": "proxy"})...)
+	rules = append(rules, userSets["direct"].portRules(map[string]any{"outbound": "direct"})...)
 	if ads != "" {
 		rules = append(rules, map[string]any{"rule_set": "ads", "action": "reject"})
 	}
@@ -477,6 +485,17 @@ func buildAll(nodesJSON string, selectedTag string, optionsJSON string) (string,
 		dnsSection["rules"] = dnsRules
 	}
 
+	// 31. WARP: всё, что шло через VPN, идёт дальше через Cloudflare WARP
+	if opts.Warp != nil {
+		if w, err := warpOutbound(opts.Warp); err == nil {
+			endpoints = append(endpoints, w)
+			throughWarp(rules)
+			if final == "proxy" {
+				final = warpEndpoint
+			}
+		}
+	}
+
 	route := map[string]any{
 		"rules":                   rules,
 		"final":                   final,
@@ -508,7 +527,7 @@ func buildAll(nodesJSON string, selectedTag string, optionsJSON string) (string,
 	}
 
 	cfg := map[string]any{
-		"log":       map[string]any{"level": "warn", "timestamp": true},
+		"log":       logSection(opts.LogFile),
 		"dns":       dnsSection,
 		"inbounds":  inbounds,
 		"outbounds": outbounds,
@@ -532,6 +551,14 @@ func buildAll(nodesJSON string, selectedTag string, optionsJSON string) (string,
 }
 
 // customDNSServer разбирает адрес DNS-over-HTTPS вида https://host[:port]/path.
+func logSection(file string) map[string]any {
+	l := map[string]any{"level": "warn", "timestamp": true}
+	if file != "" {
+		l["output"] = file
+	}
+	return l
+}
+
 func customDNSServer(raw string) (map[string]any, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
