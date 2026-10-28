@@ -12,13 +12,16 @@ import (
 	"github.com/sagernet/sing-box/experimental/libbox"
 )
 
+// настоящий формат ключа VLESS Encryption: …0rtt.<32 байта в base64url>
+var testEnc = "mlkem768x25519plus.native.0rtt." + base64.RawURLEncoding.EncodeToString([]byte("0123456789abcdef0123456789abcdef"))
+
 func xrayLinks() []string {
 	vmessXHTTP := base64.StdEncoding.EncodeToString([]byte(`{"v":"2","ps":"VMess XHTTP","add":"vx.example.com","port":"443","id":"` + testUUID + `","aid":"0","scy":"auto","net":"xhttp","type":"packet-up","host":"vx.example.com","path":"/x","tls":"tls","sni":"vx.example.com"}`))
 	return []string{
 		"vless://" + testUUID + "@xh.example.com:443?type=xhttp&mode=stream-one&path=%2Fxh&host=cdn.example.com&security=tls&sni=xh.example.com&fp=chrome&extra=%7B%22xPaddingBytes%22%3A%22100-1000%22%7D#XHTTP%20TLS",
 		"vless://" + testUUID + "@5.5.5.5:443?type=xhttp&security=reality&pbk=" + testPBK + "&sni=www.apple.com&sid=ab&spx=%2F#XHTTP%20Reality",
-		"vless://" + testUUID + "@6.6.6.6:4000?type=kcp&headerType=wechat-video&seed=s3cr3t&security=none#mKCP",
-		"vless://" + testUUID + "@7.7.7.7:443?encryption=mlkem768x25519plus.native.0rtt.abc&type=tcp&security=none&flow=xtls-rprx-vision#Encryption",
+		"vless://" + testUUID + "@6.6.6.6:4000?type=kcp&headerType=wechat-video&seed=s3cr3t&security=tls&sni=kcp.example.com#mKCP",
+		"vless://" + testUUID + "@7.7.7.7:443?encryption=" + testEnc + "&type=tcp&security=none&flow=xtls-rprx-vision#Encryption",
 		"vmess://" + vmessXHTTP,
 		// обычные — работают в sing-box, но знают и Xray
 		"vless://" + testUUID + "@1.2.3.4:443?type=tcp&security=reality&pbk=" + testPBK + "&sni=www.microsoft.com&sid=6b&flow=xtls-rprx-vision#Reality",
@@ -85,7 +88,7 @@ func TestXrayNodes(t *testing.T) {
 	if !strings.Contains(c.Xray, `"address": "203.0.113.7"`) {
 		t.Fatal("domain must be pinned to IP")
 	}
-	if !strings.Contains(c.Xray, `"encryption": "mlkem768x25519plus.native.0rtt.abc"`) || !strings.Contains(c.Xray, `"value": "s3cr3t"`) || !strings.Contains(c.Xray, `"header": "wechat"`) {
+	if !strings.Contains(c.Xray, `"encryption": "`+testEnc+`"`) || !strings.Contains(c.Xray, `"value": "s3cr3t"`) || !strings.Contains(c.Xray, `"header": "wechat"`) {
 		t.Fatalf("encryption/kcp finalmask lost:\n%s", c.Xray)
 	}
 	if strings.Contains(c.Xray, "allowInsecure") {
@@ -128,8 +131,9 @@ func TestXrayDump(t *testing.T) {
 		"vmess://"+vmessGRPC,
 		"vless://"+testUUID+"@hu.example.com:443?type=httpupgrade&path=%2Fup&host=hu.example.com&security=tls#HU",
 		"vless://"+testUUID+"@th.example.com:80?type=tcp&headerType=http&path=%2Fa&host=th.example.com#TCP%20HTTP",
-		"vless://"+testUUID+"@k2.example.com:4000?type=kcp&fm=%7B%22udp%22%3A%5B%7B%22type%22%3A%22mkcp-legacy%22%2C%22settings%22%3A%7B%22value%22%3A%22x%22%7D%7D%5D%7D#KCP%20fm",
-		"vless://"+testUUID+"@k3.example.com:4000?type=kcp&headerType=dns&host=dns.example.com#KCP%20dns",
+		"vless://"+testUUID+"@k2.example.com:4000?security=tls&type=kcp&fm=%7B%22udp%22%3A%5B%7B%22type%22%3A%22mkcp-legacy%22%2C%22settings%22%3A%7B%22value%22%3A%22x%22%7D%7D%5D%7D#KCP%20fm",
+		"vless://"+testUUID+"@k3.example.com:4000?security=tls&type=kcp&headerType=dns&host=dns.example.com#KCP%20dns",
+		"vless://"+testUUID+"@192.168.1.5:4000?type=kcp&security=none#KCP%20LAN",
 		"trojan://pw@tg.example.com:443?type=grpc&serviceName=t&security=tls&pcs=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855#Trojan%20pcs",
 		"ss://"+ss+"@9.9.9.9:8388#SS2022",
 	)
@@ -159,5 +163,17 @@ func TestXrayDump(t *testing.T) {
 			name := strings.NewReplacer(" ", "_", "/", "_").Replace(nodes[i].Name)
 			os.WriteFile(filepath.Join(dir, fmt.Sprintf("node-%02d-%s.json", i+1, name)), []byte(c.Xray), 0o644)
 		}
+	}
+}
+
+func TestXrayRefusesPlainVLESS(t *testing.T) {
+	// VLESS без TLS: sing-box подключит, Xray 26 — нет; XHTTP без TLS не подключит никто
+	nodes := parseNodes(t, "vless://"+testUUID+"@8.8.8.8:80?type=ws&security=none#Plain")
+	if nodes[0].Xray != nil || nodes[0].Outbound == nil {
+		t.Fatal("plain VLESS must stay in sing-box only")
+	}
+	_, err := ParseSubscription("vless://" + testUUID + "@8.8.8.8:80?type=xhttp&security=none#X")
+	if err == nil || !strings.Contains(err.Error(), "без TLS") {
+		t.Fatalf("want explanation, got %v", err)
 	}
 }

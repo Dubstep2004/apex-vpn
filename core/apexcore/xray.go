@@ -239,8 +239,23 @@ func xrayVLESSOrTrojan(link string) (*Node, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s %s: %w", proto, name, err)
 	}
+	// Xray 26 не запускает VLESS/Trojan без TLS и без VLESS Encryption на публичных адресах
+	if stream["security"] == "none" && !isPrivateHost(server) {
+		enc := p.get("encryption")
+		if proto == "trojan" || enc == "" || enc == "none" {
+			return nil, fmt.Errorf("%s %s: без TLS Xray 26 такой сервер не подключает", proto, name)
+		}
+	}
 	ob := map[string]any{"protocol": proto, "settings": settings, "streamSettings": stream}
 	return &Node{Name: name, Type: proto, Server: server, Port: port, Xray: ob}, nil
+}
+
+func isPrivateHost(host string) bool {
+	if ip := net.ParseIP(host); ip != nil {
+		return ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast()
+	}
+	h := strings.ToLower(host)
+	return h == "localhost" || strings.HasSuffix(h, ".local") || strings.HasSuffix(h, ".lan")
 }
 
 func xrayVMess(link string) (*Node, error) {

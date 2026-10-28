@@ -99,12 +99,14 @@ func parse(content string) (*parseResult, error) {
 					continue
 				}
 				node, err := parseLink(line)
-				xn, _ := xrayFromLink(line)
+				xn, xerr := xrayFromLink(line)
 				switch {
 				case err == nil && xn != nil:
 					node.Xray = xn.Xray
 				case err != nil && xn != nil:
 					node, err = xn, nil // sing-box не умеет — подключим через Xray
+				case err != nil && xerr != nil:
+					err = fmt.Errorf("%v; %v", err, xerr)
 				}
 				if err != nil {
 					res.Skipped = append(res.Skipped, err.Error())
