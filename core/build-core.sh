@@ -71,7 +71,8 @@ if [[ "$NAIVE" == "1" ]]; then
   APEX_RULES_DIR="$ROOT/app/src/main/assets/rules" go test -tags "$BUILD_TAGS,with_naive_outbound" -ldflags "-checklinkname=0" -run Naive ./experimental/apexcore/ \
     || echo "::warning title=NaiveProxy::тест конфига NaiveProxy не прошёл на сборочной машине"
   echo "==> gomobile bind ($TARGETS) с NaiveProxy"
-  if ! bind "$BUILD_TAGS,with_naive_outbound"; then
+  if ! bind "$BUILD_TAGS,with_naive_outbound" 2> >(tee "$WORK/bind.err" >&2); then
+    echo "::warning title=NaiveProxy bind::$(grep -iE 'error|undefined|cannot' "$WORK/bind.err" | head -5 | tr '\n' ' ' | cut -c1-800)"
     echo "::warning title=NaiveProxy::ядро с NaiveProxy не собралось — собираю без него"
     bind "$BUILD_TAGS"
   fi
@@ -83,3 +84,4 @@ fi
 mkdir -p "$(dirname "$OUT")"
 cp libbox.aar "$OUT"
 echo "==> готово: $OUT ($(du -h "$OUT" | cut -f1))"
+echo "::notice title=Ядро::libbox.aar $(du -h "$OUT" | cut -f1), $(unzip -l "$OUT" | grep -c 'libgojni.so') ABI"

@@ -75,6 +75,11 @@ jobs:
         if: steps.core-cache.outputs.cache-hit != 'true'
         run: ./core/build-core.sh
 
+      - name: Check core
+        run: |
+          ls -la app/libs/ app/src/main/jniLibs/*/ || true
+          test -s app/libs/libbox.aar || { echo "::error title=Ядро::app/libs/libbox.aar не найден после сборки ядра"; exit 1; }
+
       - name: Prepare signing key
         env:
           KEYSTORE_BASE64: ${{ secrets.APEX_KEYSTORE_BASE64 }}
