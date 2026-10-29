@@ -15,6 +15,12 @@ on:
 permissions:
   contents: write
 
+# Новый пуш отменяет незаконченную сборку: иначе старая версия, собравшаяся позже,
+# становилась «последней» вместо новой (так 3.1.0 перебила 3.1.1)
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   keep-signing-key:
     if: github.event_name == 'schedule'
