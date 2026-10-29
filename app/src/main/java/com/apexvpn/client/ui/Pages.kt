@@ -88,7 +88,7 @@ import java.util.Locale
 import kotlinx.coroutines.launch
 
 /** Дополнительные страницы, открываются поверх вкладок. */
-enum class Page { Apps, SpeedTest, SiteCheck, Wifi, Share, Dns, Profile, Appearance, Changelog, Advanced, HideApps, AppTraffic, Help, KeepAlive, SelfCheck, About }
+enum class Page { Apps, SpeedTest, SiteCheck, Wifi, Share, Dns, Profile, Appearance, Changelog, Advanced, HideApps, AppTraffic, Help, KeepAlive, SelfCheck, About, Ping }
 
 @Composable
 fun PageHost(page: Page, viewModel: MainViewModel, onBack: () -> Unit) {
@@ -109,6 +109,7 @@ fun PageHost(page: Page, viewModel: MainViewModel, onBack: () -> Unit) {
         Page.KeepAlive -> KeepAlivePage(onBack)
         Page.SelfCheck -> SelfCheckPage(viewModel, onBack)
         Page.About -> AboutPage(onBack)
+        Page.Ping -> PingSettingsPage(viewModel, onBack)
     }
 }
 
@@ -1806,7 +1807,7 @@ private fun ChipRow(items: List<Pair<String, String>>, selected: String, onSelec
 }
 
 @Composable
-private fun PlainField(value: String, hint: String, onChange: (String) -> Unit) {
+internal fun PlainField(value: String, hint: String, onChange: (String) -> Unit) {
     Box(
         Modifier
             .fillMaxWidth()

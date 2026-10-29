@@ -211,6 +211,7 @@ fun ServerSheet(viewModel: MainViewModel, onDismiss: () -> Unit) {
                     flash = g.nodes.sumOf { pingFlash[it.tag] ?: 0 },
                     mobileOnly = onWifi && g.nodes.all { ServerInfo.isLte(it.name) },
                     onPing = { viewModel.pingGroup(g.nodes.map { it.tag }) },
+                    pingView = settings.pingView,
                     favorite = g.title in settings.favorites || g.nodes.any { it.name in settings.favorites },
                     onPick = pick,
                     onFavorite = { viewModel.toggleFavorite(g.title) },
@@ -291,7 +292,7 @@ fun ServerSheet(viewModel: MainViewModel, onDismiss: () -> Unit) {
             if (special.isNotEmpty() && tab != ServerTab.Lte) {
                 Caption("Россия нужна для российских сайтов из-за границы. Обход и LTE — только для мобильного интернета с белыми списками: на Wi-Fi выбирайте обычные страны.")
             }
-            Caption("Нажмите на пинг — сервер проверится заново. ★ — добавить в избранное. Долгое нажатие на сервер — ярлык на рабочий стол. Метки протоколов выбирают конкретное подключение. Пинг — время до самого сервера (одно «туда-обратно»). «Пинг через VPN» на главном экране больше: это путь до сайта через сервер.")
+            Caption("Нажмите на пинг — сервер проверится заново. ★ — добавить в избранное. Долгое нажатие на сервер — ярлык на рабочий стол. Метки протоколов выбирают конкретное подключение. Как мерить пинг (до сервера, через прокси или ICMP) — Настройки → Инструменты → «Пинг».")
             Spacer(Modifier.height(24.dp))
         }
       }
@@ -317,6 +318,7 @@ private fun GroupRow(
     pinging: Boolean = false,
     flash: Int = 0,
     mobileOnly: Boolean = false,
+    pingView: String = "time",
     onPing: () -> Unit = {},
     favorite: Boolean,
     onPick: (Node) -> Unit,
@@ -404,6 +406,9 @@ private fun GroupRow(
             ) {
                 if (pinging) {
                     CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Apex.AccentText)
+                } else if (ping != null && ping >= 0 && pingView != "time") {
+                    // «Результат пинга»: столбики или время и столбики
+                    PingResult(ping, pingView)
                 } else {
                     Text(text, color = pc, fontSize = if (text.length > 12) 12.sp else 15.sp, fontWeight = FontWeight.SemiBold)
                 }

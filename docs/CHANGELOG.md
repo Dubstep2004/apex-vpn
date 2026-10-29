@@ -2,6 +2,17 @@
 
 <img src="img/tags/new.svg" height="22"> <img src="img/tags/improved.svg" height="22"> <img src="img/tags/changed.svg" height="22"> <img src="img/tags/fixed.svg" height="22"> <img src="img/tags/removed.svg" height="22">
 
+## 2.9.0 · 29 октября 2026
+
+<img src="img/tags/new.svg" alt="Новое" height="22">
+
+- Настройки пинга: Настройки → Инструменты → «Пинг»
+- Тип пинга: TCP до сервера, через прокси GET или HEAD (запрос к сайту через каждый сервер) и ICMP
+- Режим пинга через прокси: Обычный, Double и KeepAlive — берётся лучший из двух запросов
+- Тайм-аут пинга через прокси от 5 до 15 секунд
+- Свой адрес проверки (URL-тест) — его используют и пинг, и автопилот
+- Результат пинга: время, столбики сигнала или вместе
+
 ## 2.8.3 · 29 октября 2026
 
 <img src="img/tags/improved.svg" alt="Улучшено" height="22">

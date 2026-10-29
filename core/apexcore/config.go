@@ -104,6 +104,8 @@ type routeOptions struct {
 	// ProbePort — локальный SOCKS (с паролем XrayAuth) для замеров DNS через сервер.
 	// Всё, что пришло в него, идёт только через VPN, мимо остальных правил
 	ProbePort int `json:"probePort"`
+	// URLTest — адрес проверки для автопилота (как «Настройки URL-теста» в приложении)
+	URLTest string `json:"urlTest"`
 }
 
 // профиль подключения: как часто проверять серверы и рвать ли соединения при смене
@@ -266,7 +268,7 @@ func buildAll(nodesJSON string, selectedTag string, optionsJSON string) (string,
 		map[string]any{
 			"type": "urltest", "tag": AutoTag,
 			"outbounds":                   autoTags,
-			"url":                         "https://www.gstatic.com/generate_204",
+			"url":                         urlTestOrDefault(opts.URLTest),
 			"interval":                    prof.interval,
 			"tolerance":                   prof.tolerance,
 			"interrupt_exist_connections": prof.interrupt,
@@ -332,8 +334,12 @@ func buildAll(nodesJSON string, selectedTag string, optionsJSON string) (string,
 		// Пользователь «direct» — замер пинга до самого сервера мимо туннеля (как с выключенным VPN)
 		rules = append(rules,
 			map[string]any{"inbound": []string{"probe-in"}, "auth_user": []string{"direct"}, "outbound": "direct"},
-			map[string]any{"inbound": []string{"probe-in"}, "outbound": "proxy"},
 		)
+		// «Пинг через прокси»: пользователь n:<tag> — соединение через этот сервер
+		for _, t := range tags {
+			rules = append(rules, map[string]any{"inbound": []string{"probe-in"}, "auth_user": []string{"n:" + t}, "outbound": t})
+		}
+		rules = append(rules, map[string]any{"inbound": []string{"probe-in"}, "outbound": "proxy"})
 	}
 	rules = append(rules,
 		map[string]any{"action": "sniff"},
@@ -579,10 +585,7 @@ func buildAll(nodesJSON string, selectedTag string, optionsJSON string) (string,
 	if opts.ProbePort > 1024 && opts.ProbePort < 65536 && opts.XrayAuth != "" {
 		inbounds = append(inbounds, map[string]any{
 			"type": "socks", "tag": "probe-in", "listen": "127.0.0.1", "listen_port": opts.ProbePort,
-			"users": []any{
-				map[string]any{"username": "apex", "password": opts.XrayAuth},
-				map[string]any{"username": "direct", "password": opts.XrayAuth},
-			},
+			"users": probeUsers(tags, opts.XrayAuth),
 		})
 	}
 	if opts.Share.Enabled {
@@ -743,4 +746,24 @@ func stableAuto(tags, exclude, order []string) []string {
 		return okI && ri < rj
 	})
 	return kept
+}
+
+func probeUsers(tags []string, pass string) []any {
+	users := []any{
+		map[string]any{"username": "apex", "password": pass},
+		map[string]any{"username": "direct", "password": pass},
+	}
+	for _, t := range tags {
+		users = append(users, map[string]any{"username": "n:" + t, "password": pass})
+	}
+	return users
+}
+
+// urlTestOrDefault — адрес проверки автопилота: свой (http/https) или gstatic.
+func urlTestOrDefault(u string) string {
+	u = strings.TrimSpace(u)
+	if strings.HasPrefix(u, "https://") || strings.HasPrefix(u, "http://") {
+		return u
+	}
+	return "https://www.gstatic.com/generate_204"
 }

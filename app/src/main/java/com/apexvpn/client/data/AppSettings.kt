@@ -84,6 +84,12 @@ data class Settings(
     val photoParallax: Boolean = true,                // 563. фото сдвигается при наклоне телефона
     val rulesAuto: Boolean = true,                    // базы сайтов: проверять обновления раз в день
     val connectOnOpen: Boolean = false,               // подключать VPN при открытии приложения
+    // «Пинг»: tcp — до сервера (TCP/QUIC) | get, head — через прокси (HTTP-запрос через сервер) | icmp
+    val pingType: String = "tcp",
+    val pingMode: String = "keepalive",               // через прокси: default | double | keepalive
+    val pingTimeout: Int = 5,                         // тайм-аут пинга через прокси, с (5…15)
+    val pingUrl: String = "",                         // свой адрес проверки (пусто — gstatic)
+    val pingView: String = "time",                    // результат: time — мс | bars — столбики | both
     val quicMode: String = "mobile",                  // QUIC (HTTP/3): mobile — выкл. на мобильной сети | off — всегда выкл. | on — не трогать
     // 20. Иконка на рабочем столе показывает, включён ли VPN
     val iconStatus: Boolean = false,
@@ -230,6 +236,8 @@ object AppSettings {
         put("blockQuic", quicBlocked(s).also { quicApplied = it })
         // DNS «Авто» меряет DNS через сервер, как они и работают под VPN
         put("probePort", Prefs.probePort)
+        // Адрес проверки — и для автопилота
+        if (s.pingUrl.isNotBlank()) put("urlTest", s.pingUrl.trim())
         put("findProcess", s.appTraffic && android.os.Build.VERSION.SDK_INT >= 29)
         put("ipv6", s.ipv6)
         put("profile", s.profile.id)
@@ -313,6 +321,7 @@ object AppSettings {
         put("warp", s.warp); put("warpConfig", s.warpConfig); put("shieldBackdrop", s.shieldBackdrop); put("backdropStamp", s.backdropStamp)
         put("iconStatus", s.iconStatus); put("animatedFlags", s.animatedFlags); put("task", s.task); put("hiddenApps", list(s.hiddenApps)); put("secret", s.secretUnlocked); put("shield3d", s.shield3d); put("automation", s.automation); put("appTraffic", s.appTraffic); put("autoSkipSpecial", s.autoSkipSpecial); put("autoWhitelist", s.autoWhitelist)
         put("customAccent2", s.customAccent2); put("photoBlur", s.photoBlur); put("photoDim", s.photoDim); put("photoParallax", s.photoParallax); put("rulesAuto", s.rulesAuto); put("quicMode", s.quicMode); put("connectOnOpen", s.connectOnOpen)
+        put("pingType", s.pingType); put("pingMode", s.pingMode); put("pingTimeout", s.pingTimeout); put("pingUrl", s.pingUrl); put("pingView", s.pingView)
     }
 
     private fun fromJson(o: JSONObject): Settings {
@@ -412,6 +421,11 @@ object AppSettings {
             photoParallax = o.optBoolean("photoParallax", d.photoParallax),
             rulesAuto = o.optBoolean("rulesAuto", d.rulesAuto),
             connectOnOpen = o.optBoolean("connectOnOpen", d.connectOnOpen),
+            pingType = o.optString("pingType", d.pingType).takeIf { it in listOf("tcp", "get", "head", "icmp") } ?: d.pingType,
+            pingMode = o.optString("pingMode", d.pingMode).takeIf { it in listOf("default", "double", "keepalive") } ?: d.pingMode,
+            pingTimeout = o.optInt("pingTimeout", d.pingTimeout).coerceIn(5, 15),
+            pingUrl = o.optString("pingUrl", d.pingUrl),
+            pingView = o.optString("pingView", d.pingView).takeIf { it in listOf("time", "bars", "both") } ?: d.pingView,
             quicMode = o.optString("quicMode", d.quicMode).takeIf { it in listOf("mobile", "off", "on") } ?: d.quicMode,
         )
     }

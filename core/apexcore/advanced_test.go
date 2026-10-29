@@ -169,3 +169,17 @@ func TestProbeInbound(t *testing.T) {
 		t.Fatal("probe-in без порта")
 	}
 }
+
+func TestProbePerNode(t *testing.T) {
+	nodes := parseNodes(t, "vless://"+testUUID+"@1.2.3.4:443?type=tcp&security=tls&sni=a.example.com#A\nvless://"+testUUID+"@1.2.3.5:443?type=tcp&security=tls&sni=b.example.com#B")
+	raw, _ := json.Marshal(map[string]any{"mode": "global", "probePort": 23007, "xrayAuth": "secret", "urlTest": "http://cp.cloudflare.com/"})
+	cfg := checkAll(t, nodes, string(raw))
+	for _, want := range []string{`"n:node-1"`, `"n:node-2"`, `"http://cp.cloudflare.com/"`} {
+		if !strings.Contains(cfg, want) {
+			t.Fatalf("нет %s", want)
+		}
+	}
+	if ProxyPing("node-1", "", "GET", "keepalive", 500) != -1 {
+		t.Fatal("без ядра пинг через прокси должен быть -1")
+	}
+}

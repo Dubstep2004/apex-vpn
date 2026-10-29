@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
+import androidx.compose.material.icons.rounded.NetworkPing
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.BatteryChargingFull
 import androidx.compose.material.icons.rounded.PlayCircle
@@ -293,6 +294,18 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
         // ── Инструменты ──
         SectionLabel("Инструменты")
         Group {
+            ListRow(
+                "Пинг",
+                when (s.pingType) {
+                    "get" -> "Через прокси · GET · ${s.pingMode}"
+                    "head" -> "Через прокси · HEAD · ${s.pingMode}"
+                    "icmp" -> "ICMP"
+                    else -> "TCP — до сервера"
+                },
+                leading = { tile(Icons.Rounded.NetworkPing) },
+                onClick = { onOpenPage(Page.Ping) },
+            ) { Chevron() }
+            GroupDivider()
             ListRow("Тест скорости", "Пинг, загрузка и отдача", leading = { tile(Icons.Rounded.Speed) }, onClick = { onOpenPage(Page.SpeedTest) }) { Chevron() }
             GroupDivider()
             // 413

@@ -36,6 +36,28 @@ object Pinger {
     suspend fun pingAll(nodes: List<Node>, save: Boolean = true): Map<String, Int> = withContext(Dispatchers.IO) {
         if (nodes.isEmpty()) return@withContext emptyMap()
         val running = VpnState.status.value == VpnStatus.Started
+        val s = AppSettings.value
+        // «Пинг через прокси» (GET/HEAD): HTTP-запрос через каждый сервер — только при включённом VPN
+        if (running && (s.pingType == "get" || s.pingType == "head")) {
+            val limit = Semaphore(8)
+            val r = nodes.map { n ->
+                async {
+                    limit.withPermit {
+                        n.tag to runCatching {
+                            Apexcore.proxyPing(n.tag, s.pingUrl, s.pingType.uppercase(), s.pingMode, s.pingTimeout * 1000).let { if (it > 0) it else UNREACHABLE }
+                        }.getOrDefault(UNREACHABLE)
+                    }
+                }
+            }.awaitAll().toMap()
+            if (r.values.any { it > 0 }) return@withContext r.also { if (save) Prefs.saveLastPings(it) }
+            // Ни один не ответил — ядро без замеров (старый конфиг): дальше обычный пинг
+        }
+        // ICMP — классический ping до сервера, мимо туннеля
+        if (s.pingType == "icmp") {
+            val limit = Semaphore(8)
+            val r = nodes.map { n -> async { limit.withPermit { n.tag to icmpPing(n.server, 3000) } } }.awaitAll().toMap()
+            return@withContext r.also { if (save) Prefs.saveLastPings(it) }
+        }
         // Пинг — это время одного «туда-обратно» до самого сервера: TCP-соединение или
         // QUIC-рукопожатие, мимо туннеля (и под VPN тоже — через ядро напрямую).
         // Раньше под VPN показывалась полная проверка через сервер (подключение, шифрование
@@ -106,6 +128,30 @@ object Pinger {
             }
         }.awaitAll().toMap()
     }
+
+    /**
+     * ICMP echo (обычный ping) без root: «ping-сокет» Android, привязанный к настоящей сети,
+     * чтобы под VPN не уйти в туннель. Только IPv4; -1 — не ответил или ICMP закрыт.
+     */
+    private fun icmpPing(host: String, timeoutMs: Int): Int = runCatching {
+        val addr = java.net.InetAddress.getAllByName(host).firstOrNull { it is java.net.Inet4Address } ?: return UNREACHABLE
+        val fd = android.system.Os.socket(android.system.OsConstants.AF_INET, android.system.OsConstants.SOCK_DGRAM, android.system.OsConstants.IPPROTO_ICMP)
+        try {
+            NetworkMonitor.defaultNetwork?.bindSocket(fd)
+            // Тип 8 (запрос эха); идентификатор и контрольную сумму ядро Linux ставит само
+            val pkt = byteArrayOf(8, 0, 0, 0, 0, 0, 0, 1) + "APEXPING".toByteArray()
+            val start = System.nanoTime()
+            android.system.Os.sendto(fd, pkt, 0, pkt.size, 0, addr, 0)
+            val pfd = android.system.StructPollfd().apply { this.fd = fd; events = android.system.OsConstants.POLLIN.toShort() }
+            if (android.system.Os.poll(arrayOf(pfd), timeoutMs) <= 0) return UNREACHABLE
+            val buf = ByteArray(128)
+            android.system.Os.recvfrom(fd, buf, 0, buf.size, 0, null)
+            if (buf[0].toInt() != 0) return UNREACHABLE // ответ эха — тип 0
+            ((System.nanoTime() - start) / 1_000_000).toInt().coerceAtLeast(1)
+        } finally {
+            runCatching { android.system.Os.close(fd) }
+        }
+    }.getOrDefault(UNREACHABLE)
 
     private fun tcpPing(host: String, port: Int): Int {
         if (port !in 1..65535) return UNREACHABLE

@@ -27,6 +27,20 @@ var probeProxy struct {
 	client *socks.Client
 	// direct — тот же SOCKS, но в обход сервера: для пинга до самих серверов
 	direct *socks.Client
+	port   uint16
+	pass   string
+}
+
+func probeAddr() M.Socksaddr {
+	probeProxy.RLock()
+	defer probeProxy.RUnlock()
+	return M.ParseSocksaddrHostPort("127.0.0.1", probeProxy.port)
+}
+
+func probePass() string {
+	probeProxy.RLock()
+	defer probeProxy.RUnlock()
+	return probeProxy.pass
 }
 
 // SetProbeProxy включает замеры через ядро (port > 0) или выключает их (port = 0).
@@ -36,8 +50,10 @@ func SetProbeProxy(port int32, user, pass string) {
 	if port <= 0 || port > 65535 {
 		probeProxy.client = nil
 		probeProxy.direct = nil
+		probeProxy.port, probeProxy.pass = 0, ""
 		return
 	}
+	probeProxy.port, probeProxy.pass = uint16(port), pass
 	addr := M.ParseSocksaddrHostPort("127.0.0.1", uint16(port))
 	probeProxy.client = socks.NewClient(N.SystemDialer, addr, socks.Version5, user, pass)
 	probeProxy.direct = socks.NewClient(N.SystemDialer, addr, socks.Version5, "direct", pass)
