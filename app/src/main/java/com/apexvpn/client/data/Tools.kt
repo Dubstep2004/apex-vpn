@@ -5,7 +5,9 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
@@ -17,14 +19,37 @@ data class SpeedResult(
     val pingMs: Int = -1,
     val downMbps: Double = -1.0,
     val upMbps: Double = -1.0,
+    /** Джиттер — разброс пинга, мс */
+    val jitterMs: Int = -1,
 )
+
+/** Провайдер и сервер теста: кто вас видит (через VPN — сервер VPN) и ближайший узел Cloudflare. */
+data class SpeedMeta(val provider: String, val ip: String, val city: String, val country: String, val colo: String)
 
 /** Замер через серверы Cloudflare. Если VPN включён — меряется скорость через VPN. */
 object SpeedTest {
     private const val BASE = "https://speed.cloudflare.com"
 
-    suspend fun ping(): Int = withContext(Dispatchers.IO) {
-        val samples = (1..5).mapNotNull {
+    /** Провайдер (asOrganization), IP, город и узел Cloudflare (colo). */
+    suspend fun meta(): SpeedMeta? = withContext(Dispatchers.IO) {
+        runCatching {
+            val c = open("$BASE/meta")
+            try {
+                if (c.responseCode != 200) return@runCatching null
+                val o = org.json.JSONObject(c.inputStream.bufferedReader().readText())
+                SpeedMeta(
+                    o.optString("asOrganization"), o.optString("clientIp"),
+                    o.optString("city"), o.optString("country"), o.optString("colo"),
+                )
+            } finally {
+                c.disconnect()
+            }
+        }.getOrNull()
+    }
+
+    /** Пинг и джиттер: 8 коротких запросов, первый (с установкой соединения) не считаем. */
+    suspend fun ping(): Pair<Int, Int> = withContext(Dispatchers.IO) {
+        val samples = (1..8).mapNotNull {
             runCatching {
                 val c = open("$BASE/__down?bytes=0")
                 val t = System.nanoTime()
@@ -36,66 +61,101 @@ object SpeedTest {
                 ((System.nanoTime() - t) / 1_000_000).toInt()
             }.getOrNull()
         }
-        // Первый запрос включает установку соединения — берём лучший
-        samples.minOrNull() ?: -1
+        val warm = if (samples.size > 2) samples.drop(1) else samples
+        val ping = warm.minOrNull() ?: -1
+        val jitter = if (warm.size < 2) -1 else warm.zipWithNext { a, b -> kotlin.math.abs(a - b) }.average().toInt()
+        ping to jitter
     }
 
-    /** Загрузка до 10 секунд. [progress] получает текущую скорость в Мбит/с. */
-    suspend fun download(progress: (Double) -> Unit): Double = withContext(Dispatchers.IO) {
-        val c = open("$BASE/__down?bytes=50000000")
-        var bytes = 0L
+    /**
+     * Загрузка до 10 секунд. [streams] — сколько соединений одновременно: 1 — «одинарное»,
+     * 4 — «множественное» (как в Speedtest: лучше показывает ширину канала).
+     */
+    suspend fun download(streams: Int = 4, progress: (Double) -> Unit): Double = withContext(Dispatchers.IO) {
+        val total = java.util.concurrent.atomic.AtomicLong()
         val start = System.nanoTime()
-        try {
-            c.inputStream.use { input ->
-                val buf = ByteArray(64 * 1024)
-                var lastReport = start
-                while (true) {
-                    ensureActive()
-                    val n = input.read(buf)
-                    if (n < 0) break
-                    bytes += n
-                    val now = System.nanoTime()
-                    if (now - lastReport > 250_000_000) {
-                        progress(mbps(bytes, now - start)); lastReport = now
+        val limit = 10_000_000_000L
+        kotlinx.coroutines.coroutineScope {
+            val jobs = (1..streams.coerceIn(1, 8)).map {
+                launch {
+                    while (System.nanoTime() - start < limit) {
+                        val c = open("$BASE/__down?bytes=25000000")
+                        try {
+                            c.inputStream.use { input ->
+                                val buf = ByteArray(64 * 1024)
+                                while (true) {
+                                    ensureActive()
+                                    val n = input.read(buf)
+                                    if (n < 0) break
+                                    total.addAndGet(n.toLong())
+                                    if (System.nanoTime() - start > limit) break
+                                }
+                            }
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
+                        } catch (_: Exception) {
+                            break
+                        } finally {
+                            c.disconnect()
+                        }
                     }
-                    if (now - start > 10_000_000_000L) break
                 }
             }
-        } finally {
-            c.disconnect()
+            launch {
+                while (jobs.any { it.isActive }) {
+                    delay(250)
+                    progress(mbps(total.get(), System.nanoTime() - start))
+                }
+            }
         }
-        mbps(bytes, System.nanoTime() - start)
+        mbps(total.get(), System.nanoTime() - start)
     }
 
-    /** Отдача: несколько POST по 4 МБ, до 8 секунд. */
-    suspend fun upload(progress: (Double) -> Unit): Double = withContext(Dispatchers.IO) {
+    /** Отдача до 8 секунд: POST по 4 МБ, [streams] соединений одновременно. */
+    suspend fun upload(streams: Int = 4, progress: (Double) -> Unit): Double = withContext(Dispatchers.IO) {
         val chunk = Random.nextBytes(4 * 1024 * 1024)
-        var bytes = 0L
+        val total = java.util.concurrent.atomic.AtomicLong()
         val start = System.nanoTime()
-        while (System.nanoTime() - start < 8_000_000_000L) {
-            ensureActive()
-            val c = open("$BASE/__up")
-            try {
-                c.requestMethod = "POST"
-                c.doOutput = true
-                c.setFixedLengthStreamingMode(chunk.size)
-                c.setRequestProperty("Content-Type", "application/octet-stream")
-                c.outputStream.use { out ->
-                    var off = 0
-                    while (off < chunk.size) {
-                        val n = minOf(64 * 1024, chunk.size - off)
-                        out.write(chunk, off, n)
-                        off += n
-                        bytes += n
-                        progress(mbps(bytes, System.nanoTime() - start))
+        val limit = 8_000_000_000L
+        kotlinx.coroutines.coroutineScope {
+            val jobs = (1..streams.coerceIn(1, 8)).map {
+                launch {
+                    while (System.nanoTime() - start < limit) {
+                        ensureActive()
+                        val c = open("$BASE/__up")
+                        try {
+                            c.requestMethod = "POST"
+                            c.doOutput = true
+                            c.setFixedLengthStreamingMode(chunk.size)
+                            c.setRequestProperty("Content-Type", "application/octet-stream")
+                            c.outputStream.use { out ->
+                                var off = 0
+                                while (off < chunk.size && System.nanoTime() - start < limit) {
+                                    val n = minOf(64 * 1024, chunk.size - off)
+                                    out.write(chunk, off, n)
+                                    off += n
+                                    total.addAndGet(n.toLong())
+                                }
+                            }
+                            c.responseCode
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
+                        } catch (_: Exception) {
+                            break
+                        } finally {
+                            c.disconnect()
+                        }
                     }
                 }
-                c.responseCode
-            } finally {
-                c.disconnect()
+            }
+            launch {
+                while (jobs.any { it.isActive }) {
+                    delay(250)
+                    progress(mbps(total.get(), System.nanoTime() - start))
+                }
             }
         }
-        mbps(bytes, System.nanoTime() - start)
+        mbps(total.get(), System.nanoTime() - start)
     }
 
     private fun mbps(bytes: Long, nanos: Long): Double =
@@ -106,6 +166,28 @@ object SpeedTest {
         readTimeout = 15000
         useCaches = false
         setRequestProperty("Cache-Control", "no-cache")
+    }
+
+    /** Скорость в выбранных единицах: Мбит/с, МБ/с или КБ/с. */
+    fun format(mbps: Double, unit: String): Pair<String, String> {
+        if (mbps < 0) return "—" to unitTitle(unit)
+        val v = when (unit) {
+            "MBps" -> mbps / 8.0
+            "kBps" -> mbps * 1000.0 / 8.0
+            else -> mbps
+        }
+        val txt = when {
+            v >= 100 -> "%.0f".format(java.util.Locale.US, v)
+            v >= 10 -> "%.1f".format(java.util.Locale.US, v)
+            else -> "%.2f".format(java.util.Locale.US, v)
+        }
+        return txt to unitTitle(unit)
+    }
+
+    fun unitTitle(unit: String) = when (unit) {
+        "MBps" -> "МБ/с"
+        "kBps" -> "КБ/с"
+        else -> "Мбит/с"
     }
 }
 

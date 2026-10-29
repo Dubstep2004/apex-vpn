@@ -268,18 +268,37 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val speed = _speed.asStateFlow()
     private var speedJob: Job? = null
 
+    /** Провайдер и сервер теста (Cloudflare) — показываются до начала теста. */
+    private val _speedMeta = MutableStateFlow<com.apexvpn.client.data.SpeedMeta?>(null)
+    val speedMeta = _speedMeta.asStateFlow()
+    private val _speedMetaLoading = MutableStateFlow(false)
+    val speedMetaLoading = _speedMetaLoading.asStateFlow()
+
+    fun loadSpeedMeta() {
+        if (_speedMetaLoading.value) return
+        viewModelScope.launch {
+            _speedMetaLoading.value = true
+            _speedMeta.value = SpeedTest.meta()
+            _speedMetaLoading.value = false
+        }
+    }
+
     fun runSpeedTest() {
         if (speedJob?.isActive == true) return
         speedJob = viewModelScope.launch {
             var r = SpeedResult()
             try {
                 _speed.value = SpeedState(SpeedPhase.Ping)
-                r = r.copy(pingMs = SpeedTest.ping())
+                if (_speedMeta.value == null) loadSpeedMeta()
+                val (ping, jitter) = SpeedTest.ping()
+                r = r.copy(pingMs = ping, jitterMs = jitter)
                 if (r.pingMs < 0) error("Нет связи с сервером теста")
+                // «Тип соединения»: множественное — 4 потока, одинарное — 1
+                val streams = if (AppSettings.value.speedMulti) 4 else 1
                 _speed.value = SpeedState(SpeedPhase.Download, result = r)
-                r = r.copy(downMbps = SpeedTest.download { v -> _speed.value = _speed.value.copy(live = v) })
+                r = r.copy(downMbps = SpeedTest.download(streams) { v -> _speed.value = _speed.value.copy(live = v) })
                 _speed.value = SpeedState(SpeedPhase.Upload, result = r)
-                r = r.copy(upMbps = SpeedTest.upload { v -> _speed.value = _speed.value.copy(live = v) })
+                r = r.copy(upMbps = SpeedTest.upload(streams) { v -> _speed.value = _speed.value.copy(live = v) })
                 _speed.value = SpeedState(SpeedPhase.Done, result = r)
                 // 229. История замеров
                 val running = com.apexvpn.client.vpn.VpnState.status.value == com.apexvpn.client.vpn.VpnStatus.Started

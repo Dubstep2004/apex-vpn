@@ -2,6 +2,21 @@
 
 <img src="img/tags/new.svg" height="22"> <img src="img/tags/improved.svg" height="22"> <img src="img/tags/changed.svg" height="22"> <img src="img/tags/fixed.svg" height="22"> <img src="img/tags/removed.svg" height="22">
 
+## 3.2.0 · 29 октября 2026
+
+<img src="img/tags/new.svg" alt="Новое" height="22">
+
+- Тест скорости 3.0: большая кнопка «Начать» по центру спидометра, как в Speedtest
+- Провайдер и сервер теста видны до начала: название провайдера, IP, город и узел Cloudflare
+- Единицы: Мбит/с, МБ/с или КБ/с
+- Масштаб спидометра: 100, 500 или 1000
+- Тип соединения: множественное (4 потока — вся ширина канала) или одинарное (как качает браузер)
+- Джиттер — насколько ровный пинг
+
+<img src="img/tags/improved.svg" alt="Улучшено" height="22">
+
+- Пинг в тесте меряется точнее: 8 запросов, первый (с установкой соединения) не считается
+
 ## 3.1.2 · 29 октября 2026
 
 <img src="img/tags/new.svg" alt="Новое" height="22">

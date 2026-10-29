@@ -9,6 +9,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -398,6 +400,10 @@ private fun SpeedTestPage(viewModel: MainViewModel, onBack: () -> Unit) {
     val history by com.apexvpn.client.data.SpeedHistory.entries.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { com.apexvpn.client.data.SpeedHistory.load(context) }
     val running = st.phase in listOf(SpeedPhase.Ping, SpeedPhase.Download, SpeedPhase.Upload)
+    val set by viewModel.settings.collectAsStateWithLifecycle()
+    val meta by viewModel.speedMeta.collectAsStateWithLifecycle()
+    val metaLoading by viewModel.speedMetaLoading.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { if (meta == null) viewModel.loadSpeedMeta() }
     PageScaffold("Тест скорости", { viewModel.cancelSpeedTest(); onBack() }) {
         Spacer(Modifier.height(8.dp))
         val shown = when (st.phase) {
@@ -405,36 +411,96 @@ private fun SpeedTestPage(viewModel: MainViewModel, onBack: () -> Unit) {
             SpeedPhase.Done -> st.result.downMbps
             else -> 0.0
         }
-        SpeedGauge(
-            mbps = shown,
-            label = when (st.phase) {
-                SpeedPhase.Idle -> "Пинг, загрузка и отдача"
-                SpeedPhase.Ping -> "Измеряем пинг…"
-                SpeedPhase.Download -> "↓ Загрузка"
-                SpeedPhase.Upload -> "↑ Отдача"
-                SpeedPhase.Done -> "Готово"
-                SpeedPhase.Error -> st.error ?: "Ошибка"
-            },
-            upload = st.phase == SpeedPhase.Upload,
-            error = st.phase == SpeedPhase.Error,
-        )
+        Box(contentAlignment = Alignment.Center) {
+            SpeedGauge(
+                mbps = shown,
+                label = when (st.phase) {
+                    SpeedPhase.Idle -> ""
+                    SpeedPhase.Ping -> "Измеряем пинг…"
+                    SpeedPhase.Download -> "↓ Загрузка"
+                    SpeedPhase.Upload -> "↑ Отдача"
+                    SpeedPhase.Done -> "Готово"
+                    SpeedPhase.Error -> st.error ?: "Ошибка"
+                },
+                upload = st.phase == SpeedPhase.Upload,
+                error = st.phase == SpeedPhase.Error,
+                scale = set.speedScale,
+                unit = set.speedUnit,
+            )
+            // Большая круглая кнопка «Начать», как в Speedtest
+            if (st.phase == SpeedPhase.Idle) {
+                val pulse = androidx.compose.animation.core.rememberInfiniteTransition(label = "start")
+                val k by pulse.animateFloat(1f, 1.06f, androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(1100), androidx.compose.animation.core.RepeatMode.Reverse), label = "k")
+                Box(
+                    Modifier
+                        .size(150.dp)
+                        .graphicsLayer { scaleX = k; scaleY = k }
+                        .clip(CircleShape)
+                        .background(Apex.Base)
+                        .border(4.dp, androidx.compose.ui.graphics.Brush.linearGradient(listOf(Apex.Violet, Apex.Cyan)), CircleShape)
+                        .clickable { viewModel.runSpeedTest() },
+                    contentAlignment = Alignment.Center,
+                ) { Text("Начать", color = Apex.Text, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold) }
+            }
+        }
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             val r = st.result
             Metric("Пинг", if (r.pingMs >= 0) "${r.pingMs} мс" else "—", Modifier.weight(1f))
-            Metric("Загрузка", if (r.downMbps >= 0) "%.1f".format(Locale.US, r.downMbps) + " Мбит/с" else "—", Modifier.weight(1f))
-            Metric("Отдача", if (r.upMbps >= 0) "%.1f".format(Locale.US, r.upMbps) + " Мбит/с" else "—", Modifier.weight(1f))
+            Metric("Джиттер", if (r.jitterMs >= 0) "${r.jitterMs} мс" else "—", Modifier.weight(1f))
         }
-        Spacer(Modifier.height(20.dp))
-        Button(
-            onClick = { if (running) viewModel.cancelSpeedTest() else viewModel.runSpeedTest() },
-            modifier = Modifier.fillMaxWidth().height(56.dp),
-            shape = RoundedCornerShape(18.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = if (running) Apex.SurfaceHigh else Apex.Accent, contentColor = if (running) Apex.Text else Apex.OnAccent),
-        ) {
-            Text(if (running) "Остановить" else if (st.phase == SpeedPhase.Idle) "Начать тест" else "Повторить", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            val r = st.result
+            val (d, u1) = com.apexvpn.client.data.SpeedTest.format(r.downMbps, set.speedUnit)
+            val (up, u2) = com.apexvpn.client.data.SpeedTest.format(r.upMbps, set.speedUnit)
+            Metric("↓ Загрузка", if (r.downMbps >= 0) "$d $u1" else "—", Modifier.weight(1f))
+            Metric("↑ Отдача", if (r.upMbps >= 0) "$up $u2" else "—", Modifier.weight(1f))
         }
-        Caption("Если VPN включён, измеряется скорость через VPN. Сервер теста — Cloudflare. Тест расходует около 50–100 МБ трафика.")
+        if (st.phase != SpeedPhase.Idle) {
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = { if (running) viewModel.cancelSpeedTest() else viewModel.runSpeedTest() },
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = RoundedCornerShape(18.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = if (running) Apex.SurfaceHigh else Apex.Accent, contentColor = if (running) Apex.Text else Apex.OnAccent),
+            ) {
+                Text(if (running) "Остановить" else "Повторить", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+
+        // Провайдер и сервер теста
+        Spacer(Modifier.height(16.dp))
+        Group {
+            ListRow(
+                meta?.provider?.ifEmpty { null } ?: if (metaLoading) "Поиск провайдера…" else "Провайдер не определён",
+                meta?.let { m -> listOf(m.ip, listOf(m.city, m.country).filter { it.isNotEmpty() }.joinToString(", ")).filter { it.isNotEmpty() }.joinToString(" · ") },
+                leading = { if (metaLoading) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.5.dp, color = Apex.Accent) else IconTile(Apex.SurfaceHigh) { Text("🛰", fontSize = 20.sp) } },
+                onClick = { viewModel.loadSpeedMeta() },
+            )
+            GroupDivider()
+            ListRow(
+                if (metaLoading && meta == null) "Поиск сервера…" else "Cloudflare" + (meta?.colo?.takeIf { it.isNotEmpty() }?.let { " · $it" } ?: ""),
+                "Сервер теста — ближайший узел Cloudflare",
+                leading = { if (metaLoading) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.5.dp, color = Apex.Accent) else IconTile(Apex.SurfaceHigh) { Text("🌐", fontSize = 20.sp) } },
+            )
+        }
+        Caption("Если VPN включён, видно провайдера сервера VPN — так и должно быть. Тест расходует около 50–150 МБ трафика.")
+
+        // Единицы, масштаб и тип соединения
+        SectionLabel("Настройки теста")
+        Column(Modifier.fillMaxWidth().apexCard().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            SpeedOption("Единицы", listOf("mbps" to "Мбит/с", "MBps" to "МБ/с", "kBps" to "КБ/с"), set.speedUnit) {
+                viewModel.change(reload = false) { copy(speedUnit = it) }
+            }
+            SpeedOption("Масштаб", listOf("100" to "100", "500" to "500", "1000" to "1000"), set.speedScale.toString()) {
+                viewModel.change(reload = false) { copy(speedScale = it.toInt()) }
+            }
+            SpeedOption("Соединение", listOf("multi" to "Множественное", "single" to "Одинарное"), if (set.speedMulti) "multi" else "single") {
+                viewModel.change(reload = false) { copy(speedMulti = it == "multi") }
+            }
+        }
+        Caption("Множественное — 4 соединения сразу: показывает всю ширину канала, как Speedtest. Одинарное — одно соединение: так обычно качает браузер или видео.")
 
         // 220. Самый быстрый сервер
         SectionLabel("Самый быстрый сервер")
@@ -487,8 +553,10 @@ private fun SpeedTestPage(viewModel: MainViewModel, onBack: () -> Unit) {
 
 /** 229. Спидометр: дуга 240°, шкала до 1000 Мбит/с (логарифмическая), стрелка плавно догоняет значение. */
 @Composable
-private fun SpeedGauge(mbps: Double, label: String, upload: Boolean, error: Boolean) {
-    val target = (kotlin.math.log10(1.0 + mbps.coerceAtLeast(0.0)) / 3.0).toFloat().coerceIn(0f, 1f)
+private fun SpeedGauge(mbps: Double, label: String, upload: Boolean, error: Boolean, scale: Int = 1000, unit: String = "mbps") {
+    // Шкала логарифмическая до [scale] Мбит/с: 100, 500 или 1000
+    val top = kotlin.math.log10(1.0 + scale)
+    val target = (kotlin.math.log10(1.0 + mbps.coerceAtLeast(0.0)) / top).toFloat().coerceIn(0f, 1f)
     val frac by androidx.compose.animation.core.animateFloatAsState(
         target, androidx.compose.animation.core.tween(if (Apex.feel.smooth) 0 else 450), label = "gauge",
     )
@@ -513,8 +581,8 @@ private fun SpeedGauge(mbps: Double, label: String, upload: Boolean, error: Bool
             }
             // Подписи шкалы
             val r = arcSize.width / 2
-            listOf(0, 10, 100, 1000).forEach { v ->
-                val f = (kotlin.math.log10(1.0 + v) / 3.0).toFloat().coerceIn(0f, 1f)
+            listOf(0, scale / 100, scale / 10, scale).forEach { v ->
+                val f = (kotlin.math.log10(1.0 + v) / top).toFloat().coerceIn(0f, 1f)
                 val a = Math.toRadians((150 + 240 * f).toDouble())
                 val rr = r + stroke * 0.5f + 10.dp.toPx()
                 val text = measurer.measure(v.toString(), TextStyle(color = dim, fontSize = 11.sp))
@@ -530,13 +598,32 @@ private fun SpeedGauge(mbps: Double, label: String, upload: Boolean, error: Bool
             )
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                if (mbps > 0) (if (mbps >= 100) "%.0f" else "%.1f").format(Locale.US, mbps) else "—",
-                color = Apex.Text, fontSize = 56.sp, fontWeight = FontWeight.ExtraBold,
-            )
-            Text("Мбит/с", color = Apex.TextDim, fontSize = 15.sp)
+            val (num, u) = com.apexvpn.client.data.SpeedTest.format(if (mbps > 0) mbps else -1.0, unit)
+            Text(num, color = Apex.Text, fontSize = 56.sp, fontWeight = FontWeight.ExtraBold)
+            Text(u, color = Apex.TextDim, fontSize = 15.sp)
             Spacer(Modifier.height(6.dp))
             Text(label, color = if (error) Apex.Bad else Apex.TextDim, fontSize = 14.sp, textAlign = TextAlign.Center, modifier = Modifier.width(170.dp))
+        }
+    }
+}
+
+/** Строка настройки теста: название слева, варианты справа (как в Speedtest). */
+@Composable
+private fun SpeedOption(title: String, items: List<Pair<String, String>>, selected: String, onPick: (String) -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(title, color = Apex.Text, fontSize = 15.sp, modifier = Modifier.weight(1f))
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            items.forEach { (id, t) ->
+                val on = id == selected
+                Text(
+                    t,
+                    color = if (on) Apex.OnAccent else Apex.TextDim,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.clip(RoundedCornerShape(50)).background(if (on) Apex.Accent else Apex.SurfaceHigh)
+                        .clickable { onPick(id) }.padding(horizontal = 10.dp, vertical = 6.dp),
+                )
+            }
         }
     }
 }
