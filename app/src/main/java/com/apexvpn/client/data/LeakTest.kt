@@ -56,7 +56,8 @@ object LeakTest {
 
     /** DNS: edns.ip-api.com отвечает, какой DNS-сервер запросил его адрес. */
     private fun dnsResolver(): Pair<String, String>? = runCatching {
-        val c = URL("http://edns.ip-api.com/json").openConnection() as HttpURLConnection
+        val id = (1..16).map { "abcdefghijklmnopqrstuvwxyz0123456789"[SecureRandom().nextInt(36)] }.joinToString("")
+        val c = URL("http://$id.edns.ip-api.com/json").openConnection() as HttpURLConnection
         c.connectTimeout = 6000
         c.readTimeout = 6000
         try {

@@ -86,6 +86,7 @@ import com.apexvpn.client.vpn.VpnToggle
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
 enum class Tab(val title: String, val icon: ImageVector) {
@@ -147,6 +148,7 @@ class MainActivity : ComponentActivity() {
                 com.apexvpn.client.vpn.VpnState.status,
                 com.apexvpn.client.data.Subscription.state,
             ) { s, st, sub -> Triple(s, st == com.apexvpn.client.vpn.VpnStatus.Started, sub.selectedTag == com.apexvpn.client.data.AUTO_TAG) }
+                .distinctUntilChanged()
                 .collect { (s, on, auto) ->
                 val systemDark = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
                 // Material Expressive: акцент из обоев (Android 12+)
@@ -170,7 +172,7 @@ class MainActivity : ComponentActivity() {
                 enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
             }
         }
-        handleIntent(intent)
+        if (savedInstanceState == null) handleIntent(intent)
         // «Подключать при открытии»: только при настоящем запуске (не при повороте экрана),
         // если есть серверы и разрешение на VPN уже дано
         if (savedInstanceState == null && AppSettings.value.connectOnOpen &&

@@ -2,6 +2,14 @@
 
 <img src="img/tags/new.svg" height="22"> <img src="img/tags/improved.svg" height="22"> <img src="img/tags/changed.svg" height="22"> <img src="img/tags/fixed.svg" height="22"> <img src="img/tags/removed.svg" height="22">
 
+## 3.1.1 · 29 октября 2026
+
+<img src="img/tags/fixed.svg" alt="Исправлено" height="22">
+
+- Проверка DNS-утечек могла показать старый результат из кэша — теперь каждый раз свой адрес проверки
+- После поворота экрана приложение снова спрашивало про ту же ссылку («Добавить подписку?», «Сайт …»)
+- Цвета темы больше не пересчитываются при каждом обновлении подписки — меньше лишней работы
+
 ## 3.1.0 · 29 октября 2026
 
 <img src="img/tags/new.svg" alt="Новое" height="22">
