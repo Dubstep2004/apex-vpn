@@ -108,15 +108,7 @@ class ApexApp : Application() {
                             VpnState.status.value == com.apexvpn.client.vpn.VpnStatus.Started
                         ) com.apexvpn.client.vpn.ApexVpnService.reload(this@ApexApp)
                     }
-                    // 220. Задача «Видео»: на автопилоте сами подбираем самый быстрый сервер
-                    if (AppSettings.value.task == "video" && Prefs.selectedTag == com.apexvpn.client.data.AUTO_TAG) {
-                        appScope.launch {
-                            kotlinx.coroutines.delay(3000)
-                            if (VpnState.status.value == com.apexvpn.client.vpn.VpnStatus.Started) {
-                                com.apexvpn.client.data.FastestServer.run(this@ApexApp)
-                            }
-                        }
-                    }
+                    // Задача «Видео» стала режимом автопилота «Скорость» (3.0) — сервер больше не закрепляется
                 }
                 // 271. Звук отключения
                 if (st == com.apexvpn.client.vpn.VpnStatus.Stopped && last == com.apexvpn.client.vpn.VpnStatus.Stopping) {
@@ -197,10 +189,11 @@ class ApexApp : Application() {
                                 val am = com.apexvpn.client.data.AutoModes
                                 val stale = System.currentTimeMillis() - am.lastMeasured(app) > 15 * 60_000L ||
                                     (mode == com.apexvpn.client.data.AutoModes.Mode.Speed && System.currentTimeMillis() - am.lastSpeed(app) > 30 * 60_000L)
-                                if (stale) am.measure(app, mode)
+                                if (stale) am.measure(app, mode, force = false)
                                 // Подходящие серверы изменились — ядро перезагружается один раз
                                 val allowed = am.allowed(mode, Subscription.state.value.nodes)
-                                if (allowed.isNotEmpty() && allowed.toSet() != AppSettings.autoApplied.toSet()) {
+                                val whitelist = com.apexvpn.client.data.WhiteList.active && AppSettings.value.autoWhitelist
+                                if (!whitelist && allowed.isNotEmpty() && allowed.toSet() != AppSettings.autoApplied.toSet()) {
                                     com.apexvpn.client.vpn.ApexVpnService.reload(app)
                                 }
                             }

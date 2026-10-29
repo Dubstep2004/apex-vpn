@@ -61,7 +61,7 @@ object FastestServer {
         stopRequested = false
         _state.value = State(running = true, step = "Пинг всех серверов…")
         try {
-            val pings = Pinger.pingAll(nodes)
+            val pings = Pinger.pingAll(nodes, type = "tcp")
             // Как и автопилот: без России и обхода LTE (они «быстрые», но сайты через них не открываются)
             val skip = AppSettings.value.autoSkipSpecial
             val pool = nodes.filter { !skip || !ServerInfo.isSpecial(it.name) }.ifEmpty { nodes }

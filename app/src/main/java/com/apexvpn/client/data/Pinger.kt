@@ -33,18 +33,24 @@ object Pinger {
 
     /** tag → задержка в мс или UNREACHABLE */
     /** [save] = false — замер части серверов: сохранять будет вызывающий, вместе с остальными. */
-    suspend fun pingAll(nodes: List<Node>, save: Boolean = true): Map<String, Int> = withContext(Dispatchers.IO) {
+    /**
+     * [type] — способ замера вместо выбранного в «Пинге»: служебные проверки (белые списки,
+     * режимы автопилота, самопроверка) всегда берут "tcp", чтобы ICMP или прокси-пинг
+     * не выдали рабочие серверы за «мёртвые».
+     */
+    suspend fun pingAll(nodes: List<Node>, save: Boolean = true, type: String? = null): Map<String, Int> = withContext(Dispatchers.IO) {
         if (nodes.isEmpty()) return@withContext emptyMap()
         val running = VpnState.status.value == VpnStatus.Started
         val s = AppSettings.value
+        val pingType = type ?: s.pingType
         // «Пинг через прокси» (GET/HEAD): HTTP-запрос через каждый сервер — только при включённом VPN
-        if (running && (s.pingType == "get" || s.pingType == "head")) {
+        if (running && (pingType == "get" || pingType == "head")) {
             val limit = Semaphore(8)
             val r = nodes.map { n ->
                 async {
                     limit.withPermit {
                         n.tag to runCatching {
-                            Apexcore.proxyPing(n.tag, s.pingUrl, s.pingType.uppercase(), s.pingMode, s.pingTimeout * 1000).let { if (it > 0) it else UNREACHABLE }
+                            Apexcore.proxyPing(n.tag, s.pingUrl, pingType.uppercase(), s.pingMode, s.pingTimeout * 1000).let { if (it > 0) it else UNREACHABLE }
                         }.getOrDefault(UNREACHABLE)
                     }
                 }
@@ -53,7 +59,7 @@ object Pinger {
             // Ни один не ответил — ядро без замеров (старый конфиг): дальше обычный пинг
         }
         // ICMP — классический ping до сервера, мимо туннеля
-        if (s.pingType == "icmp") {
+        if (pingType == "icmp") {
             val limit = Semaphore(8)
             val r = nodes.map { n -> async { limit.withPermit { n.tag to icmpPing(n.server, 3000) } } }.awaitAll().toMap()
             return@withContext r.also { if (save) Prefs.saveLastPings(it) }

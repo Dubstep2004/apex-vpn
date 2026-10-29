@@ -417,8 +417,9 @@ private fun GroupRow(
             }
             // Нажатие на пинг — перепроверить только этот сервер; новый результат «вспыхивает»
             val glow = remember { androidx.compose.animation.core.Animatable(0f) }
+            val firstFlash = remember { flash }
             androidx.compose.runtime.LaunchedEffect(flash) {
-                if (flash > 0) {
+                if (flash > 0 && flash != firstFlash) {
                     glow.snapTo(1f)
                     glow.animateTo(0f, androidx.compose.animation.core.tween(1600))
                 }

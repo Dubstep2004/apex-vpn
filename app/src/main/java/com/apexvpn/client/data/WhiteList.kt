@@ -52,7 +52,7 @@ object WhiteList {
         val lte = nodes.filter { ServerInfo.isLte(it.name) }
         val normal = nodes.filter { !ServerInfo.isSpecial(it.name) }
         if (lte.isEmpty() || normal.isEmpty()) return reset(context)
-        val pings = Pinger.pingAll(nodes)
+        val pings = Pinger.pingAll(nodes, type = "tcp")
         val normalOk = normal.any { (pings[it.tag] ?: -1) > 0 }
         val lteOk = lte.any { (pings[it.tag] ?: -1) > 0 }
         val looks = !normalOk && lteOk

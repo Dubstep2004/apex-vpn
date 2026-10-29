@@ -419,7 +419,7 @@ object AppSettings {
             backdropStamp = o.optLong("backdropStamp", d.backdropStamp),
             iconStatus = o.optBoolean("iconStatus", d.iconStatus),
             animatedFlags = o.optBoolean("animatedFlags", d.animatedFlags),
-            task = o.optString("task", d.task),
+            task = "", // задачи стали режимами автопилота (3.0)
             hiddenApps = arr("hiddenApps", d.hiddenApps).toSet(),
             secretUnlocked = o.optBoolean("secret", d.secretUnlocked),
             shield3d = o.optBoolean("shield3d", d.shield3d),
@@ -433,7 +433,11 @@ object AppSettings {
             photoParallax = o.optBoolean("photoParallax", d.photoParallax),
             rulesAuto = o.optBoolean("rulesAuto", d.rulesAuto),
             connectOnOpen = o.optBoolean("connectOnOpen", d.connectOnOpen),
-            autoMode = AutoModes.Mode.of(o.optString("autoMode", d.autoMode)).id,
+            autoMode = AutoModes.Mode.of(
+                o.optString("autoMode", "").ifEmpty {
+                    when (o.optString("task")) { "video" -> "speed"; "games" -> "games"; "calls" -> "calls"; else -> d.autoMode }
+                },
+            ).id,
             pingType = o.optString("pingType", d.pingType).takeIf { it in listOf("tcp", "get", "head", "icmp") } ?: d.pingType,
             pingMode = o.optString("pingMode", d.pingMode).takeIf { it in listOf("default", "double", "keepalive") } ?: d.pingMode,
             pingTimeout = o.optInt("pingTimeout", d.pingTimeout).coerceIn(5, 15),

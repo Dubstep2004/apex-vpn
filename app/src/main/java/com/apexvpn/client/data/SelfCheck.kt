@@ -78,7 +78,7 @@ object SelfCheck {
             // 3. Серверы
             if (sub.nodes.isNotEmpty() && net) {
                 set(2, Mark.Run, "Проверяем ${sub.nodes.size}…")
-                pings = runCatching { Pinger.pingAll(sub.nodes) }.getOrDefault(emptyMap())
+                pings = runCatching { Pinger.pingAll(sub.nodes, type = "tcp") }.getOrDefault(emptyMap())
                 val ok = sub.nodes.count { (pings[it.tag] ?: -1) > 0 }
                 when {
                     ok == sub.nodes.size -> set(2, Mark.Ok, "Отвечают все ($ok)")

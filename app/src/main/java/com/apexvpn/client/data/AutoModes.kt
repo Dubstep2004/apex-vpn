@@ -2,6 +2,7 @@ package com.apexvpn.client.data
 
 import android.content.Context
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONObject
@@ -79,7 +80,17 @@ object AutoModes {
      * Замер пинга: 4 круга по всем серверам — среднее, джиттер (разброс) и потери.
      * Для «Скорости» — ещё и загрузка через 3 лучших по пингу (нужен включённый VPN).
      */
-    suspend fun measure(context: Context, mode: Mode) {
+    private val lock = kotlinx.coroutines.sync.Mutex()
+
+    suspend fun measure(context: Context, mode: Mode, force: Boolean = true) = lock.withLock {
+        // Только что мерили (второй вызов ждал первый) — повторять незачем
+        val fresh = System.currentTimeMillis() - lastMeasured(context) < 60_000L &&
+            (mode != Mode.Speed || System.currentTimeMillis() - lastSpeed(context) < 60_000L)
+        if (fresh && !force) return@withLock
+        measureLocked(context, mode)
+    }
+
+    private suspend fun measureLocked(context: Context, mode: Mode) {
         val nodes = pool(Subscription.state.value.nodes)
         if (nodes.isEmpty() || !mode.measured) return
         _status.value = when (mode) {
@@ -90,7 +101,7 @@ object AutoModes {
         try {
             val rounds = mutableListOf<Map<String, Int>>()
             repeat(4) { i ->
-                rounds += runCatching { Pinger.pingAll(nodes, save = false) }.getOrDefault(emptyMap())
+                rounds += runCatching { Pinger.pingAll(nodes, save = false, type = "tcp") }.getOrDefault(emptyMap())
                 if (i < 3) delay(400)
             }
             val old = _quality.value
