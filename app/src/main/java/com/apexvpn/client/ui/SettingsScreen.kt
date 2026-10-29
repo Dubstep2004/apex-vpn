@@ -645,27 +645,21 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = Apex.Accent, contentColor = Apex.OnAccent),
                     ) { Text("Скопировать отчёт") }
-                    if (sub.supportUrl.isNotBlank()) {
-                        Button(
-                            onClick = {
-                                runCatching {
-                                    context.startActivity(
-                                        android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(sub.supportUrl))
-                                            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                                    )
-                                }.onFailure { viewModel.showMessage("Не удалось открыть ссылку поддержки") }
-                                supportDialog = false
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = Apex.SurfaceHigh, contentColor = Apex.Text),
-                        ) { Text("Открыть чат поддержки") }
-                    } else {
-                        Text(
-                            "Ссылка на чат поддержки не пришла с подпиской — её задаёт сервис (support-url в панели).",
-                            color = Apex.TextDim,
-                            fontSize = 13.sp,
-                        )
-                    }
+                    // Чат из подписки (support-url в панели), иначе — наша поддержка @Apexx_support
+                    val chat = sub.supportUrl.ifBlank { com.apexvpn.client.data.Links.SUPPORT }
+                    Button(
+                        onClick = {
+                            runCatching {
+                                context.startActivity(
+                                    android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(chat))
+                                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                                )
+                            }.onFailure { viewModel.showMessage("Не удалось открыть ссылку поддержки") }
+                            supportDialog = false
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Apex.SurfaceHigh, contentColor = Apex.Text),
+                    ) { Text(if (sub.supportUrl.isBlank()) "Открыть ${com.apexvpn.client.data.Links.SUPPORT_NAME}" else "Открыть чат поддержки") }
                     androidx.compose.material3.TextButton(
                         onClick = {
                             runCatching { com.apexvpn.client.data.Diagnostics.share(context) }

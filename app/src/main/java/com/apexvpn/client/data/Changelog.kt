@@ -25,6 +25,12 @@ private fun d(text: String) = Change(ChangeKind.Removed, text)  // Удален�
 object Changelog {
     val releases = listOf(
         Release(
+            "3.2.1", 61, "29 октября 2026",
+            listOf(
+                n("Поддержка в Telegram — @Apexx_support: на странице «О приложении» (нажмите, чтобы открыть чат) и в «Написать в поддержку»"),
+            ),
+        ),
+        Release(
             "3.2.0", 60, "29 октября 2026",
             listOf(
                 n("Тест скорости 3.0: большая кнопка «Начать» по центру спидометра, как в Speedtest"),

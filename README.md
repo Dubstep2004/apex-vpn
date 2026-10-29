@@ -17,7 +17,7 @@
 <p><b>Два ядра</b> · все популярные протоколы · <b>свои списки</b> с шаблонами · <b>3D-глобус</b> · <b>13 дизайнов</b>, палитры и свой цвет<br>
 автопилот с белыми списками · DNS «Авто» для каждой сети · базы сайтов каждый день · часы Wear OS · без своего сервера</p>
 
-<sub>Последняя версия — <b>3.2.0</b> · Android 7+ · sing-box 1.13 · Xray 26</sub>
+<sub>Последняя версия — <b>3.2.1</b> · Android 7+ · sing-box 1.13 · Xray 26</sub>
 
 </div>
 
@@ -950,7 +950,18 @@ core/apexcore/          Go: разбор подписки → конфиги sin
 
 <img src="docs/img/tags/new.svg" alt="Новое" height="22"> <img src="docs/img/tags/improved.svg" alt="Улучшено" height="22"> <img src="docs/img/tags/changed.svg" alt="Изменено" height="22"> <img src="docs/img/tags/fixed.svg" alt="Исправлено" height="22"> <img src="docs/img/tags/removed.svg" alt="Удалено" height="22">
 
-### 3.2.0 · 29 октября 2026
+### 3.2.1 · 29 октября 2026
+
+<img src="docs/img/tags/new.svg" alt="Новое" height="22">
+
+- Поддержка в Telegram — @Apexx_support: на странице «О приложении» (нажмите, чтобы открыть чат) и в «Написать в поддержку»
+
+#### 📚 Все версии (61)
+
+Каждая версия — отдельная вкладка.
+
+<details>
+<summary><b>3.2.0</b> · 29 октября 2026</summary>
 
 <img src="docs/img/tags/new.svg" alt="Новое" height="22">
 
@@ -965,9 +976,7 @@ core/apexcore/          Go: разбор подписки → конфиги sin
 
 - Пинг в тесте меряется точнее: 8 запросов, первый (с установкой соединения) не считается
 
-#### 📚 Все версии (60)
-
-Каждая версия — отдельная вкладка.
+</details>
 
 <details>
 <summary><b>3.1.2</b> · 29 октября 2026</summary>
