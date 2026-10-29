@@ -13,6 +13,7 @@ import (
 	"github.com/sagernet/quic-go"
 	"github.com/sagernet/sing-quic/hysteria2"
 	"github.com/sagernet/sing/common/bufio"
+	M "github.com/sagernet/sing/common/metadata"
 )
 
 // UdpPing измеряет задержку серверов на QUIC (Hysteria 2, Hysteria, TUIC, NaiveProxy QUIC):
@@ -99,12 +100,23 @@ func quicPing(n Node, timeout time.Duration) (ms int) {
 		return -1
 	}
 	raddr := &net.UDPAddr{IP: addrs[0].IP, Port: port}
-	udp, err := net.DialUDP("udp", nil, raddr)
-	if err != nil {
-		return -1
+	var pc net.PacketConn
+	if d := currentDirectProxy(); d != nil {
+		// VPN включён: сокет приложения попал бы в туннель. Идём через ядро напрямую —
+		// так меряется пинг до самого сервера, как без VPN
+		p, err := d.ListenPacket(ctx, M.SocksaddrFromNet(raddr))
+		if err != nil {
+			return -1
+		}
+		pc = p
+	} else {
+		udp, err := net.DialUDP("udp", nil, raddr)
+		if err != nil {
+			return -1
+		}
+		// как в sing-quic: подключённый сокет → обычный PacketConn
+		pc = bufio.NewUnbindPacketConn(udp)
 	}
-	// как в sing-quic: подключённый сокет → обычный PacketConn
-	var pc net.PacketConn = bufio.NewUnbindPacketConn(udp)
 	defer pc.Close()
 	// Hysteria 2 с обфускацией Salamander
 	if n.Type == "hysteria2" {

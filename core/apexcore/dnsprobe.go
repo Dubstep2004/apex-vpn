@@ -25,6 +25,8 @@ import (
 var probeProxy struct {
 	sync.RWMutex
 	client *socks.Client
+	// direct — тот же SOCKS, но в обход сервера: для пинга до самих серверов
+	direct *socks.Client
 }
 
 // SetProbeProxy включает замеры через ядро (port > 0) или выключает их (port = 0).
@@ -33,9 +35,18 @@ func SetProbeProxy(port int32, user, pass string) {
 	defer probeProxy.Unlock()
 	if port <= 0 || port > 65535 {
 		probeProxy.client = nil
+		probeProxy.direct = nil
 		return
 	}
-	probeProxy.client = socks.NewClient(N.SystemDialer, M.ParseSocksaddrHostPort("127.0.0.1", uint16(port)), socks.Version5, user, pass)
+	addr := M.ParseSocksaddrHostPort("127.0.0.1", uint16(port))
+	probeProxy.client = socks.NewClient(N.SystemDialer, addr, socks.Version5, user, pass)
+	probeProxy.direct = socks.NewClient(N.SystemDialer, addr, socks.Version5, "direct", pass)
+}
+
+func currentDirectProxy() *socks.Client {
+	probeProxy.RLock()
+	defer probeProxy.RUnlock()
+	return probeProxy.direct
 }
 
 func currentProbeProxy() *socks.Client {

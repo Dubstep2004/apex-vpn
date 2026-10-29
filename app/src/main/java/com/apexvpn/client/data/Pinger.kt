@@ -36,10 +36,10 @@ object Pinger {
     suspend fun pingAll(nodes: List<Node>, save: Boolean = true): Map<String, Int> = withContext(Dispatchers.IO) {
         if (nodes.isEmpty()) return@withContext emptyMap()
         val running = VpnState.status.value == VpnStatus.Started
-        if (running) {
-            val viaCore = runCatching { viaClashApi(nodes) }.getOrNull()
-            if (viaCore != null) return@withContext viaCore.also { if (save) Prefs.saveLastPings(it) }
-        }
+        // Пинг — это время одного «туда-обратно» до самого сервера: TCP-соединение или
+        // QUIC-рукопожатие, мимо туннеля (и под VPN тоже — через ядро напрямую).
+        // Раньше под VPN показывалась полная проверка через сервер (подключение, шифрование
+        // и запрос к сайту) — в 2–3 раза больше настоящего пинга.
         val result = mutableMapOf<String, Int>()
         val udpNodes = nodes.filter { it.udp }
         if (udpNodes.isNotEmpty()) {
@@ -54,6 +54,14 @@ object Pinger {
         val limit = Semaphore(8)
         rest.map { node -> async { limit.withPermit { node.tag to tcpPing(node.server, node.port) } } }
             .awaitAll().toMap(result)
+        // Не измерить напрямую (сервер закрыт для прямых соединений, белые списки, mKCP) —
+        // берём проверку через ядро: она показывает, что сервер работает
+        if (running) {
+            val missing = nodes.filter { (result[it.tag] ?: UNREACHABLE) < 0 }
+            if (missing.isNotEmpty()) {
+                runCatching { viaClashApi(missing) }.getOrNull()?.forEach { (tag, ms) -> if (ms > 0) result[tag] = ms }
+            }
+        }
         if (save) Prefs.saveLastPings(result)
         result
     }

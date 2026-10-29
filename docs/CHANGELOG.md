@@ -2,6 +2,16 @@
 
 <img src="img/tags/new.svg" height="22"> <img src="img/tags/improved.svg" height="22"> <img src="img/tags/changed.svg" height="22"> <img src="img/tags/fixed.svg" height="22"> <img src="img/tags/removed.svg" height="22">
 
+## 2.8.3 · 29 октября 2026
+
+<img src="img/tags/improved.svg" alt="Улучшено" height="22">
+
+- Если сервер нельзя проверить напрямую (белые списки, mKCP), пинг берётся из проверки через ядро
+
+<img src="img/tags/fixed.svg" alt="Исправлено" height="22">
+
+- Пинг в списке серверов был в 2–3 раза больше настоящего: под VPN показывалась полная проверка через сервер (подключение, шифрование и запрос к сайту). Теперь это время до самого сервера — одно «туда-обратно», как в других клиентах, и с VPN, и без
+
 ## 2.8.2 · 29 октября 2026
 
 <img src="img/tags/removed.svg" alt="Удалено" height="22">

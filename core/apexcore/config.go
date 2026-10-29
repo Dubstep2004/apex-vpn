@@ -329,7 +329,11 @@ func buildAll(nodesJSON string, selectedTag string, optionsJSON string) (string,
 	// ── правила маршрутизации (сверху вниз, первое совпадение) ───────────
 	rules := []any{}
 	if opts.ProbePort > 1024 && opts.ProbePort < 65536 && opts.XrayAuth != "" {
-		rules = append(rules, map[string]any{"inbound": []string{"probe-in"}, "outbound": "proxy"})
+		// Пользователь «direct» — замер пинга до самого сервера мимо туннеля (как с выключенным VPN)
+		rules = append(rules,
+			map[string]any{"inbound": []string{"probe-in"}, "auth_user": []string{"direct"}, "outbound": "direct"},
+			map[string]any{"inbound": []string{"probe-in"}, "outbound": "proxy"},
+		)
 	}
 	rules = append(rules,
 		map[string]any{"action": "sniff"},
@@ -575,7 +579,10 @@ func buildAll(nodesJSON string, selectedTag string, optionsJSON string) (string,
 	if opts.ProbePort > 1024 && opts.ProbePort < 65536 && opts.XrayAuth != "" {
 		inbounds = append(inbounds, map[string]any{
 			"type": "socks", "tag": "probe-in", "listen": "127.0.0.1", "listen_port": opts.ProbePort,
-			"users": []any{map[string]any{"username": "apex", "password": opts.XrayAuth}},
+			"users": []any{
+				map[string]any{"username": "apex", "password": opts.XrayAuth},
+				map[string]any{"username": "direct", "password": opts.XrayAuth},
+			},
 		})
 	}
 	if opts.Share.Enabled {
