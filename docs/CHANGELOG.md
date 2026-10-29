@@ -2,6 +2,12 @@
 
 <img src="img/tags/new.svg" height="22"> <img src="img/tags/improved.svg" height="22"> <img src="img/tags/changed.svg" height="22"> <img src="img/tags/fixed.svg" height="22"> <img src="img/tags/removed.svg" height="22">
 
+## 2.8.2 · 29 октября 2026
+
+<img src="img/tags/removed.svg" alt="Удалено" height="22">
+
+- Плашка с пингом у сервера на главном экране — пинг виден в графике «Пинг через VPN» и в списке серверов
+
 ## 2.8.1 · 29 октября 2026
 
 <img src="img/tags/fixed.svg" alt="Исправлено" height="22">

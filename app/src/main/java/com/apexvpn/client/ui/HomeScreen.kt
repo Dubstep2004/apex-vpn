@@ -344,23 +344,7 @@ fun HomeScreen(
                     }
                 },
                 onClick = onOpenServers,
-            ) {
-                // Пинг сервера: под VPN — живой замер через сервер, без VPN — последний замер из списка
-                val serverPings by viewModel.pings.collectAsStateWithLifecycle()
-                val saved = remember(sub.nodes) { com.apexvpn.client.data.Prefs.lastPings() }
-                val tag = if (auto) nowNode?.tag else selected?.tag
-                // Тот же пинг, что у этого сервера в списке серверов (замер через сервер)
-                val ms = when {
-                    tag != null -> serverPings[tag] ?: saved[tag] ?: livePing.lastOrNull()?.takeIf { status == VpnStatus.Started }
-                    auto -> sub.nodes.mapNotNull { n -> (serverPings[n.tag] ?: saved[n.tag])?.takeIf { it > 0 } }.minOrNull()
-                    else -> null
-                }
-                if (ms != null) {
-                    PingPill(ms)
-                    Spacer(Modifier.width(6.dp))
-                }
-                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = Apex.TextDim)
-            }
+            ) { Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = Apex.TextDim) }
             GroupDivider()
             ListRow(
                 title = settings.mode.title,
@@ -938,36 +922,3 @@ private fun CountryPhotoBackdrop(code: String) {
     }
 }
 
-
-/** Пинг сервера плашкой: столбики сигнала и мс в цвет качества. */
-@Composable
-private fun PingPill(ms: Int) {
-    val color = if (ms < 0) Apex.Bad else pingColor(ms)
-    val bars = when {
-        ms < 0 -> 0
-        ms < 120 -> 3
-        ms < 300 -> 2
-        else -> 1
-    }
-    Row(
-        Modifier
-            .clip(RoundedCornerShape(50))
-            .background(color.copy(alpha = 0.14f))
-            .padding(horizontal = 10.dp, vertical = 5.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-            for (i in 1..3) {
-                Box(
-                    Modifier
-                        .width(3.dp)
-                        .height((4 + i * 3).dp)
-                        .clip(RoundedCornerShape(1.dp))
-                        .background(if (i <= bars) color else color.copy(alpha = 0.25f)),
-                )
-            }
-        }
-        Spacer(Modifier.width(6.dp))
-        Text(if (ms < 0) "нет" else "$ms мс", color = color, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-    }
-}
