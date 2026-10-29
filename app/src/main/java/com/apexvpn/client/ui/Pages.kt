@@ -88,7 +88,7 @@ import java.util.Locale
 import kotlinx.coroutines.launch
 
 /** Дополнительные страницы, открываются поверх вкладок. */
-enum class Page { Apps, SpeedTest, SiteCheck, Wifi, Share, Dns, Profile, Appearance, Changelog, Advanced, HideApps, AppTraffic, Help }
+enum class Page { Apps, SpeedTest, SiteCheck, Wifi, Share, Dns, Profile, Appearance, Changelog, Advanced, HideApps, AppTraffic, Help, KeepAlive, SelfCheck, About }
 
 @Composable
 fun PageHost(page: Page, viewModel: MainViewModel, onBack: () -> Unit) {
@@ -106,11 +106,14 @@ fun PageHost(page: Page, viewModel: MainViewModel, onBack: () -> Unit) {
         Page.HideApps -> HideAppsPage(viewModel, onBack)
         Page.AppTraffic -> AppTrafficPage(viewModel, onBack)
         Page.Help -> HelpPage(onBack)
+        Page.KeepAlive -> KeepAlivePage(onBack)
+        Page.SelfCheck -> SelfCheckPage(viewModel, onBack)
+        Page.About -> AboutPage(onBack)
     }
 }
 
 @Composable
-private fun PageScaffold(title: String, onBack: () -> Unit, scroll: Boolean = true, content: @Composable ColumnScope.() -> Unit) {
+internal fun PageScaffold(title: String, onBack: () -> Unit, scroll: Boolean = true, content: @Composable ColumnScope.() -> Unit) {
     Box(Modifier.fillMaxSize()) {
     com.apexvpn.client.ui.theme.DesignBackground()
     Column(Modifier.fillMaxSize().statusBarsPadding()) {

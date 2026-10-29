@@ -158,6 +158,15 @@ class MainActivity : ComponentActivity() {
             }
         }
         handleIntent(intent)
+        // «Подключать при открытии»: только при настоящем запуске (не при повороте экрана),
+        // если есть серверы и разрешение на VPN уже дано
+        if (savedInstanceState == null && AppSettings.value.connectOnOpen &&
+            com.apexvpn.client.vpn.VpnState.status.value == com.apexvpn.client.vpn.VpnStatus.Stopped &&
+            com.apexvpn.client.data.Subscription.state.value.nodes.isNotEmpty() &&
+            VpnService.prepare(this) == null
+        ) {
+            ApexVpnService.start(this)
+        }
 
         setContent {
             ApexTheme {

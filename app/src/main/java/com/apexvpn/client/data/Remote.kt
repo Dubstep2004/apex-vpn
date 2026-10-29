@@ -282,6 +282,8 @@ object CrashReporter {
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
             runCatching {
+                // «Отчёты об ошибках» выключены — ничего не сохраняем
+                if (!runCatching { AppSettings.value.crashReports }.getOrDefault(true)) return@runCatching
                 // Только техническая информация: без ссылки подписки, IP и списков сайтов
                 val report = buildString {
                     appendLine("app=${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
@@ -304,6 +306,7 @@ object CrashReporter {
     fun collectNativeCrash(context: Context, stderr: File) {
         runCatching {
             if (!stderr.exists() || stderr.length() == 0L) return@runCatching
+            if (!runCatching { AppSettings.value.crashReports }.getOrDefault(true)) return@runCatching
             val text = stderr.readText().takeLast(30_000)
             val start = listOf("panic:", "fatal error:", "SIGSEGV", "SIGABRT").map { text.indexOf(it) }.filter { it >= 0 }.minOrNull()
                 ?: return@runCatching

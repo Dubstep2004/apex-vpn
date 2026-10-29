@@ -184,6 +184,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** «Не работает?» — самопроверка; заодно обновляет пинги в списке серверов. */
+    fun runSelfCheck() {
+        viewModelScope.launch {
+            val p = com.apexvpn.client.data.SelfCheck.run()
+            if (p.isNotEmpty()) _pings.value = p
+        }
+    }
+
     // ─── 49. Живой пинг на главном экране ────────────────────────────────
 
     private val _livePing = MutableStateFlow<List<Int>>(emptyList())

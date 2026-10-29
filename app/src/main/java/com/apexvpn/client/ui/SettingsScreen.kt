@@ -4,6 +4,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
+import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material.icons.rounded.BatteryChargingFull
+import androidx.compose.material.icons.rounded.PlayCircle
+import androidx.compose.material.icons.rounded.Healing
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Block
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -232,9 +237,41 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
                 leading = { tile(Icons.Rounded.GppMaybe) },
                 onClick = { viewModel.change(reload = false) { copy(killSwitch = !killSwitch) } },
             ) { ApexSwitch(s.killSwitch, { v -> viewModel.change(reload = false) { copy(killSwitch = v) } }) }
-            GroupDivider()
-            ListRow("Постоянный VPN", "Для полной защиты включите «Постоянная VPN» и «Блокировать соединения без VPN» в Android", leading = { tile(Icons.Rounded.Lock) }, onClick = { openVpnSettings(context) }) { Chevron() }
         }
+
+        // ── Надёжность ──
+        SectionLabel("Надёжность")
+        Group {
+            ListRow(
+                "Защита без перерывов",
+                "Постоянная VPN и блокировка без VPN — в настройках Android",
+                leading = { tile(Icons.Rounded.Shield) },
+                onClick = { openVpnSettings(context) },
+            ) { Chevron() }
+            GroupDivider()
+            ListRow(
+                "Чтобы VPN не отключался",
+                "Батарея и автозапуск для Xiaomi, Samsung, Honor",
+                leading = { tile(Icons.Rounded.BatteryChargingFull) },
+                onClick = { onOpenPage(Page.KeepAlive) },
+            ) { Chevron() }
+            GroupDivider()
+            ListRow(
+                "Подключать при открытии",
+                if (s.connectOnOpen) "VPN включается, как только вы открываете приложение" else null,
+                leading = { tile(Icons.Rounded.PlayCircle) },
+                onClick = { viewModel.change(reload = false) { copy(connectOnOpen = !connectOnOpen) } },
+            ) { ApexSwitch(s.connectOnOpen, { v -> viewModel.change(reload = false) { copy(connectOnOpen = v) } }) }
+            GroupDivider()
+            ListRow(
+                "Не работает?",
+                "Самопроверка и выбор рабочего сервера",
+                leading = { tile(Icons.Rounded.Healing) },
+                onClick = { onOpenPage(Page.SelfCheck) },
+            ) { Chevron() }
+        }
+        Spacer(Modifier.height(12.dp))
+        ServerHealthCard(viewModel)
 
         // ── Сеть ──
         SectionLabel("Сеть")
@@ -467,6 +504,20 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
                 Spacer(Modifier.weight(1f))
                 Chevron()
             }
+            GroupDivider()
+            ListRow(
+                "О приложении",
+                "Конфиденциальность, исходный код и лицензии",
+                leading = { tile(Icons.Rounded.Info) },
+                onClick = { onOpenPage(Page.About) },
+            ) { Chevron() }
+            GroupDivider()
+            ListRow(
+                "Отчёты об ошибках",
+                "Сохранять отчёт о сбое для поддержки — без сайтов и содержимого трафика",
+                leading = { tile(Icons.Rounded.BugReport) },
+                onClick = { viewModel.change(reload = false) { copy(crashReports = !crashReports) } },
+            ) { ApexSwitch(s.crashReports, { v -> viewModel.change(reload = false) { copy(crashReports = v) } }) }
             GroupDivider()
             ListRow(
                 "Справка",

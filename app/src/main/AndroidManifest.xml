@@ -17,6 +17,8 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- «Ощущения»: вибрация при подключении -->
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- «Чтобы VPN не отключался»: системный запрос «работать без ограничений батареи» -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <!-- 47. Android TV: сенсорный экран, камера и GPS не обязательны -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
