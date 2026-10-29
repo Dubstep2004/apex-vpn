@@ -349,9 +349,9 @@ fun HomeScreen(
                 val serverPings by viewModel.pings.collectAsStateWithLifecycle()
                 val saved = remember(sub.nodes) { com.apexvpn.client.data.Prefs.lastPings() }
                 val tag = if (auto) nowNode?.tag else selected?.tag
+                // Тот же пинг, что у этого сервера в списке серверов (замер через сервер)
                 val ms = when {
-                    status == VpnStatus.Started -> livePing.lastOrNull()
-                    tag != null -> serverPings[tag] ?: saved[tag]
+                    tag != null -> serverPings[tag] ?: saved[tag] ?: livePing.lastOrNull()?.takeIf { status == VpnStatus.Started }
                     auto -> sub.nodes.mapNotNull { n -> (serverPings[n.tag] ?: saved[n.tag])?.takeIf { it > 0 } }.minOrNull()
                     else -> null
                 }
