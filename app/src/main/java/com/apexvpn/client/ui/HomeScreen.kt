@@ -330,8 +330,8 @@ fun HomeScreen(
                 subtitle = when {
                     !auto -> "Сервер выбран вручную"
                     whitelist && settings.autoWhitelist -> "Белые списки · обход LTE" + (nowNode?.let { " · " + ServerInfo.title(it.name) } ?: "")
-                    nowNode != null && status == VpnStatus.Started -> "Сейчас: " + ServerInfo.title(nowNode.name)
-                    else -> "Самый быстрый из ${sub.nodes.size} серверов"
+                    nowNode != null && status == VpnStatus.Started -> autoModePrefix(settings.autoMode) + "Сейчас: " + ServerInfo.title(nowNode.name)
+                    else -> autoModePrefix(settings.autoMode).ifEmpty { "Самый быстрый из ${sub.nodes.size} серверов" }.removeSuffix(" · ")
                 },
                 leading = {
                     // 383. Флаг переворачивается, как карточка, при смене страны
@@ -922,3 +922,10 @@ private fun CountryPhotoBackdrop(code: String) {
     }
 }
 
+
+
+/** «🎮 Игры · » перед подписью автопилота (для обычного режима — пусто). */
+private fun autoModePrefix(id: String): String {
+    val m = com.apexvpn.client.data.AutoModes.Mode.of(id)
+    return if (m == com.apexvpn.client.data.AutoModes.Mode.Balance) "" else "${m.emoji} ${m.title} · "
+}

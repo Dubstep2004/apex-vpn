@@ -179,6 +179,36 @@ class ApexApp : Application() {
                     }
                 }
         }
+        // Режимы автопилота: после подключения и раз в 15 минут подбираем подходящие серверы
+        com.apexvpn.client.data.AutoModes.load(this)
+        appScope.launch {
+            var job: kotlinx.coroutines.Job? = null
+            combine(VpnState.status, AppSettings.state.map { it.autoMode }) { st, m -> st to m }
+                .distinctUntilChanged()
+                .collect { (st, m) ->
+                    job?.cancel()
+                    val mode = com.apexvpn.client.data.AutoModes.Mode.of(m)
+                    if (st != com.apexvpn.client.vpn.VpnStatus.Started || !mode.measured) return@collect
+                    job = appScope.launch {
+                        val app = this@ApexApp
+                        kotlinx.coroutines.delay(6000)
+                        while (VpnState.status.value == com.apexvpn.client.vpn.VpnStatus.Started) {
+                            if (Prefs.selectedTag == com.apexvpn.client.data.AUTO_TAG) {
+                                val am = com.apexvpn.client.data.AutoModes
+                                val stale = System.currentTimeMillis() - am.lastMeasured(app) > 15 * 60_000L ||
+                                    (mode == com.apexvpn.client.data.AutoModes.Mode.Speed && System.currentTimeMillis() - am.lastSpeed(app) > 30 * 60_000L)
+                                if (stale) am.measure(app, mode)
+                                // Подходящие серверы изменились — ядро перезагружается один раз
+                                val allowed = am.allowed(mode, Subscription.state.value.nodes)
+                                if (allowed.isNotEmpty() && allowed.toSet() != AppSettings.autoApplied.toSet()) {
+                                    com.apexvpn.client.vpn.ApexVpnService.reload(app)
+                                }
+                            }
+                            kotlinx.coroutines.delay(15 * 60_000L)
+                        }
+                    }
+                }
+        }
         // DNS «Авто»: замеры через ядро, пока VPN включён
         appScope.launch {
             VpnState.status.collect { st ->

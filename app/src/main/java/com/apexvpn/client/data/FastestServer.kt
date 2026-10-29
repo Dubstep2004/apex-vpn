@@ -108,6 +108,31 @@ object FastestServer {
         if (!_state.value.running) _state.value = State()
     }
 
+    /**
+     * Режим автопилота «Скорость»: скорость загрузки через каждый из [candidates] (Мбит/с),
+     * без закрепления сервера — после замера ядро возвращается к прежнему выбору.
+     */
+    suspend fun speeds(candidates: List<Node>, bytes: Int = 3_000_000): Map<String, Double> {
+        if (_state.value.running || candidates.isEmpty()) return emptyMap()
+        if (VpnState.status.value != VpnStatus.Started) return emptyMap()
+        val before = Prefs.selectedTag
+        val out = mutableMapOf<String, Double>()
+        var switched = false
+        try {
+            for (n in candidates) {
+                switched = true
+                val mbps = runCatching {
+                    switchTo(n.tag)
+                    download(bytes)
+                }.getOrDefault(0.0)
+                if (mbps > 0) out[n.tag] = mbps
+            }
+        } finally {
+            if (switched) runCatching { switchTo(before) }
+        }
+        return out
+    }
+
     /** Переключить группу «proxy» в работающем ядре без перезапуска (Clash API). */
     private suspend fun switchTo(tag: String) = withContext(Dispatchers.IO) {
         val c = URL("http://127.0.0.1:${Prefs.clashApiPort}/proxies/proxy").openConnection() as HttpURLConnection
@@ -126,8 +151,8 @@ object FastestServer {
     }
 
     /** До [BYTES] байт или [LIMIT_NS]; новое соединение каждый раз, чтобы не ехать через старый сервер. */
-    private suspend fun download(): Double = withContext(Dispatchers.IO) {
-        val c = URL("https://speed.cloudflare.com/__down?bytes=$BYTES").openConnection() as HttpURLConnection
+    private suspend fun download(bytes: Int = BYTES): Double = withContext(Dispatchers.IO) {
+        val c = URL("https://speed.cloudflare.com/__down?bytes=$bytes").openConnection() as HttpURLConnection
         c.connectTimeout = 6000
         c.readTimeout = 8000
         c.useCaches = false

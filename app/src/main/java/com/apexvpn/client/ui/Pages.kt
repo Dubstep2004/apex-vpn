@@ -909,38 +909,17 @@ private fun ProfilePage(viewModel: MainViewModel, onBack: () -> Unit) {
     val s by viewModel.settings.collectAsStateWithLifecycle()
     PageScaffold("Профиль подключения", onBack) {
         // 220. Автовыбор сервера по задаче
-        SectionLabel("Для чего VPN сейчас")
-        val tasks = listOf(
-            Triple("games", "🎮", "Игры") to "Минимальный пинг",
-            Triple("video", "🎬", "Видео") to "Самая высокая скорость",
-            Triple("calls", "📞", "Звонки") to "Стабильная связь",
-        )
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            tasks.forEach { (t, sub) ->
-                val (id, glyph, title) = t
-                val on = s.task == id
-                Column(
-                    Modifier
-                        .weight(1f)
-                        .apexCard(if (on) Apex.SelectedCard else Apex.Surface)
-                        .border(2.dp, if (on) Apex.Accent else Color.Transparent, RoundedCornerShape(Apex.Radius))
-                        .clickable { viewModel.chooseTask(if (on) "" else id) }
-                        .padding(vertical = 14.dp, horizontal = 8.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Text(glyph, fontSize = 30.sp)
-                    Spacer(Modifier.height(6.dp))
-                    Text(title, color = Apex.Text, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                    Text(sub, color = Apex.TextDim, fontSize = 12.sp, textAlign = TextAlign.Center, lineHeight = 15.sp)
-                }
-            }
-        }
+        SectionLabel("Режим автопилота")
+        AutoModeGrid(s.autoMode) { viewModel.setAutoMode(it) }
+        val mode = com.apexvpn.client.data.AutoModes.Mode.of(s.autoMode)
         Caption(
-            when (s.task) {
-                "games" -> "Автопилот проверяет серверы каждую минуту и держит самый низкий пинг. Игры не обрываются при смене."
-                "video" -> "После подключения APEX измерит скорость 5 лучших серверов и закрепит самый быстрый. Подобрать заново — в «Тесте скорости»."
-                "calls" -> "Сервер «залипает» и не меняется без нужды — звонки не рвутся."
-                else -> "Выберите задачу — APEX сам настроит профиль и выбор сервера. Нажмите ещё раз, чтобы снять."
+            when (mode) {
+                com.apexvpn.client.data.AutoModes.Mode.Games -> "Каждый сервер проверяется 4 раза подряд: автопилот выбирает только из тех, где пинг низкий и ровный (маленький джиттер) и нет потерь. Проверка каждую минуту, игры не обрываются при смене."
+                com.apexvpn.client.data.AutoModes.Mode.Speed -> "После подключения APEX измеряет скорость загрузки через 3 лучших сервера (≈ 9 МБ трафика) и оставляет автопилоту 2 самых быстрых. Перепроверка — раз в 30 минут."
+                com.apexvpn.client.data.AutoModes.Mode.Stable -> "Автопилот выбирает только серверы без потерь, которые ни разу не пропадали, и не меняет сервер без нужды."
+                com.apexvpn.client.data.AutoModes.Mode.Calls -> "Ровная связь для Telegram, WhatsApp и Discord: стабильные серверы, сервер «залипает» и не меняется во время разговора."
+                com.apexvpn.client.data.AutoModes.Mode.Battery -> "Серверы проверяются раз в 30 минут — меньше расход батареи."
+                else -> "Автопилот выбирает самый быстрый сервер и меняет его, только если другой заметно быстрее."
             },
         )
         SectionLabel("Профиль")

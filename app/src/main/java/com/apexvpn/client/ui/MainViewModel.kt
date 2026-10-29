@@ -313,28 +313,27 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Задача: игры, видео или звонки — профиль и способ выбора сервера. */
+    /** Режим автопилота: включает автопилот и сразу подбирает подходящие серверы. */
+    fun setAutoMode(mode: com.apexvpn.client.data.AutoModes.Mode) {
+        change(reload = false) { copy(autoMode = mode.id, profile = mode.profile, task = "") }
+        Subscription.select(com.apexvpn.client.data.AUTO_TAG)
+        showMessage("${mode.emoji} ${mode.title}: ${mode.subtitle.replaceFirstChar { it.lowercase() }}")
+        viewModelScope.launch {
+            if (mode.measured) {
+                com.apexvpn.client.data.AutoModes.measure(getApplication(), mode)
+                _pings.value = _pings.value + com.apexvpn.client.data.AutoModes.quality.value
+                    .mapValues { it.value.avg }.filterValues { it > 0 }
+            }
+            applyToVpn()
+        }
+    }
+
     fun chooseTask(task: String) {
         when (task) {
-            "games" -> {
-                change(reload = false) { copy(task = task, profile = com.apexvpn.client.data.ConnProfile.Gaming) }
-                select(com.apexvpn.client.data.AUTO_TAG)
-                showMessage("Игры: автопилот держит сервер с самым низким пингом")
-            }
-            "calls" -> {
-                change(reload = false) { copy(task = task, profile = com.apexvpn.client.data.ConnProfile.Calls) }
-                select(com.apexvpn.client.data.AUTO_TAG)
-                showMessage("Звонки: стабильный сервер, связь не рвётся при смене")
-            }
-            "video" -> {
-                change(reload = false) { copy(task = task, profile = com.apexvpn.client.data.ConnProfile.Normal) }
-                if (com.apexvpn.client.vpn.VpnState.status.value == com.apexvpn.client.vpn.VpnStatus.Started) {
-                    findFastest()
-                } else {
-                    select(com.apexvpn.client.data.AUTO_TAG)
-                    showMessage("Видео: после подключения APEX сам найдёт самый быстрый сервер")
-                }
-            }
-            else -> change { copy(task = "") }
+            "games" -> setAutoMode(com.apexvpn.client.data.AutoModes.Mode.Games)
+            "calls" -> setAutoMode(com.apexvpn.client.data.AutoModes.Mode.Calls)
+            "video" -> setAutoMode(com.apexvpn.client.data.AutoModes.Mode.Speed)
+            else -> setAutoMode(com.apexvpn.client.data.AutoModes.Mode.Balance)
         }
     }
 

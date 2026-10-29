@@ -86,6 +86,7 @@ data class Settings(
     val connectOnOpen: Boolean = false,               // подключать VPN при открытии приложения
     // «Пинг»: tcp — до сервера (TCP/QUIC) | get, head — через прокси (HTTP-запрос через сервер) | icmp
     val pingType: String = "tcp",
+    val autoMode: String = "balance",                 // режим автопилота: balance | games | speed | stable | calls | battery
     val pingMode: String = "keepalive",               // через прокси: default | double | keepalive
     val pingTimeout: Int = 5,                         // тайм-аут пинга через прокси, с (5…15)
     val pingUrl: String = "",                         // свой адрес проверки (пусто — gstatic)
@@ -198,6 +199,9 @@ object AppSettings {
     fun onMobile(): Boolean = com.apexvpn.client.vpn.NetworkMonitor.transport.value.substringBefore(':') == "mobile" ||
         (com.apexvpn.client.vpn.NetworkMonitor.transport.value.isEmpty() && DnsAuto.networkKey() == "mobile")
 
+    /** Список серверов режима автопилота, который сейчас в ядре. */
+    @Volatile var autoApplied: List<String> = emptyList()
+
     /** Что сейчас в ядре — чтобы при смене Wi-Fi ↔ мобильная понять, нужна ли перезагрузка. */
     @Volatile var quicApplied: Boolean? = null
 
@@ -261,11 +265,19 @@ object AppSettings {
         if (WhiteList.active && s.autoWhitelist) {
             // 491. Белые списки: только LTE-обход
             put("autoExclude", JSONArray(nodes.filter { !ServerInfo.isLte(it.name) }.map { it.tag }))
-        } else if (s.autoSkipSpecial) {
-            put("autoExclude", JSONArray(nodes.filter { ServerInfo.isSpecial(it.name) }.map { it.tag }))
+        } else {
+            // Режим автопилота (игры, скорость, надёжный, звонки): только подходящие серверы
+            val allowed = AutoModes.allowed(AutoModes.Mode.of(s.autoMode), nodes)
+            if (allowed.isNotEmpty()) {
+                put("autoExclude", JSONArray(nodes.map { it.tag }.filter { it !in allowed }))
+                put("autoOrder", JSONArray(allowed))
+            } else if (s.autoSkipSpecial) {
+                put("autoExclude", JSONArray(nodes.filter { ServerInfo.isSpecial(it.name) }.map { it.tag }))
+            }
+            autoApplied = allowed
         }
         // …и до первой проверки — сначала серверы, которые были быстрее при прошлом замере
-        put("autoOrder", JSONArray(Prefs.lastPings().entries.filter { it.value > 0 }.sortedBy { it.value }.map { it.key }))
+        if (!has("autoOrder")) put("autoOrder", JSONArray(Prefs.lastPings().entries.filter { it.value > 0 }.sortedBy { it.value }.map { it.key }))
         put(
             "share",
             JSONObject().put("enabled", s.share).put("port", s.sharePort)
@@ -321,7 +333,7 @@ object AppSettings {
         put("warp", s.warp); put("warpConfig", s.warpConfig); put("shieldBackdrop", s.shieldBackdrop); put("backdropStamp", s.backdropStamp)
         put("iconStatus", s.iconStatus); put("animatedFlags", s.animatedFlags); put("task", s.task); put("hiddenApps", list(s.hiddenApps)); put("secret", s.secretUnlocked); put("shield3d", s.shield3d); put("automation", s.automation); put("appTraffic", s.appTraffic); put("autoSkipSpecial", s.autoSkipSpecial); put("autoWhitelist", s.autoWhitelist)
         put("customAccent2", s.customAccent2); put("photoBlur", s.photoBlur); put("photoDim", s.photoDim); put("photoParallax", s.photoParallax); put("rulesAuto", s.rulesAuto); put("quicMode", s.quicMode); put("connectOnOpen", s.connectOnOpen)
-        put("pingType", s.pingType); put("pingMode", s.pingMode); put("pingTimeout", s.pingTimeout); put("pingUrl", s.pingUrl); put("pingView", s.pingView)
+        put("pingType", s.pingType); put("pingMode", s.pingMode); put("pingTimeout", s.pingTimeout); put("pingUrl", s.pingUrl); put("pingView", s.pingView); put("autoMode", s.autoMode)
     }
 
     private fun fromJson(o: JSONObject): Settings {
@@ -421,6 +433,7 @@ object AppSettings {
             photoParallax = o.optBoolean("photoParallax", d.photoParallax),
             rulesAuto = o.optBoolean("rulesAuto", d.rulesAuto),
             connectOnOpen = o.optBoolean("connectOnOpen", d.connectOnOpen),
+            autoMode = AutoModes.Mode.of(o.optString("autoMode", d.autoMode)).id,
             pingType = o.optString("pingType", d.pingType).takeIf { it in listOf("tcp", "get", "head", "icmp") } ?: d.pingType,
             pingMode = o.optString("pingMode", d.pingMode).takeIf { it in listOf("default", "double", "keepalive") } ?: d.pingMode,
             pingTimeout = o.optInt("pingTimeout", d.pingTimeout).coerceIn(5, 15),

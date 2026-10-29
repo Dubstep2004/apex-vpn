@@ -168,6 +168,20 @@ fun ServerSheet(viewModel: MainViewModel, onDismiss: () -> Unit) {
                     ApexSwitch(autopilot, { toggleAutopilot(viewModel, autopilot, fallback) })
                 }
             }
+            // Режим автопилота: игры, скорость, надёжный…
+            Spacer(Modifier.height(10.dp))
+            AutoModeChips(settings.autoMode) { viewModel.setAutoMode(it) }
+            val modeStatus by com.apexvpn.client.data.AutoModes.status.collectAsStateWithLifecycle()
+            val quality by com.apexvpn.client.data.AutoModes.quality.collectAsStateWithLifecycle()
+            val mode = com.apexvpn.client.data.AutoModes.Mode.of(settings.autoMode)
+            if (modeStatus != null || mode.measured) {
+                Text(
+                    modeStatus ?: remember(quality, sub.nodes, mode) { com.apexvpn.client.data.AutoModes.summary(mode, sub.nodes) },
+                    color = Apex.TextDim,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(start = 6.dp, top = 8.dp),
+                )
+            }
             Spacer(Modifier.height(14.dp))
 
             Segmented(ServerTab.entries.map { it.title }, ServerTab.entries.indexOf(tab)) { tab = ServerTab.entries[it] }
@@ -212,6 +226,10 @@ fun ServerSheet(viewModel: MainViewModel, onDismiss: () -> Unit) {
                     mobileOnly = onWifi && g.nodes.all { ServerInfo.isLte(it.name) },
                     onPing = { viewModel.pingGroup(g.nodes.map { it.tag }) },
                     pingView = settings.pingView,
+                    // Для игр видно, насколько ровный пинг (джиттер) и есть ли потери
+                    quality = if (com.apexvpn.client.data.AutoModes.Mode.of(settings.autoMode) == com.apexvpn.client.data.AutoModes.Mode.Games ||
+                        com.apexvpn.client.data.AutoModes.Mode.of(settings.autoMode) == com.apexvpn.client.data.AutoModes.Mode.Speed
+                    ) g.nodes.firstNotNullOfOrNull { com.apexvpn.client.data.AutoModes.quality.value[it.tag] } else null,
                     favorite = g.title in settings.favorites || g.nodes.any { it.name in settings.favorites },
                     onPick = pick,
                     onFavorite = { viewModel.toggleFavorite(g.title) },
@@ -319,6 +337,7 @@ private fun GroupRow(
     flash: Int = 0,
     mobileOnly: Boolean = false,
     pingView: String = "time",
+    quality: com.apexvpn.client.data.AutoModes.Quality? = null,
     onPing: () -> Unit = {},
     favorite: Boolean,
     onPick: (Node) -> Unit,
@@ -375,6 +394,16 @@ private fun GroupRow(
                         Spacer(Modifier.width(6.dp))
                     }
                     Text(info, color = Apex.TextDim, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                quality?.let { q ->
+                    val parts = buildList {
+                        if (q.jitter >= 0) add("джиттер ${q.jitter} мс")
+                        if (q.loss in 1..100) add("потери ${q.loss}%")
+                        if (q.mbps > 0) add("%.0f Мбит/с".format(java.util.Locale.US, q.mbps))
+                    }
+                    if (parts.isNotEmpty()) {
+                        Text(parts.joinToString(" · "), color = if (q.loss > 0) Apex.Warn else Apex.TextDim, fontSize = 12.sp, modifier = Modifier.padding(top = 3.dp))
+                    }
                 }
             }
             Spacer(Modifier.width(8.dp))
