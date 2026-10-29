@@ -112,22 +112,51 @@ object SpeedTest {
 // ─── 49. Живой пинг ─────────────────────────────────────────────────────
 
 object LivePing {
-    /** Задержка HTTPS-запроса (через VPN, если он включён); -1 — нет ответа. */
+    private const val URL_TEST = "https://www.gstatic.com/generate_204"
+
+    /**
+     * Задержка до интернета через текущий сервер, мс; -1 — нет ответа.
+     * Меряем внутри ядра (Clash API, тот же способ, что и пинг в списке серверов): так результат
+     * не зависит от того, пропускает ли туннель запросы самого приложения и как настроены правила.
+     * Если ядро не ответило — обычный HTTPS-запрос, как раньше.
+     */
     suspend fun measure(): Int = withContext(Dispatchers.IO) {
-        runCatching {
-            val c = URL("https://www.gstatic.com/generate_204").openConnection() as HttpURLConnection
-            c.connectTimeout = 4000
-            c.readTimeout = 4000
-            c.useCaches = false
-            val t = System.nanoTime()
-            try {
-                c.responseCode
-            } finally {
-                c.disconnect()
-            }
-            ((System.nanoTime() - t) / 1_000_000).toInt()
-        }.getOrDefault(-1)
+        viaCore()?.let { return@withContext it }
+        viaHttp(URL_TEST).takeIf { it >= 0 } ?: viaHttp("https://cp.cloudflare.com/generate_204")
     }
+
+    /** null — Clash API недоступен (тогда пробуем HTTP), -1 — сервер не ответил. */
+    private fun viaCore(): Int? = runCatching {
+        val path = "/proxies/proxy/delay?timeout=4000&url=" + java.net.URLEncoder.encode(URL_TEST, "UTF-8")
+        val c = URL("http://127.0.0.1:${Prefs.clashApiPort}$path").openConnection() as HttpURLConnection
+        c.connectTimeout = 1500
+        c.readTimeout = 6000
+        c.setRequestProperty("Authorization", "Bearer ${Prefs.xrayAuth}")
+        try {
+            when (c.responseCode) {
+                200 -> org.json.JSONObject(c.inputStream.bufferedReader().readText()).optInt("delay", -1).takeIf { it > 0 } ?: -1
+                // Таймаут или ошибка сервера — ядро на месте, но сервер не ответил
+                408, 503, 504 -> -1
+                else -> null
+            }
+        } finally {
+            c.disconnect()
+        }
+    }.getOrNull()
+
+    private fun viaHttp(url: String): Int = runCatching {
+        val c = URL(url).openConnection() as HttpURLConnection
+        c.connectTimeout = 4000
+        c.readTimeout = 4000
+        c.useCaches = false
+        val t = System.nanoTime()
+        try {
+            c.responseCode
+        } finally {
+            c.disconnect()
+        }
+        ((System.nanoTime() - t) / 1_000_000).toInt()
+    }.getOrDefault(-1)
 }
 
 // ─── 6. Список приложений ───────────────────────────────────────────────

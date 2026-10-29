@@ -2,6 +2,12 @@
 
 <img src="img/tags/new.svg" height="22"> <img src="img/tags/improved.svg" height="22"> <img src="img/tags/changed.svg" height="22"> <img src="img/tags/fixed.svg" height="22"> <img src="img/tags/removed.svg" height="22">
 
+## 2.5.2 · 29 октября 2026
+
+<img src="img/tags/fixed.svg" alt="Исправлено" height="22">
+
+- «Пинг через VPN» на главном экране показывал «нет ответа», хотя сервер работал (например, LTE-обход). Теперь пинг меряется внутри ядра — так же, как в списке серверов
+
 ## 2.5.1 · 29 октября 2026
 
 <img src="img/tags/fixed.svg" alt="Исправлено" height="22">
