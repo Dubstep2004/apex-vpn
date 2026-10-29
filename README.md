@@ -17,7 +17,7 @@
 <p><b>Два ядра</b> · все популярные протоколы · <b>свои списки</b> с шаблонами · <b>3D-глобус</b> · <b>13 дизайнов</b>, палитры и свой цвет<br>
 автопилот с белыми списками · DNS «Авто» для каждой сети · базы сайтов каждый день · часы Wear OS · без своего сервера</p>
 
-<sub>Последняя версия — <b>2.6.0</b> · Android 7+ · sing-box 1.13 · Xray 26</sub>
+<sub>Последняя версия — <b>2.6.1</b> · Android 7+ · sing-box 1.13 · Xray 26</sub>
 
 </div>
 
@@ -851,7 +851,18 @@ core/apexcore/          Go: разбор подписки → конфиги sin
 
 <img src="docs/img/tags/new.svg" alt="Новое" height="22"> <img src="docs/img/tags/improved.svg" alt="Улучшено" height="22"> <img src="docs/img/tags/changed.svg" alt="Изменено" height="22"> <img src="docs/img/tags/fixed.svg" alt="Исправлено" height="22"> <img src="docs/img/tags/removed.svg" alt="Удалено" height="22">
 
-### 2.6.0 · 29 октября 2026
+### 2.6.1 · 29 октября 2026
+
+<img src="docs/img/tags/changed.svg" alt="Изменено" height="22">
+
+- Карточка APEX VPN в настройках открывает страницу «О приложении», отдельная строка-дубль убрана
+
+#### 📚 Все версии (47)
+
+Каждая версия — отдельная вкладка.
+
+<details>
+<summary><b>2.6.0</b> · 29 октября 2026</summary>
 
 <img src="docs/img/tags/new.svg" alt="Новое" height="22">
 
@@ -866,9 +877,7 @@ core/apexcore/          Go: разбор подписки → конфиги sin
 
 - Переключатель «Отчёты об ошибках» теперь работает: выключен — отчёты о сбоях не сохраняются
 
-#### 📚 Все версии (46)
-
-Каждая версия — отдельная вкладка.
+</details>
 
 <details>
 <summary><b>2.5.4</b> · 29 октября 2026</summary>

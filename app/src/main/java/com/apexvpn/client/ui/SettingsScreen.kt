@@ -8,7 +8,6 @@ import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.BatteryChargingFull
 import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.Healing
-import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Block
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -475,7 +474,8 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
         SectionLabel("О приложении")
         Group {
             Row(
-                Modifier.fillMaxWidth().clickable { onOpenPage(Page.Changelog) }.padding(18.dp),
+                // Карточка и есть «О приложении»: конфиденциальность, исходный код, лицензии
+                Modifier.fillMaxWidth().clickable { onOpenPage(Page.About) }.padding(18.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 SecretLogo(viewModel)
@@ -485,6 +485,7 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
                     Text("Версия ${BuildConfig.VERSION_NAME}", color = Apex.TextDim, fontSize = 14.sp)
                     Text("Ядро sing-box ${singBoxVersion()}", color = Apex.TextDim, fontSize = 13.sp)
                     Text("Ядро Xray ${BuildConfig.XRAY_VERSION}", color = Apex.TextDim, fontSize = 13.sp)
+                    Text("Конфиденциальность, исходный код и лицензии", color = Apex.TextDim, fontSize = 13.sp)
                     // Подлинность сборки
                     val integrity = remember { com.apexvpn.client.data.Integrity.status(context) }
                     Text(
@@ -504,13 +505,6 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
                 Spacer(Modifier.weight(1f))
                 Chevron()
             }
-            GroupDivider()
-            ListRow(
-                "О приложении",
-                "Конфиденциальность, исходный код и лицензии",
-                leading = { tile(Icons.Rounded.Info) },
-                onClick = { onOpenPage(Page.About) },
-            ) { Chevron() }
             GroupDivider()
             ListRow(
                 "Отчёты об ошибках",
