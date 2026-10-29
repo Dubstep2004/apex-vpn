@@ -959,6 +959,18 @@ private fun ProfilePage(viewModel: MainViewModel, onBack: () -> Unit) {
                 ApexSwitch(s.autoWhitelist, { v -> viewModel.change { copy(autoWhitelist = v) } })
             }
         }
+        // Медленный интернет на LTE: QUIC (HTTP/3) через VPN на мобильной сети часто тормозит
+        SectionLabel("QUIC (HTTP/3)")
+        ChipRow(listOf("mobile" to "Выкл. на мобильной", "off" to "Всегда выкл.", "on" to "Не трогать"), s.quicMode) {
+            viewModel.change { copy(quicMode = it) }
+        }
+        Caption(
+            when (s.quicMode) {
+                "mobile" -> "На мобильной сети сайты и видео идут по TCP — так через VPN быстрее и стабильнее. На Wi-Fi QUIC работает как обычно."
+                "off" -> "QUIC выключен везде: браузер и приложения сразу идут по TCP."
+                else -> "QUIC работает всегда. Если на LTE сайты открываются медленно — выберите «Выкл. на мобильной»."
+            },
+        )
     }
 }
 

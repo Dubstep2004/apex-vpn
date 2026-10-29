@@ -156,6 +156,8 @@ class ApexApp : Application() {
                         val s = AppSettings.value
                         val mobile = tr.substringBefore(':') == "mobile"
                         if (!mobile || !s.autoWhitelist) reload = com.apexvpn.client.data.WhiteList.reset(app)
+                        // QUIC: на мобильной выключен, на Wi-Fi включён — сеть сменилась, обновляем ядро
+                        if (AppSettings.quicApplied != null && AppSettings.quicBlocked() != AppSettings.quicApplied) reload = true
                         // Для этой сети уже известен лучший DNS — применяем сразу
                         if (s.dns == com.apexvpn.client.data.DnsChoice.Auto &&
                             com.apexvpn.client.data.DnsAuto.bestVariant().key != com.apexvpn.client.data.DnsAuto.applied
@@ -171,7 +173,8 @@ class ApexApp : Application() {
                             VpnState.status.value == com.apexvpn.client.vpn.VpnStatus.Started
                         ) {
                             if (com.apexvpn.client.data.WhiteList.check(app)) com.apexvpn.client.vpn.ApexVpnService.reload(app)
-                            kotlinx.coroutines.delay(5 * 60_000L)
+                            // Похоже на белые списки — перепроверяем через минуту, а не через 5
+                            kotlinx.coroutines.delay(if (com.apexvpn.client.data.WhiteList.suspected) 60_000L else 5 * 60_000L)
                         }
                     }
                 }

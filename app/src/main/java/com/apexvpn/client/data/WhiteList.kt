@@ -29,11 +29,21 @@ object WhiteList {
 
     /** Сбросить (Wi-Fi, автопилот выключен, функция отключена); true — состояние изменилось. */
     fun reset(context: Context): Boolean {
+        hits = 0
         if (!active) return false
         active = false
         notify(context, false)
         return true
     }
+
+    /**
+     * Сколько проверок подряд похоже на белые списки. Включаем обход только со второго раза:
+     * на медленном LTE обычные серверы могут разок не ответить — это ещё не белые списки,
+     * а лишний переход на LTE-обход только замедлил бы интернет.
+     */
+    @Volatile private var hits = 0
+    val suspected get() = hits in 1 until CONFIRM
+    private const val CONFIRM = 2
 
     /** Проверка; true — состояние изменилось (нужно перезагрузить ядро). */
     suspend fun check(context: Context): Boolean {
@@ -45,7 +55,10 @@ object WhiteList {
         val pings = Pinger.pingAll(nodes)
         val normalOk = normal.any { (pings[it.tag] ?: -1) > 0 }
         val lteOk = lte.any { (pings[it.tag] ?: -1) > 0 }
-        val now = !normalOk && lteOk
+        val looks = !normalOk && lteOk
+        hits = if (looks) hits + 1 else 0
+        // Включаем после подтверждения, выключаем сразу, как только обычные серверы ответили
+        val now = if (active) looks else hits >= CONFIRM
         if (now == active) return false
         active = now
         notify(context, now)

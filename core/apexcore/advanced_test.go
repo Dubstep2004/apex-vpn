@@ -139,3 +139,14 @@ func TestAllDNSProviders(t *testing.T) {
 		}
 	}
 }
+
+func TestBlockQUIC(t *testing.T) {
+	nodes := parseNodes(t, "vless://"+testUUID+"@1.2.3.4:443?type=tcp&security=tls&sni=a.example.com#A")
+	for _, on := range []bool{false, true} {
+		raw, _ := json.Marshal(map[string]any{"mode": "global", "blockQuic": on})
+		cfg := checkAll(t, nodes, string(raw))
+		if got := strings.Contains(cfg, `"protocol": "quic"`); got != on {
+			t.Fatalf("blockQuic=%v: правило QUIC есть=%v", on, got)
+		}
+	}
+}

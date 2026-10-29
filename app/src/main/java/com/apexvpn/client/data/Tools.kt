@@ -121,8 +121,10 @@ object LivePing {
      * Если ядро не ответило — обычный HTTPS-запрос, как раньше.
      */
     suspend fun measure(): Int = withContext(Dispatchers.IO) {
-        viaCore()?.let { return@withContext it }
-        viaHttp(URL_TEST).takeIf { it >= 0 } ?: viaHttp("https://cp.cloudflare.com/generate_204")
+        // Сначала обычный запрос: он не трогает замеры автопилота. Замер в ядре — только если
+        // запрос приложения не прошёл (так бывает на LTE-обходе), иначе частые замеры могли бы
+        // заставить автопилот лишний раз менять сервер
+        viaHttp(URL_TEST).takeIf { it >= 0 } ?: viaCore() ?: viaHttp("https://cp.cloudflare.com/generate_204")
     }
 
     /** null — Clash API недоступен (тогда пробуем HTTP), -1 — сервер не ответил. */

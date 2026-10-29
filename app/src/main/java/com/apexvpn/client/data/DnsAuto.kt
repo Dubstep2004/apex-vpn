@@ -78,7 +78,10 @@ object DnsAuto {
     /** Лучший вариант для текущей сети; по умолчанию — Cloudflare DoH. */
     fun bestVariant(key: String = networkKey()): Variant {
         val k = saved().optString(key).ifBlank { saved().optString("any") }
-        return variants.firstOrNull { it.key == k } ?: variants.first()
+        val v = variants.firstOrNull { it.key == k } ?: variants.first()
+        // Сохранённый DoQ не применяем на мобильной сети — берём тот же DNS по DoT
+        if (key == "mobile" && v.proto == "quic") return variants.firstOrNull { it.choice == v.choice && it.proto == "tls" } ?: variants.first()
+        return v
     }
 
     /** Совместимость: id DNS для ядра. */
@@ -90,8 +93,10 @@ object DnsAuto {
     /** Замер; возвращает true, если лучший DNS для этой сети сменился. */
     suspend fun measure(): Boolean = withContext(Dispatchers.IO) {
         val key = networkKey()
+        // На мобильной сети без DoQ: UDP через VPN на LTE теряется, DNS по TCP надёжнее
+        val pool = if (key == "mobile") variants.filter { it.proto != "quic" } else variants
         val res = coroutineScope {
-            variants.map { v -> async { Result(v, probe(v)) } }.awaitAll()
+            pool.map { v -> async { Result(v, probe(v)) } }.awaitAll()
         }.sortedBy { if (it.ms < 0) Int.MAX_VALUE else it.ms }
         _results.value = res
         val win = res.firstOrNull { it.ms >= 0 } ?: return@withContext false

@@ -98,6 +98,9 @@ type routeOptions struct {
 	// порядке пробовать до первой проверки (по последнему замеру пинга в приложении)
 	AutoExclude []string `json:"autoExclude"`
 	AutoOrder   []string `json:"autoOrder"`
+	// Без QUIC (HTTP/3): браузер и приложения сразу идут по TCP. На мобильной сети UDP часто
+	// режут или теряют, и QUIC через VPN заметно тормозит — по TCP сайты открываются быстрее
+	BlockQUIC bool `json:"blockQuic"`
 }
 
 // профиль подключения: как часто проверять серверы и рвать ли соединения при смене
@@ -325,6 +328,10 @@ func buildAll(nodesJSON string, selectedTag string, optionsJSON string) (string,
 		map[string]any{"action": "sniff"},
 		map[string]any{"protocol": "dns", "action": "hijack-dns"},
 		map[string]any{"ip_is_private": true, "outbound": "direct"},
+	}
+	if opts.BlockQUIC {
+		// Отказ сразу: браузер за доли секунды переходит на обычный HTTPS по TCP
+		rules = append(rules, map[string]any{"protocol": "quic", "action": "reject"})
 	}
 	// Соединения Xray к его серверам — мимо туннеля, иначе петля
 	rules = append(rules, xray.singBoxRules()...)

@@ -2,6 +2,19 @@
 
 <img src="img/tags/new.svg" height="22"> <img src="img/tags/improved.svg" height="22"> <img src="img/tags/changed.svg" height="22"> <img src="img/tags/fixed.svg" height="22"> <img src="img/tags/removed.svg" height="22">
 
+## 2.5.4 · 29 октября 2026
+
+<img src="img/tags/new.svg" alt="Новое" height="22">
+
+- Настройка «QUIC (HTTP/3)» в Профиле подключения: выкл. на мобильной, всегда выкл. или не трогать
+
+<img src="img/tags/fixed.svg" alt="Исправлено" height="22">
+
+- Медленные сайты на LTE: на мобильной сети QUIC (HTTP/3) выключается, и сайты идут по TCP — через VPN так быстрее и стабильнее. На Wi-Fi всё как раньше
+- Белые списки больше не включают LTE-обход из-за одного неудачного замера на медленном LTE — нужно подтверждение второй проверкой
+- DNS «Авто» на мобильной сети не выбирает DoQ (UDP), только DoH и DoT по TCP
+- Пинг на главном экране больше не влияет на выбор сервера автопилотом
+
 ## 2.5.3 · 29 октября 2026
 
 <img src="img/tags/improved.svg" alt="Улучшено" height="22">

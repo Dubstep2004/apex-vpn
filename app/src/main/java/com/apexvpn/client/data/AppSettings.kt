@@ -83,6 +83,7 @@ data class Settings(
     val photoDim: Int = 55,                           // 563. затемнение, % (0…90)
     val photoParallax: Boolean = true,                // 563. фото сдвигается при наклоне телефона
     val rulesAuto: Boolean = true,                    // базы сайтов: проверять обновления раз в день
+    val quicMode: String = "mobile",                  // QUIC (HTTP/3): mobile — выкл. на мобильной сети | off — всегда выкл. | on — не трогать
     // 20. Иконка на рабочем столе показывает, включён ли VPN
     val iconStatus: Boolean = false,
     // 94. Флаги в списке серверов колышутся
@@ -186,6 +187,20 @@ object AppSettings {
     }
 
     /** Настройки для ядра (routeOptions в core/apexcore/config.go). */
+    /** Мобильная сеть сейчас (без VPN-туннеля). */
+    fun onMobile(): Boolean = com.apexvpn.client.vpn.NetworkMonitor.transport.value.substringBefore(':') == "mobile" ||
+        (com.apexvpn.client.vpn.NetworkMonitor.transport.value.isEmpty() && DnsAuto.networkKey() == "mobile")
+
+    /** Что сейчас в ядре — чтобы при смене Wi-Fi ↔ мобильная понять, нужна ли перезагрузка. */
+    @Volatile var quicApplied: Boolean? = null
+
+    /** Выключать ли QUIC сейчас: на мобильной сети он через VPN часто тормозит. */
+    fun quicBlocked(s: Settings = value): Boolean = when (s.quicMode) {
+        "off" -> true
+        "on" -> false
+        else -> onMobile()
+    }
+
     fun coreOptions(rulesDir: String?): String = JSONObject().apply {
         val s = _state.value
         put("mode", s.mode.id)
@@ -211,6 +226,7 @@ object AppSettings {
         put("kids", s.kids)
         put("adBlock", s.adBlock)
         // 413. Ядро определяет приложение каждого соединения (Android 10+)
+        put("blockQuic", quicBlocked(s).also { quicApplied = it })
         put("findProcess", s.appTraffic && android.os.Build.VERSION.SDK_INT >= 29)
         put("ipv6", s.ipv6)
         put("profile", s.profile.id)
@@ -293,7 +309,7 @@ object AppSettings {
         put("remoteDns", s.remoteDns.json()); put("directDns", s.directDns.json()); put("rulesSource", s.rulesSource)
         put("warp", s.warp); put("warpConfig", s.warpConfig); put("shieldBackdrop", s.shieldBackdrop); put("backdropStamp", s.backdropStamp)
         put("iconStatus", s.iconStatus); put("animatedFlags", s.animatedFlags); put("task", s.task); put("hiddenApps", list(s.hiddenApps)); put("secret", s.secretUnlocked); put("shield3d", s.shield3d); put("automation", s.automation); put("appTraffic", s.appTraffic); put("autoSkipSpecial", s.autoSkipSpecial); put("autoWhitelist", s.autoWhitelist)
-        put("customAccent2", s.customAccent2); put("photoBlur", s.photoBlur); put("photoDim", s.photoDim); put("photoParallax", s.photoParallax); put("rulesAuto", s.rulesAuto)
+        put("customAccent2", s.customAccent2); put("photoBlur", s.photoBlur); put("photoDim", s.photoDim); put("photoParallax", s.photoParallax); put("rulesAuto", s.rulesAuto); put("quicMode", s.quicMode)
     }
 
     private fun fromJson(o: JSONObject): Settings {
@@ -392,6 +408,7 @@ object AppSettings {
             photoDim = o.optInt("photoDim", d.photoDim).coerceIn(0, 90),
             photoParallax = o.optBoolean("photoParallax", d.photoParallax),
             rulesAuto = o.optBoolean("rulesAuto", d.rulesAuto),
+            quicMode = o.optString("quicMode", d.quicMode).takeIf { it in listOf("mobile", "off", "on") } ?: d.quicMode,
         )
     }
 }
