@@ -150,3 +150,22 @@ func TestBlockQUIC(t *testing.T) {
 		}
 	}
 }
+
+func TestProbeInbound(t *testing.T) {
+	nodes := parseNodes(t, "vless://"+testUUID+"@1.2.3.4:443?type=tcp&security=tls&sni=a.example.com#A")
+	raw, _ := json.Marshal(map[string]any{"mode": "smart", "rulesDir": rulesDirForTest(), "probePort": 23007, "xrayAuth": "secret", "blockQuic": true})
+	cfg := checkAll(t, nodes, string(raw))
+	for _, want := range []string{`"probe-in"`, `"listen": "127.0.0.1"`, `"password": "secret"`} {
+		if !strings.Contains(cfg, want) {
+			t.Fatalf("нет %s", want)
+		}
+	}
+	// Правило замеров — раньше отказа QUIC, иначе DoQ не проверить
+	if strings.Index(cfg, `"probe-in"`) > strings.Index(cfg, `"protocol": "quic"`) && strings.Count(cfg, `"probe-in"`) < 2 {
+		t.Fatal("правило probe-in после QUIC")
+	}
+	raw, _ = json.Marshal(map[string]any{"mode": "smart", "rulesDir": rulesDirForTest()})
+	if strings.Contains(checkAll(t, nodes, string(raw)), "probe-in") {
+		t.Fatal("probe-in без порта")
+	}
+}

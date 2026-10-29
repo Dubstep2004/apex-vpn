@@ -866,6 +866,15 @@ private fun DnsPage(viewModel: MainViewModel, onBack: () -> Unit) {
                         Text(if (r.ms >= 0) "${r.ms} мс" else "нет ответа", color = if (r.ms >= 0) pingColor(r.ms) else Apex.Bad, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
+                if (!busy && com.apexvpn.client.data.DnsAuto.allFailed) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        if (com.apexvpn.client.vpn.VpnState.status.value == com.apexvpn.client.vpn.VpnStatus.Started)
+                            "Ни один DNS не ответил через сервер — возможно, сервер сейчас недоступен. DNS не менялся."
+                        else "Ни один DNS не ответил. Включите VPN: DNS проверяются через сервер — так замер работает и на мобильной сети с белыми списками.",
+                        color = Apex.Warn, fontSize = 13.sp, lineHeight = 18.sp,
+                    )
+                }
                 Spacer(Modifier.height(8.dp))
                 androidx.compose.material3.TextButton(onClick = {
                     if (!busy) scope.launch {

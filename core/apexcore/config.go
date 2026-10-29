@@ -101,6 +101,9 @@ type routeOptions struct {
 	// Без QUIC (HTTP/3): браузер и приложения сразу идут по TCP. На мобильной сети UDP часто
 	// режут или теряют, и QUIC через VPN заметно тормозит — по TCP сайты открываются быстрее
 	BlockQUIC bool `json:"blockQuic"`
+	// ProbePort — локальный SOCKS (с паролем XrayAuth) для замеров DNS через сервер.
+	// Всё, что пришло в него, идёт только через VPN, мимо остальных правил
+	ProbePort int `json:"probePort"`
 }
 
 // профиль подключения: как часто проверять серверы и рвать ли соединения при смене
@@ -324,11 +327,15 @@ func buildAll(nodesJSON string, selectedTag string, optionsJSON string) (string,
 	addSet("betting", betting)
 
 	// ── правила маршрутизации (сверху вниз, первое совпадение) ───────────
-	rules := []any{
+	rules := []any{}
+	if opts.ProbePort > 1024 && opts.ProbePort < 65536 && opts.XrayAuth != "" {
+		rules = append(rules, map[string]any{"inbound": []string{"probe-in"}, "outbound": "proxy"})
+	}
+	rules = append(rules,
 		map[string]any{"action": "sniff"},
 		map[string]any{"protocol": "dns", "action": "hijack-dns"},
 		map[string]any{"ip_is_private": true, "outbound": "direct"},
-	}
+	)
 	if opts.BlockQUIC {
 		// Отказ сразу: браузер за доли секунды переходит на обычный HTTPS по TCP
 		rules = append(rules, map[string]any{"protocol": "quic", "action": "reject"})
@@ -565,6 +572,12 @@ func buildAll(nodesJSON string, selectedTag string, optionsJSON string) (string,
 		"strict_route": true,
 		"stack":        "mixed",
 	}}
+	if opts.ProbePort > 1024 && opts.ProbePort < 65536 && opts.XrayAuth != "" {
+		inbounds = append(inbounds, map[string]any{
+			"type": "socks", "tag": "probe-in", "listen": "127.0.0.1", "listen_port": opts.ProbePort,
+			"users": []any{map[string]any{"username": "apex", "password": opts.XrayAuth}},
+		})
+	}
 	if opts.Share.Enabled {
 		port := opts.Share.Port
 		if port <= 0 || port > 65535 {

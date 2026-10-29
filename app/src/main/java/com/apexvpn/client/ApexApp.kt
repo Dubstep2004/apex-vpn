@@ -179,6 +179,15 @@ class ApexApp : Application() {
                     }
                 }
         }
+        // DNS «Авто»: замеры через ядро, пока VPN включён
+        appScope.launch {
+            VpnState.status.collect { st ->
+                runCatching {
+                    if (st == com.apexvpn.client.vpn.VpnStatus.Started) io.nekohasekai.apexcore.Apexcore.setProbeProxy(Prefs.probePort, "apex", Prefs.xrayAuth)
+                    else io.nekohasekai.apexcore.Apexcore.setProbeProxy(0, "", "")
+                }
+            }
+        }
         // 413. Трафик по приложениям — пока VPN включён
         com.apexvpn.client.data.AppTraffic.init(this)
         appScope.launch {

@@ -80,6 +80,9 @@ fun ServerSheet(viewModel: MainViewModel, onDismiss: () -> Unit) {
     LaunchedEffect(Unit) { viewModel.pingAll() }
 
     val autopilot = sub.selectedTag == AUTO_TAG
+    val whitelist by com.apexvpn.client.data.WhiteList.state.collectAsStateWithLifecycle()
+    val autoNow by viewModel.autoNow.collectAsStateWithLifecycle()
+    val nowNode = autoNow?.let { t -> sub.nodes.find { it.tag == t } }
     fun ping(n: Node): Int? = pings[n.tag]
     fun key(n: Node) = ping(n)?.takeIf { it >= 0 } ?: Int.MAX_VALUE
     fun groupKey(g: ServerGroup) = g.nodes.minOf { key(it) }
@@ -137,7 +140,12 @@ fun ServerSheet(viewModel: MainViewModel, onDismiss: () -> Unit) {
             Group {
                 ListRow(
                     title = "Автопилот",
-                    subtitle = if (autopilot) "Включён: сам выбирает самый быстрый" else "Выключен: сервер выбран вручную",
+                    subtitle = when {
+                        !autopilot -> "Выключен: сервер выбран вручную"
+                        whitelist && settings.autoWhitelist -> "Белые списки: выбирает только LTE-обход" + (nowNode?.let { " · сейчас ${ServerInfo.title(it.name)}" } ?: "")
+                        nowNode != null -> "Включён · сейчас ${ServerInfo.title(nowNode.name)}"
+                        else -> "Включён: сам выбирает самый быстрый"
+                    },
                     leading = {
                         IconTile(if (autopilot) Apex.AccentSoft else Apex.SurfaceHigh) {
                             Icon(Icons.Rounded.Bolt, null, tint = if (autopilot) Apex.AccentText else Apex.Text)
@@ -257,6 +265,14 @@ fun ServerSheet(viewModel: MainViewModel, onDismiss: () -> Unit) {
                         }
                     }
                 }
+            }
+            // Трафик подписки: сколько осталось (как в карточке подписки)
+            if (sub.total > 0) {
+                Spacer(Modifier.height(14.dp))
+                TrafficLeftCard(sub.used.coerceAtLeast(0), sub.total, sub.expireAt, hasLte = groups.any { g -> g.nodes.any { ServerInfo.isLte(it.name) } })
+            }
+            if (special.isNotEmpty() && tab != ServerTab.Lte) {
+                Caption("Россия нужна для российских сайтов из-за границы. Обход и LTE — только для мобильного интернета с белыми списками: на Wi-Fi выбирайте обычные страны.")
             }
             Caption("★ — добавить в избранное. Долгое нажатие на сервер — ярлык на рабочий стол. Метки протоколов выбирают конкретное подключение. Пинг — время соединения с сервером; при включённом VPN — задержка через сервер.")
             Spacer(Modifier.height(24.dp))
@@ -415,6 +431,44 @@ private fun RoundButton(onClick: () -> Unit, content: @Composable () -> Unit) {
 }
 
 /** Сегментированный переключатель-«пилюля». */
+/** «Осталось 62 из 80 ГБ» с полосой; подсказка про LTE-серверы с лимитом. */
+@Composable
+private fun TrafficLeftCard(used: Long, total: Long, expireAt: Long, hasLte: Boolean) {
+    val left = (total - used).coerceAtLeast(0)
+    val frac = (left.toFloat() / total).coerceIn(0f, 1f)
+    val color = when {
+        frac < 0.1f -> Apex.Bad
+        frac < 0.3f -> Apex.Warn
+        else -> Apex.Good
+    }
+    Column(Modifier.fillMaxWidth().apexCard().padding(16.dp)) {
+        Row(verticalAlignment = Alignment.Bottom) {
+            Column(Modifier.weight(1f)) {
+                Text("Осталось трафика", color = Apex.TextDim, fontSize = 13.sp)
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(formatBytes(left), color = Apex.Text, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold)
+                    Text(" из ${formatBytes(total)}", color = Apex.TextDim, fontSize = 15.sp, modifier = Modifier.padding(bottom = 3.dp))
+                }
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text("потрачено ${formatBytes(used)}", color = Apex.TextDim, fontSize = 12.sp)
+                if (expireAt > 0) Text("до ${formatDate(expireAt)}", color = Apex.TextDim, fontSize = 12.sp)
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        Box(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)).background(Apex.SurfaceHigh)) {
+            Box(Modifier.fillMaxWidth(frac).height(8.dp).clip(RoundedCornerShape(4.dp)).background(color))
+        }
+        if (hasLte) {
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "ⓘ LTE-серверы — для мобильного интернета, когда открываются только разрешённые сайты. На Wi-Fi выбирайте обычные страны: так трафик LTE сохранится.",
+                color = Apex.TextDim, fontSize = 12.sp, lineHeight = 16.sp,
+            )
+        }
+    }
+}
+
 @Composable
 fun Segmented(items: List<String>, selected: Int, onSelect: (Int) -> Unit) {
     Row(

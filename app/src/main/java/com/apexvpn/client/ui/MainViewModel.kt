@@ -198,15 +198,24 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val livePing = _livePing.asStateFlow()
     private var livePingJob: Job? = null
 
+    /** Сервер, который сейчас выбрал автопилот (обновляется вместе с живым пингом). */
+    private val _autoNow = MutableStateFlow<String?>(null)
+    val autoNow = _autoNow.asStateFlow()
+
     fun startLivePing() {
         if (livePingJob?.isActive == true) return
         livePingJob = viewModelScope.launch {
+            var tick = 0
             while (isActive) {
                 if (VpnState.status.value == VpnStatus.Started) {
+                    if (tick++ % 3 == 0 && Subscription.state.value.selectedTag == com.apexvpn.client.data.AUTO_TAG) {
+                        _autoNow.value = com.apexvpn.client.data.Pinger.autopilotNow()
+                    }
                     val ms = LivePing.measure()
                     _livePing.value = (_livePing.value + ms).takeLast(40)
-                } else if (_livePing.value.isNotEmpty()) {
-                    _livePing.value = emptyList()
+                } else {
+                    if (_livePing.value.isNotEmpty()) _livePing.value = emptyList()
+                    _autoNow.value = null
                 }
                 delay(2000)
             }

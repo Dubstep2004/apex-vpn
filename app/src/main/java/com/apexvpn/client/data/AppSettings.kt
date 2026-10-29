@@ -228,6 +228,8 @@ object AppSettings {
         put("adBlock", s.adBlock)
         // 413. Ядро определяет приложение каждого соединения (Android 10+)
         put("blockQuic", quicBlocked(s).also { quicApplied = it })
+        // DNS «Авто» меряет DNS через сервер, как они и работают под VPN
+        put("probePort", Prefs.probePort)
         put("findProcess", s.appTraffic && android.os.Build.VERSION.SDK_INT >= 29)
         put("ipv6", s.ipv6)
         put("profile", s.profile.id)

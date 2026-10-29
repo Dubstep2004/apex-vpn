@@ -105,6 +105,8 @@ object Prefs {
     val xrayBasePort: Int get() = localPortBase + 10
     /** 197. Локальный DNS счётчика рекламы */
     val adsDnsPort: Int get() = localPortBase + 5
+    /** Локальный SOCKS ядра для замеров DNS через сервер (DNS «Авто») */
+    val probePort: Int get() = localPortBase + 7
 
     /** Секрет локального SOCKS между sing-box и Xray (постоянный, чтобы Xray не перезапускался зря) */
     val xrayAuth: String

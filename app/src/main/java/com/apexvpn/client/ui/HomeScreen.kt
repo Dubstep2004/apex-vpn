@@ -320,10 +320,20 @@ fun HomeScreen(
         Spacer(Modifier.height(16.dp))
 
         // Сервер и режим
+        val autoNow by viewModel.autoNow.collectAsStateWithLifecycle()
+        val whitelist by com.apexvpn.client.data.WhiteList.state.collectAsStateWithLifecycle()
+        val nowNode = autoNow?.let { t -> sub.nodes.find { it.tag == t } }
         Group {
             ListRow(
                 title = if (auto) "Автопилот" else ServerInfo.title(selected!!.name),
-                subtitle = if (auto) "Самый быстрый из ${sub.nodes.size} серверов" else "Сервер выбран вручную",
+                // Автопилот показывает, какой сервер он выбрал прямо сейчас
+                subtitle = when {
+                    !auto -> "Сервер выбран вручную"
+                    whitelist && settings.autoWhitelist -> "Белые списки · обход LTE" + (nowNode?.let { " · " + ServerInfo.title(it.name) } ?: "")
+                    nowNode != null && status == VpnStatus.Started -> "Сейчас: " + ServerInfo.title(nowNode.name) +
+                        (livePing.lastOrNull()?.takeIf { it >= 0 }?.let { " · $it мс" } ?: "")
+                    else -> "Самый быстрый из ${sub.nodes.size} серверов"
+                },
                 leading = {
                     // 383. Флаг переворачивается, как карточка, при смене страны
                     FlipFlag(if (auto) "auto" else (ServerInfo.flag(selected!!.name) ?: "🌐")) { k ->

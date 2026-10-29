@@ -57,6 +57,14 @@ object Pinger {
         result
     }
 
+    /** Какой сервер сейчас выбрал автопилот (tag) — из работающего ядра; null — неизвестно. */
+    suspend fun autopilotNow(): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            val (code, body) = clashGet("/proxies/${URLEncoder.encode(AUTO_TAG, "UTF-8")}", 2000)
+            if (code == 200) JSONObject(body).optString("now").takeIf { it.isNotBlank() } else null
+        }.getOrNull()
+    }
+
     private fun clashGet(path: String, readTimeout: Int): Pair<Int, String> {
         val conn = URL("http://127.0.0.1:${Prefs.clashApiPort}$path").openConnection() as HttpURLConnection
         conn.connectTimeout = 2000

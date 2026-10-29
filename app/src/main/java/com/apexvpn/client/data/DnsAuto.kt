@@ -112,10 +112,19 @@ object DnsAuto {
         bestVariant(key).key != applied
     }
 
-    private fun probe(v: Variant): Int = when (v.proto) {
-        "https" -> probeDoh(v.doh)
-        else -> runCatching { Apexcore.dnsProbe(v.proto, v.ip, v.sni, 3000) }.getOrDefault(-1)
-    }
+    /**
+     * Замер в ядре: при включённом VPN — через сервер (локальный SOCKS ядра), как и ходит DNS.
+     * Раньше DoH мерился запросом самого приложения, и на мобильной сети с белыми списками
+     * все DNS показывали «нет ответа», хотя через VPN работали.
+     */
+    private fun probe(v: Variant): Int = runCatching {
+        if (v.proto == "https") Apexcore.dnsProbeHTTPS(v.doh, 3000) else Apexcore.dnsProbe(v.proto, v.ip, v.sni, 3000)
+    }.getOrDefault(-1).let { if (it < 0 && v.proto == "https" && !viaVpn()) probeDoh(v.doh) else it }
+
+    private fun viaVpn() = com.apexvpn.client.vpn.VpnState.status.value == com.apexvpn.client.vpn.VpnStatus.Started
+
+    /** Ни один DNS не ответил на последнем замере. */
+    val allFailed: Boolean get() = _results.value.isNotEmpty() && _results.value.none { it.ms >= 0 }
 
     /** Лучшее из трёх запросов, мс; -1 — не ответил. */
     private fun probeDoh(url: String): Int {
