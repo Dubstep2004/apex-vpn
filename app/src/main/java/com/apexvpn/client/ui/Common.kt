@@ -234,9 +234,11 @@ fun ListRow(
             Text(title, color = titleColor, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (subtitle != null) {
                 Spacer(Modifier.height(2.dp))
-                Text(subtitle, color = Apex.TextDim, fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                // Подпись целиком: раньше обрезалась на второй строке «…»
+                Text(subtitle, color = Apex.TextDim, fontSize = 14.sp, lineHeight = 18.sp, maxLines = 5, overflow = TextOverflow.Ellipsis)
             }
         }
+        Spacer(Modifier.width(12.dp))
         trailing()
     }
 }

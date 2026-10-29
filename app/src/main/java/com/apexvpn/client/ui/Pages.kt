@@ -940,15 +940,21 @@ private fun ProfilePage(viewModel: MainViewModel, onBack: () -> Unit) {
         Caption("Автопилот меняет сервер, только если другой заметно быстрее, и не обрывает открытые соединения. «Игры» проверяют серверы каждую минуту, «Экономия батареи» — раз в 30 минут.")
         Spacer(Modifier.height(12.dp))
         Group {
-            ListRow("Автопилот без России и LTE", "Не выбирать российские серверы и обход белых списков — у них низкий пинг, но заблокированные сайты через них не открываются") {
+            ListRow(
+                "Автопилот без России и LTE",
+                "Не брать российские серверы и LTE-обход: пинг у них низкий, но заблокированные сайты не открываются",
+                onClick = { viewModel.change { copy(autoSkipSpecial = !autoSkipSpecial) } },
+            ) {
                 ApexSwitch(s.autoSkipSpecial, { v -> viewModel.change { copy(autoSkipSpecial = v) } })
             }
             GroupDivider()
             // 491
+            val wlActive by com.apexvpn.client.data.WhiteList.state.collectAsStateWithLifecycle()
             ListRow(
                 "Белые списки на мобильной сети",
-                if (com.apexvpn.client.data.WhiteList.active) "Сейчас включён LTE-обход: обычные серверы недоступны"
-                else "Если оператор пускает только «разрешённые» сайты, автопилот сам включит LTE-обход, а потом вернёт обычные серверы",
+                if (wlActive && s.autoWhitelist) "Сейчас включён LTE-обход: обычные серверы недоступны"
+                else "Если оператор пускает только «разрешённые» сайты, автопилот сам включит LTE-обход и потом вернёт обычные серверы",
+                onClick = { viewModel.change { copy(autoWhitelist = !autoWhitelist) } },
             ) {
                 ApexSwitch(s.autoWhitelist, { v -> viewModel.change { copy(autoWhitelist = v) } })
             }

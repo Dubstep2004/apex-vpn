@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
 import androidx.core.content.getSystemService
+import kotlinx.coroutines.flow.asStateFlow
 import com.apexvpn.client.ApexApp
 import com.apexvpn.client.R
 import com.apexvpn.client.ui.MainActivity
@@ -19,9 +20,12 @@ import com.apexvpn.client.ui.MainActivity
  */
 object WhiteList {
     /** Сейчас автопилот выбирает только LTE-обход. */
-    @Volatile
-    var active = false
-        private set
+    private val _state = kotlinx.coroutines.flow.MutableStateFlow(false)
+    /** Для экрана: подпись меняется сразу, когда автопилот переключился. */
+    val state = _state.asStateFlow()
+    var active: Boolean
+        get() = _state.value
+        private set(v) { _state.value = v }
 
     /** Сбросить (Wi-Fi, автопилот выключен, функция отключена); true — состояние изменилось. */
     fun reset(context: Context): Boolean {

@@ -2,6 +2,18 @@
 
 <img src="img/tags/new.svg" height="22"> <img src="img/tags/improved.svg" height="22"> <img src="img/tags/changed.svg" height="22"> <img src="img/tags/fixed.svg" height="22"> <img src="img/tags/removed.svg" height="22">
 
+## 2.5.3 · 29 октября 2026
+
+<img src="img/tags/improved.svg" alt="Улучшено" height="22">
+
+- «Автопилот без России и LTE» и «Белые списки» переключаются нажатием на всю строку
+
+<img src="img/tags/fixed.svg" alt="Исправлено" height="22">
+
+- Подписи к настройкам больше не обрезаются «…» на второй строке — видно весь текст
+- Между текстом и переключателем появился отступ, текст не прилипает к переключателю
+- Подпись «Сейчас включён LTE-обход» появляется сразу, без повторного открытия экрана
+
 ## 2.5.2 · 29 октября 2026
 
 <img src="img/tags/fixed.svg" alt="Исправлено" height="22">
