@@ -183,3 +183,18 @@ func TestProbePerNode(t *testing.T) {
 		t.Fatal("без ядра пинг через прокси должен быть -1")
 	}
 }
+
+func TestDirectCountries(t *testing.T) {
+	nodes := parseNodes(t, "vless://"+testUUID+"@1.2.3.4:443?type=tcp&security=tls&sni=a.example.com#A")
+	raw, _ := json.Marshal(map[string]any{"mode": "global", "directSuffixes": []string{"kz", ".by", "kaspi.kz", "bad suffix"}})
+	cfg := checkAll(t, nodes, string(raw))
+	for _, want := range []string{`"kz"`, `"by"`, `"kaspi.kz"`} {
+		if !strings.Contains(cfg, want) {
+			t.Fatalf("нет %s", want)
+		}
+	}
+	if strings.Contains(cfg, "bad suffix") {
+		t.Fatal("мусор в правилах")
+	}
+}
+

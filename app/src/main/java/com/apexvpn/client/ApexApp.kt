@@ -213,6 +213,7 @@ class ApexApp : Application() {
         }
         // 413. Трафик по приложениям — пока VPN включён
         com.apexvpn.client.data.AppTraffic.init(this)
+        com.apexvpn.client.data.ConnLog.init(this)
         appScope.launch {
             VpnState.status.collect { st ->
                 if (st == com.apexvpn.client.vpn.VpnStatus.Started) com.apexvpn.client.data.AppTraffic.start(appScope)

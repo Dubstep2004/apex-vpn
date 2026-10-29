@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Android 9+ запрещает обычный HTTP. Приложению он нужен только для своего ядра на этом же
-  телефоне (API ядра на 127.0.0.1: пинг через сервер, автопилот, трафик приложений).
+  телефоне (API ядра на 127.0.0.1: пинг через сервер, автопилот, трафик приложений) и для
+  проверки DNS-утечек (edns.ip-api.com отвечает только по HTTP; запрос — по нажатию).
   Всё остальное — только HTTPS, как и раньше.
 -->
 <network-security-config>
@@ -9,5 +10,6 @@
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="false">127.0.0.1</domain>
         <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">edns.ip-api.com</domain>
     </domain-config>
 </network-security-config>

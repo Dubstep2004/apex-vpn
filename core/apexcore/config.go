@@ -106,6 +106,8 @@ type routeOptions struct {
 	ProbePort int `json:"probePort"`
 	// URLTest — адрес проверки для автопилота (как «Настройки URL-теста» в приложении)
 	URLTest string `json:"urlTest"`
+	// 602. Сайты стран напрямую: домены верхнего уровня («kz», «by») и важные сайты стран
+	DirectSuffixes []string `json:"directSuffixes"`
 }
 
 // профиль подключения: как часто проверять серверы и рвать ли соединения при смене
@@ -303,6 +305,11 @@ func buildAll(nodesJSON string, selectedTag string, optionsJSON string) (string,
 	}
 	custom := cleanDomains(opts.CustomDomains)
 	direct := cleanDomains(opts.DirectDomains)
+	for _, s := range opts.DirectSuffixes {
+		if s = strings.Trim(strings.ToLower(strings.TrimSpace(s)), "."); s != "" && !strings.ContainsAny(s, " /:") {
+			direct = append(direct, s)
+		}
+	}
 
 	// ── базы правил ──────────────────────────────────────────────────────
 	var ruleSets []any

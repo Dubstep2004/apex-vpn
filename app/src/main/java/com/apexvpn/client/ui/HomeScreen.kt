@@ -232,6 +232,7 @@ fun HomeScreen(
                 // 430. Планеты вокруг щита в дизайне «Космос»
                 if (Apex.palette.design == com.apexvpn.client.data.Design.Cosmos) CosmosOrbit(Modifier.matchParentSize())
                 ShieldAmbient(settings.shieldBackdrop, status == VpnStatus.Started, Modifier.matchParentSize())
+                if (settings.modeColors && sub.selectedTag == AUTO_TAG) ModeAura(settings.autoMode, status == VpnStatus.Started, Modifier.matchParentSize())
                 ShieldButton(status, onToggle, diameter = 150.dp)
             }
         } else {
@@ -240,6 +241,7 @@ fun HomeScreen(
                 // 430. Планеты вокруг щита в дизайне «Космос»
                 if (Apex.palette.design == com.apexvpn.client.data.Design.Cosmos) CosmosOrbit(Modifier.matchParentSize())
                 ShieldAmbient(settings.shieldBackdrop, status == VpnStatus.Started, Modifier.matchParentSize())
+                if (settings.modeColors && sub.selectedTag == AUTO_TAG) ModeAura(settings.autoMode, status == VpnStatus.Started, Modifier.matchParentSize())
                 ShieldButton(status, onToggle)
             }
         }
@@ -252,7 +254,12 @@ fun HomeScreen(
             VpnStatus.Blocked -> "Интернет заблокирован"
             VpnStatus.Stopped -> "Не подключено"
         }
-        Text(label, color = Apex.Text, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
+        // 615. Приветствие по времени суток: «Доброе утро! Защищено ✓»
+        if (settings.greeting && (status == VpnStatus.Started || status == VpnStatus.Stopped)) {
+            Text(greeting(), color = Apex.TextDim, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.height(2.dp))
+        }
+        Text(if (settings.greeting && status == VpnStatus.Started) "$label ✓" else label, color = Apex.Text, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
         Spacer(Modifier.height(6.dp))
         when {
             status == VpnStatus.Started && connectedAt > 0 -> ConnectionTimer(connectedAt)
@@ -928,4 +935,13 @@ private fun CountryPhotoBackdrop(code: String) {
 private fun autoModePrefix(id: String): String {
     val m = com.apexvpn.client.data.AutoModes.Mode.of(id)
     return if (m == com.apexvpn.client.data.AutoModes.Mode.Balance) "" else "${m.emoji} ${m.title} · "
+}
+
+
+/** 615. «Доброе утро!» / «Добрый день!» / «Добрый вечер!» / «Доброй ночи!» по часам телефона. */
+private fun greeting(): String = when (java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)) {
+    in 5..11 -> "☀️ Доброе утро!"
+    in 12..17 -> "🌤 Добрый день!"
+    in 18..22 -> "🌆 Добрый вечер!"
+    else -> "🌙 Доброй ночи!"
 }

@@ -64,6 +64,7 @@ object AppTraffic {
     }
 
     fun stop() {
+        ConnLog.save()
         job?.cancel()
         job = null
         last.clear()
@@ -76,7 +77,8 @@ object AppTraffic {
     }
 
     private fun poll() {
-        if (!AppSettings.value.appTraffic) return
+        val traffic = AppSettings.value.appTraffic
+        if (!traffic && !AppSettings.value.connLog) return
         val c = URL("http://127.0.0.1:${Prefs.clashApiPort}/connections").openConnection() as HttpURLConnection
         c.connectTimeout = 1500
         c.readTimeout = 3000
@@ -94,6 +96,9 @@ object AppTraffic {
             val o = conns.optJSONObject(i) ?: continue
             val id = o.optString("id")
             seen += id
+            // 604. Журнал соединений
+            ConnLog.onConnection(o)
+            if (!traffic) continue
             val chains = o.optJSONArray("chains")
             val direct = chains != null && (0 until chains.length()).any { chains.optString(it) == "direct" || chains.optString(it) == "block" }
             val up = o.optLong("upload")
@@ -110,6 +115,7 @@ object AppTraffic {
             a[0] += du.coerceAtLeast(0); a[1] += dd.coerceAtLeast(0)
         }
         last.keys.retainAll(seen)
+        ConnLog.retain(seen)
         if (add.isEmpty()) return
         val key = day()
         val cur = load(key).associateBy { it.pkg }.mapValues { longArrayOf(it.value.up, it.value.down) }.toMutableMap()

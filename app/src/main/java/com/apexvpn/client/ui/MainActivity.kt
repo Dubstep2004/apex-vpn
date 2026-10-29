@@ -106,6 +106,9 @@ class MainActivity : ComponentActivity() {
     /** Ссылка подписки из QR-кода, «Поделиться» или apexvpn:// — ждёт подтверждения. */
     private val pendingImport = MutableStateFlow<String?>(null)
 
+    /** 601. Сайт из «Поделиться» в браузере — ждёт выбора «Через VPN» или «Напрямую». */
+    private val pendingSite = MutableStateFlow<String?>(null)
+
     private val vpnPermission = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) { result ->
@@ -138,13 +141,23 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         // Тема: палитра и цвет значков строки состояния меняются вместе с настройками
         lifecycleScope.launch {
-            AppSettings.state.collect { s ->
+            // 588. Пока VPN включён на автопилоте, щит в цветах режима (🎮 красный, 🚀 голубой…)
+            kotlinx.coroutines.flow.combine(
+                AppSettings.state,
+                com.apexvpn.client.vpn.VpnState.status,
+                com.apexvpn.client.data.Subscription.state,
+            ) { s, st, sub -> Triple(s, st == com.apexvpn.client.vpn.VpnStatus.Started, sub.selectedTag == com.apexvpn.client.data.AUTO_TAG) }
+                .collect { (s, on, auto) ->
                 val systemDark = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
                 // Material Expressive: акцент из обоев (Android 12+)
                 val wallpaper = if (Build.VERSION.SDK_INT >= 31) {
                     runCatching { androidx.compose.ui.graphics.Color(getColor(android.R.color.system_accent1_400)) }.getOrNull()
                 } else null
-                val p = paletteFor(s.design, s.theme, s.accent, systemDark, wallpaper, customArgb = s.customAccent, customArgb2 = s.customAccent2)
+                val base = paletteFor(s.design, s.theme, s.accent, systemDark, wallpaper, customArgb = s.customAccent, customArgb2 = s.customAccent2)
+                val mode = com.apexvpn.client.data.AutoModes.Mode.of(s.autoMode)
+                val p = if (s.modeColors && on && auto && mode.c1 != 0L) {
+                    base.copy(brand1 = androidx.compose.ui.graphics.Color(mode.c1), brand2 = androidx.compose.ui.graphics.Color(mode.c2))
+                } else base
                 applyPalette(p)
                 com.apexvpn.client.ui.theme.applyFeel(
                     com.apexvpn.client.ui.theme.Feel(s.vibration, s.smoothMode, s.glassBlur, s.liveMap, s.shield3d),
@@ -271,6 +284,27 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
+                    val siteToAdd by pendingSite.collectAsStateWithLifecycle()
+                    siteToAdd?.let { site ->
+                        AlertDialog(
+                            onDismissRequest = { pendingSite.value = null },
+                            containerColor = Apex.Dialog,
+                            title = { Text("Сайт $site", color = Apex.Text) },
+                            text = { Text("Как открывать этот сайт? Его можно убрать в «Режим → Свои сайты».", color = Apex.TextDim) },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    pendingSite.value = null
+                                    viewModel.showMessage(viewModel.addDomain(site, direct = false) ?: "$site теперь через VPN")
+                                }) { Text("Через VPN", color = Apex.Accent) }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = {
+                                    pendingSite.value = null
+                                    viewModel.showMessage(viewModel.addDomain(site, direct = true) ?: "$site теперь напрямую")
+                                }) { Text("Напрямую", color = Apex.TextDim) }
+                            },
+                        )
+                    }
                     importLink?.let { link ->
                         AlertDialog(
                             onDismissRequest = { pendingImport.value = null },
@@ -399,7 +433,11 @@ class MainActivity : ComponentActivity() {
         if (link != null) {
             pendingImport.value = link
         } else if (text != null) {
-            viewModel.showMessage("Поддерживаются только ссылки sub.knownhosts.ru")
+            // 601. «Поделиться» ссылкой на сайт из браузера — добавить сайт в свой список
+            val url = Regex("""https?://[^\s]+""").find(text)?.value ?: text.trim().takeIf { !it.contains(' ') }
+            val site = url?.let { AppSettings.normalizeDomain(it) }
+            if (site != null) pendingSite.value = site
+            else viewModel.showMessage("Поддерживаются ссылки на сайты и подписки sub.knownhosts.ru")
         }
         // 9/16. Ярлыки и голосовые команды
         when (intent.action) {

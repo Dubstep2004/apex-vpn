@@ -100,6 +100,34 @@ fun ModeScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit) {
         SectionLabel("Свои сайты")
         SiteLists(s.customDomains, s.directDomains, viewModel)
 
+        // 602. Сайты стран напрямую
+        SectionLabel("Сайты стран напрямую", trailing = s.directCountries.size.takeIf { it > 0 }?.toString())
+        androidx.compose.foundation.layout.Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+            com.apexvpn.client.data.DirectCountries.all.chunked(2).forEach { pair ->
+                androidx.compose.foundation.layout.Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+                    pair.forEach { c ->
+                        val on = c.id in s.directCountries
+                        androidx.compose.material3.Text(
+                            "${c.flag}  ${c.title}" + if (on) "  ✓" else "",
+                            color = if (on) Apex.OnAccent else Apex.Text,
+                            fontSize = 15.sp,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                                .background(if (on) Apex.Accent else Apex.Surface)
+                                .clickable {
+                                    viewModel.change { copy(directCountries = if (on) directCountries - c.id else directCountries + c.id) }
+                                }
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                        )
+                    }
+                    if (pair.size == 1) Spacer(Modifier.weight(1f))
+                }
+            }
+        }
+        Caption("Сайты выбранных стран (.kz, .by…) и их крупные сервисы — банки, маркетплейсы — открываются напрямую, без VPN: быстрее и без «доступно только в стране».")
+
         Spacer(Modifier.height(22.dp))
         Group {
             ListRow(

@@ -88,7 +88,7 @@ import java.util.Locale
 import kotlinx.coroutines.launch
 
 /** Дополнительные страницы, открываются поверх вкладок. */
-enum class Page { Apps, SpeedTest, SiteCheck, Wifi, Share, Dns, Profile, Appearance, Changelog, Advanced, HideApps, AppTraffic, Help, KeepAlive, SelfCheck, About, Ping }
+enum class Page { Apps, SpeedTest, SiteCheck, Wifi, Share, Dns, Profile, Appearance, Changelog, Advanced, HideApps, AppTraffic, Help, KeepAlive, SelfCheck, About, Ping, ConnLog, LeakTest }
 
 @Composable
 fun PageHost(page: Page, viewModel: MainViewModel, onBack: () -> Unit) {
@@ -110,6 +110,8 @@ fun PageHost(page: Page, viewModel: MainViewModel, onBack: () -> Unit) {
         Page.SelfCheck -> SelfCheckPage(viewModel, onBack)
         Page.About -> AboutPage(onBack)
         Page.Ping -> PingSettingsPage(viewModel, onBack)
+        Page.ConnLog -> ConnLogPage(viewModel, onBack)
+        Page.LeakTest -> LeakTestPage(onBack)
     }
 }
 
@@ -1140,6 +1142,18 @@ private fun AppearancePage(viewModel: MainViewModel, onBack: () -> Unit) {
         // Ощущения
         SectionLabel("Ощущения")
         Group {
+            ListRow(
+                "Приветствие",
+                "«Доброе утро! Защищено ✓» на главном экране",
+                onClick = { viewModel.change(reload = false) { copy(greeting = !greeting) } },
+            ) { ApexSwitch(s.greeting, { v -> viewModel.change(reload = false) { copy(greeting = v) } }) }
+            GroupDivider()
+            ListRow(
+                "Щит в цветах режима",
+                "🎮 Игры — красный пульс, 🚀 Скорость — голубые полосы и т. д. (на автопилоте)",
+                onClick = { viewModel.change(reload = false) { copy(modeColors = !modeColors) } },
+            ) { ApexSwitch(s.modeColors, { v -> viewModel.change(reload = false) { copy(modeColors = v) } }) }
+            GroupDivider()
             ListRow("Звук подключения", if (s.connectSound) com.apexvpn.client.data.ConnectFeedback.title(s.sound) + " · на беззвучном телефон молчит" else "Выключен") {
                 ApexSwitch(s.connectSound, { v -> viewModel.change(reload = false) { copy(connectSound = v) } })
             }

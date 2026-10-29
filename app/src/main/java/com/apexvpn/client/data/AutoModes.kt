@@ -15,13 +15,14 @@ import kotlin.math.abs
  * высокой скоростью загрузки, для надёжного — те, что ни разу не «пропадали».
  */
 object AutoModes {
-    enum class Mode(val id: String, val emoji: String, val title: String, val subtitle: String, val profile: ConnProfile) {
+    /** [c1], [c2] — 588. цвета щита в этом режиме (0 — цвета дизайна). */
+    enum class Mode(val id: String, val emoji: String, val title: String, val subtitle: String, val profile: ConnProfile, val c1: Long = 0, val c2: Long = 0) {
         Balance("balance", "⚖️", "Обычный", "Баланс скорости и стабильности", ConnProfile.Normal),
-        Games("games", "🎮", "Игры", "Низкий и ровный пинг без потерь", ConnProfile.Gaming),
-        Speed("speed", "🚀", "Скорость", "Самая высокая скорость загрузки", ConnProfile.Normal),
-        Stable("stable", "🛡", "Надёжный", "Серверы, которые ни разу не пропадали", ConnProfile.Calls),
-        Calls("calls", "📞", "Звонки", "Ровная связь, сервер не меняется в разговоре", ConnProfile.Calls),
-        Battery("battery", "🔋", "Батарея", "Редкие проверки — меньше расход", ConnProfile.Battery),
+        Games("games", "🎮", "Игры", "Низкий и ровный пинг без потерь", ConnProfile.Gaming, 0xFFFF4D5E, 0xFFFF9F43),
+        Speed("speed", "🚀", "Скорость", "Самая высокая скорость загрузки", ConnProfile.Normal, 0xFF3B82F6, 0xFF22D3EE),
+        Stable("stable", "🛡", "Надёжный", "Серверы, которые ни разу не пропадали", ConnProfile.Calls, 0xFF10B981, 0xFF6EE7B7),
+        Calls("calls", "📞", "Звонки", "Ровная связь, сервер не меняется в разговоре", ConnProfile.Calls, 0xFF14B8A6, 0xFF60A5FA),
+        Battery("battery", "🔋", "Батарея", "Редкие проверки — меньше расход", ConnProfile.Battery, 0xFF84CC16, 0xFFFDE047),
         ;
 
         /** Нужны замеры качества (пинг несколько раз, скорость). */
@@ -68,6 +69,11 @@ object AutoModes {
             o.put(k, JSONObject().put("a", q.avg).put("j", q.jitter).put("l", q.loss).put("m", q.mbps).put("f", q.fails))
         }
         sp(context).edit().putString("q", o.toString()).putLong("at", System.currentTimeMillis()).apply()
+    }
+
+    fun clear(context: Context) {
+        _quality.value = emptyMap()
+        sp(context).edit().clear().apply()
     }
 
     fun lastMeasured(context: Context) = sp(context).getLong("at", 0)

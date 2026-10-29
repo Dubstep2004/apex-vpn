@@ -4,6 +4,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
+import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
+import androidx.compose.material.icons.rounded.Policy
 import androidx.compose.material.icons.rounded.NetworkPing
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.BatteryChargingFull
@@ -313,6 +315,20 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
                 leading = { tile(Icons.Rounded.SmartToy) },
                 onClick = { viewModel.change(reload = false) { copy(automation = !automation) } },
             ) { ApexSwitch(s.automation, { v -> viewModel.change(reload = false) { copy(automation = v) } }) }
+            GroupDivider()
+            ListRow(
+                "Проверка утечек",
+                "Видят ли сайты ваш настоящий IP: IP, DNS, IPv6, WebRTC",
+                leading = { tile(Icons.Rounded.Policy) },
+                onClick = { onOpenPage(Page.LeakTest) },
+            ) { Chevron() }
+            GroupDivider()
+            ListRow(
+                "Журнал соединений",
+                if (s.connLog) "Какие сайты шли через VPN, а какие напрямую" else "Выключен",
+                leading = { tile(Icons.AutoMirrored.Rounded.ReceiptLong) },
+                onClick = { onOpenPage(Page.ConnLog) },
+            ) { Chevron() }
             GroupDivider()
             ListRow("Проверить сайт", "Через VPN или напрямую", leading = { tile(Icons.Rounded.Search) }, onClick = { onOpenPage(Page.SiteCheck) }) { Chevron() }
             GroupDivider()
@@ -684,15 +700,36 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
     }
 
     if (confirmRemove) {
+        // 670. Галочка «Удалить и данные»: настройки, журналы, замеры, фото — как «Очистить данные»
+        var wipe by remember { mutableStateOf(false) }
         AlertDialog(
             onDismissRequest = { confirmRemove = false },
             containerColor = Apex.Dialog,
             title = { Text("Удалить подписку?", color = Apex.Text) },
-            text = { Text("VPN будет отключён, список серверов очищен.", color = Apex.TextDim) },
+            text = {
+                Column {
+                    Text("VPN будет отключён, список серверов очищен.", color = Apex.TextDim)
+                    Spacer(Modifier.height(12.dp))
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { wipe = !wipe }.padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        androidx.compose.material3.Checkbox(
+                            checked = wipe,
+                            onCheckedChange = { wipe = it },
+                            colors = androidx.compose.material3.CheckboxDefaults.colors(checkedColor = Apex.Bad),
+                        )
+                        Column {
+                            Text("Удалить и все данные", color = Apex.Text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Настройки, свои списки, журналы, замеры, историю и фото фона", color = Apex.TextDim, fontSize = 12.sp)
+                        }
+                    }
+                }
+            },
             confirmButton = {
                 TextButton(onClick = {
                     confirmRemove = false
-                    viewModel.removeSubscription()
+                    viewModel.removeSubscription(wipeData = wipe)
                 }) { Text("Удалить", color = Apex.Bad) }
             },
             dismissButton = { TextButton(onClick = { confirmRemove = false }) { Text("Отмена", color = Apex.TextDim) } },

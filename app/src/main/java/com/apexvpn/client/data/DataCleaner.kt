@@ -12,6 +12,8 @@ object DataCleaner {
         AppSettings.reset()
         SpeedHistory.clear(context)
         AppTraffic.clear()
+        ConnLog.clear()
+        AutoModes.clear(context)
         AdCounter.reset()
         FastestServer.reset()
         Backdrop.clear(context)

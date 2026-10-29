@@ -140,10 +140,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun removeSubscription() {
+    fun removeSubscription(wipeData: Boolean = false) {
         ApexVpnService.stop(getApplication<Application>())
         Subscription.remove()
         _pings.value = emptyMap()
+        // 670. Вместе с подпиской — все данные приложения на телефоне
+        if (wipeData) {
+            com.apexvpn.client.data.DataCleaner.clear(getApplication())
+            com.apexvpn.client.data.RulesUpdater.remoteDir(getApplication()).deleteRecursively()
+            getApplication<Application>().getSharedPreferences("auto_modes", android.content.Context.MODE_PRIVATE).edit().clear().apply()
+            showMessage("Подписка и все данные удалены")
+        }
     }
 
     /** Применить восстановленную копию (файл или QR переноса): подписка, выбранный сервер, настройки. */
