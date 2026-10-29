@@ -2,6 +2,12 @@
 
 <img src="img/tags/new.svg" height="22"> <img src="img/tags/improved.svg" height="22"> <img src="img/tags/changed.svg" height="22"> <img src="img/tags/fixed.svg" height="22"> <img src="img/tags/removed.svg" height="22">
 
+## 2.7.1 · 29 октября 2026
+
+<img src="img/tags/new.svg" alt="Новое" height="22">
+
+- Пинг сервера на главном экране: плашка со столбиками сигнала и миллисекундами рядом с сервером. Под VPN — живой замер через сервер, без VPN — последний замер
+
 ## 2.7.0 · 29 октября 2026
 
 <img src="img/tags/new.svg" alt="Новое" height="22">

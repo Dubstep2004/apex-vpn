@@ -330,8 +330,7 @@ fun HomeScreen(
                 subtitle = when {
                     !auto -> "Сервер выбран вручную"
                     whitelist && settings.autoWhitelist -> "Белые списки · обход LTE" + (nowNode?.let { " · " + ServerInfo.title(it.name) } ?: "")
-                    nowNode != null && status == VpnStatus.Started -> "Сейчас: " + ServerInfo.title(nowNode.name) +
-                        (livePing.lastOrNull()?.takeIf { it >= 0 }?.let { " · $it мс" } ?: "")
+                    nowNode != null && status == VpnStatus.Started -> "Сейчас: " + ServerInfo.title(nowNode.name)
                     else -> "Самый быстрый из ${sub.nodes.size} серверов"
                 },
                 leading = {
@@ -345,7 +344,23 @@ fun HomeScreen(
                     }
                 },
                 onClick = onOpenServers,
-            ) { Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = Apex.TextDim) }
+            ) {
+                // Пинг сервера: под VPN — живой замер через сервер, без VPN — последний замер из списка
+                val serverPings by viewModel.pings.collectAsStateWithLifecycle()
+                val saved = remember(sub.nodes) { com.apexvpn.client.data.Prefs.lastPings() }
+                val tag = if (auto) nowNode?.tag else selected?.tag
+                val ms = when {
+                    status == VpnStatus.Started -> livePing.lastOrNull()
+                    tag != null -> serverPings[tag] ?: saved[tag]
+                    auto -> sub.nodes.mapNotNull { n -> (serverPings[n.tag] ?: saved[n.tag])?.takeIf { it > 0 } }.minOrNull()
+                    else -> null
+                }
+                if (ms != null) {
+                    PingPill(ms)
+                    Spacer(Modifier.width(6.dp))
+                }
+                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = Apex.TextDim)
+            }
             GroupDivider()
             ListRow(
                 title = settings.mode.title,
@@ -920,5 +935,39 @@ private fun CountryPhotoBackdrop(code: String) {
                 .background(Color.Black.copy(alpha = 0.35f))
                 .padding(horizontal = 8.dp, vertical = 3.dp),
         )
+    }
+}
+
+
+/** Пинг сервера плашкой: столбики сигнала и мс в цвет качества. */
+@Composable
+private fun PingPill(ms: Int) {
+    val color = if (ms < 0) Apex.Bad else pingColor(ms)
+    val bars = when {
+        ms < 0 -> 0
+        ms < 120 -> 3
+        ms < 300 -> 2
+        else -> 1
+    }
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .background(color.copy(alpha = 0.14f))
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            for (i in 1..3) {
+                Box(
+                    Modifier
+                        .width(3.dp)
+                        .height((4 + i * 3).dp)
+                        .clip(RoundedCornerShape(1.dp))
+                        .background(if (i <= bars) color else color.copy(alpha = 0.25f)),
+                )
+            }
+        }
+        Spacer(Modifier.width(6.dp))
+        Text(if (ms < 0) "нет" else "$ms мс", color = color, fontSize = 13.sp, fontWeight = FontWeight.Bold)
     }
 }
