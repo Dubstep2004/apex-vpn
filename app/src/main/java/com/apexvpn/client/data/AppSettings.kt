@@ -82,7 +82,8 @@ data class Settings(
     val photoBlur: Int = 6,                           // 563. размытие своего фото, dp (0…24)
     val photoDim: Int = 55,                           // 563. затемнение, % (0…90)
     val photoParallax: Boolean = true,                // 563. фото сдвигается при наклоне телефона
-    val rulesAuto: Boolean = true,                    // базы сайтов: проверять обновления раз в день
+    val rulesAuto: Boolean = true,                    // базы сайтов: проверять обновления сами
+    val rulesHours: Int = 24,                         // как часто: 6 | 12 | 24 | 168 часов
     val connectOnOpen: Boolean = false,               // подключать VPN при открытии приложения
     // «Пинг»: tcp — до сервера (TCP/QUIC) | get, head — через прокси (HTTP-запрос через сервер) | icmp
     val pingType: String = "tcp",
@@ -337,7 +338,7 @@ object AppSettings {
         put("remoteDns", s.remoteDns.json()); put("directDns", s.directDns.json()); put("rulesSource", s.rulesSource)
         put("warp", s.warp); put("warpConfig", s.warpConfig); put("shieldBackdrop", s.shieldBackdrop); put("backdropStamp", s.backdropStamp)
         put("iconStatus", s.iconStatus); put("animatedFlags", s.animatedFlags); put("task", s.task); put("hiddenApps", list(s.hiddenApps)); put("secret", s.secretUnlocked); put("shield3d", s.shield3d); put("automation", s.automation); put("appTraffic", s.appTraffic); put("autoSkipSpecial", s.autoSkipSpecial); put("autoWhitelist", s.autoWhitelist)
-        put("customAccent2", s.customAccent2); put("photoBlur", s.photoBlur); put("photoDim", s.photoDim); put("photoParallax", s.photoParallax); put("rulesAuto", s.rulesAuto); put("quicMode", s.quicMode); put("connectOnOpen", s.connectOnOpen)
+        put("customAccent2", s.customAccent2); put("photoBlur", s.photoBlur); put("photoDim", s.photoDim); put("photoParallax", s.photoParallax); put("rulesAuto", s.rulesAuto); put("rulesHours", s.rulesHours); put("quicMode", s.quicMode); put("connectOnOpen", s.connectOnOpen)
         put("pingType", s.pingType); put("pingMode", s.pingMode); put("pingTimeout", s.pingTimeout); put("pingUrl", s.pingUrl); put("pingView", s.pingView); put("autoMode", s.autoMode); put("modeColors", s.modeColors); put("directCountries", list(s.directCountries)); put("connLog", s.connLog); put("greeting", s.greeting)
     }
 
@@ -437,6 +438,7 @@ object AppSettings {
             photoDim = o.optInt("photoDim", d.photoDim).coerceIn(0, 90),
             photoParallax = o.optBoolean("photoParallax", d.photoParallax),
             rulesAuto = o.optBoolean("rulesAuto", d.rulesAuto),
+            rulesHours = o.optInt("rulesHours", d.rulesHours).takeIf { it in listOf(6, 12, 24, 168) } ?: d.rulesHours,
             connectOnOpen = o.optBoolean("connectOnOpen", d.connectOnOpen),
             autoMode = AutoModes.Mode.of(
                 o.optString("autoMode", "").ifEmpty {

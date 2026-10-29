@@ -1589,7 +1589,7 @@ private fun AdvancedPage(viewModel: MainViewModel, onBack: () -> Unit) {
         Group {
             ListRow(
                 "Автообновление баз",
-                if (s.rulesAuto) "Проверка раз в день, качаются только изменившиеся базы" else "Только по кнопке «Обновить базы»",
+                if (s.rulesAuto) "Проверка: " + when (s.rulesHours) { 6 -> "каждые 6 часов"; 12 -> "каждые 12 часов"; 168 -> "раз в неделю"; else -> "каждый день" } + ", качаются только изменившиеся базы" else "Только по кнопке «Обновить базы»",
                 onClick = { viewModel.change(reload = false) { copy(rulesAuto = !rulesAuto) } },
             ) { ApexSwitch(s.rulesAuto, { v -> viewModel.change(reload = false) { copy(rulesAuto = v) } }) }
             GroupDivider()

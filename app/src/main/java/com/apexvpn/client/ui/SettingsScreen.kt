@@ -5,6 +5,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
 import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
+import androidx.compose.material.icons.rounded.Update
 import androidx.compose.material.icons.rounded.Policy
 import androidx.compose.material.icons.rounded.NetworkPing
 import androidx.compose.material.icons.rounded.Shield
@@ -108,6 +109,7 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
     var editing by remember { mutableStateOf(false) }
     var supportDialog by remember { mutableStateOf(false) }
     var confirmRemove by remember { mutableStateOf(false) }
+    var rulesDialog by remember { mutableStateOf(false) }
     var coreDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
@@ -343,6 +345,47 @@ fun SettingsScreen(viewModel: MainViewModel, onOpenPage: (Page) -> Unit, onScanQ
                 leading = { tile(Icons.Rounded.Storage) },
                 onClick = { viewModel.updateRules() },
             ) { if (rulesUpdating) Spinner() }
+            GroupDivider()
+            // Автообновление баз — прямо здесь, а не только в «Маршрутизации»
+            ListRow(
+                "Автообновление баз",
+                if (s.rulesAuto) "${rulesPeriod(s.rulesHours)} · качаются только изменения · нажмите, чтобы изменить" else "Выключено — только по кнопке выше",
+                leading = { tile(Icons.Rounded.Update) },
+                onClick = { rulesDialog = true },
+            ) { ApexSwitch(s.rulesAuto, { v -> viewModel.change(reload = false) { copy(rulesAuto = v) } }) }
+        }
+        if (rulesDialog) {
+            AlertDialog(
+                onDismissRequest = { rulesDialog = false },
+                containerColor = Apex.Dialog,
+                title = { Text("Как часто обновлять базы", color = Apex.Text) },
+                text = {
+                    Column {
+                        listOf(6, 12, 24, 168).forEach { h ->
+                            Row(
+                                Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        viewModel.change(reload = false) { copy(rulesAuto = true, rulesHours = h) }
+                                        rulesDialog = false
+                                    }
+                                    .padding(vertical = 12.dp, horizontal = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                androidx.compose.material3.RadioButton(
+                                    selected = s.rulesAuto && s.rulesHours == h,
+                                    onClick = null,
+                                    colors = androidx.compose.material3.RadioButtonDefaults.colors(selectedColor = Apex.Accent),
+                                )
+                                Spacer(Modifier.width(10.dp))
+                                Text(rulesPeriod(h), color = Apex.Text, fontSize = 16.sp)
+                            }
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Text("Проверка почти не тратит трафик: качаются только изменившиеся базы. После обновления ядро подхватывает их само.", color = Apex.TextDim, fontSize = 13.sp)
+                    }
+                },
+                confirmButton = { TextButton(onClick = { rulesDialog = false }) { Text("Готово", color = Apex.Accent) } },
+            )
         }
 
         // ── Уведомления ──
@@ -863,4 +906,13 @@ private fun openLink(context: android.content.Context, url: String) {
     runCatching {
         context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
     }
+}
+
+
+/** «Каждые 6 часов», «Каждый день»… для автообновления баз. */
+private fun rulesPeriod(h: Int) = when (h) {
+    6 -> "Каждые 6 часов"
+    12 -> "Каждые 12 часов"
+    168 -> "Раз в неделю"
+    else -> "Каждый день"
 }

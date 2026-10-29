@@ -2,6 +2,16 @@
 
 <img src="img/tags/new.svg" height="22"> <img src="img/tags/improved.svg" height="22"> <img src="img/tags/changed.svg" height="22"> <img src="img/tags/fixed.svg" height="22"> <img src="img/tags/removed.svg" height="22">
 
+## 3.1.2 · 29 октября 2026
+
+<img src="img/tags/new.svg" alt="Новое" height="22">
+
+- Можно выбрать, как часто обновлять базы сайтов: каждые 6 часов, 12 часов, каждый день или раз в неделю
+
+<img src="img/tags/improved.svg" alt="Улучшено" height="22">
+
+- «Автообновление баз» теперь прямо в Настройках, под «Обновить базы сайтов», а не только в «Маршрутизации»
+
 ## 3.1.1 · 29 октября 2026
 
 <img src="img/tags/fixed.svg" alt="Исправлено" height="22">
