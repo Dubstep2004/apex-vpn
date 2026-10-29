@@ -32,12 +32,13 @@ object Pinger {
     const val UNKNOWN = -2
 
     /** tag → задержка в мс или UNREACHABLE */
-    suspend fun pingAll(nodes: List<Node>): Map<String, Int> = withContext(Dispatchers.IO) {
+    /** [save] = false — замер части серверов: сохранять будет вызывающий, вместе с остальными. */
+    suspend fun pingAll(nodes: List<Node>, save: Boolean = true): Map<String, Int> = withContext(Dispatchers.IO) {
         if (nodes.isEmpty()) return@withContext emptyMap()
         val running = VpnState.status.value == VpnStatus.Started
         if (running) {
             val viaCore = runCatching { viaClashApi(nodes) }.getOrNull()
-            if (viaCore != null) return@withContext viaCore.also { Prefs.saveLastPings(it) }
+            if (viaCore != null) return@withContext viaCore.also { if (save) Prefs.saveLastPings(it) }
         }
         val result = mutableMapOf<String, Int>()
         val udpNodes = nodes.filter { it.udp }
@@ -53,7 +54,7 @@ object Pinger {
         val limit = Semaphore(8)
         rest.map { node -> async { limit.withPermit { node.tag to tcpPing(node.server, node.port) } } }
             .awaitAll().toMap(result)
-        Prefs.saveLastPings(result)
+        if (save) Prefs.saveLastPings(result)
         result
     }
 

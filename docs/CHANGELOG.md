@@ -2,6 +2,22 @@
 
 <img src="img/tags/new.svg" height="22"> <img src="img/tags/improved.svg" height="22"> <img src="img/tags/changed.svg" height="22"> <img src="img/tags/fixed.svg" height="22"> <img src="img/tags/removed.svg" height="22">
 
+## 2.8.0 · 29 октября 2026
+
+<img src="img/tags/new.svg" alt="Новое" height="22">
+
+- Нажмите на пинг сервера в списке — он перепроверится прямо на месте: крутится индикатор, новый пинг «вспыхивает», а список сразу пересортируется
+- Метка «Автопилот» у сервера, который автопилот выбрал сейчас
+- Автопилот в списке серверов пишет, где он сейчас и в какой сети: «Сейчас Швеция · Wi-Fi»
+
+<img src="img/tags/improved.svg" alt="Улучшено" height="22">
+
+- На Wi-Fi серверы LTE-обхода показывают «только мобильный» вместо «нет ответа» — это не поломка
+
+<img src="img/tags/fixed.svg" alt="Исправлено" height="22">
+
+- Перепроверка одного сервера не стирает сохранённые замеры остальных
+
 ## 2.7.1 · 29 октября 2026
 
 <img src="img/tags/new.svg" alt="Новое" height="22">

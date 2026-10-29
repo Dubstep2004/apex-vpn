@@ -38,6 +38,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -83,6 +84,17 @@ fun ServerSheet(viewModel: MainViewModel, onDismiss: () -> Unit) {
     val whitelist by com.apexvpn.client.data.WhiteList.state.collectAsStateWithLifecycle()
     val autoNow by viewModel.autoNow.collectAsStateWithLifecycle()
     val nowNode = autoNow?.let { t -> sub.nodes.find { it.tag == t } }
+    val pingingTags by viewModel.pingingTags.collectAsStateWithLifecycle()
+    val pingFlash by viewModel.pingFlash.collectAsStateWithLifecycle()
+    // Сеть: на Wi-Fi серверы LTE-обхода обычно не отвечают — это нормально
+    val netKey = remember { com.apexvpn.client.data.DnsAuto.networkKey() }
+    val onWifi = netKey.startsWith("wifi") || netKey == "ethernet"
+    val netTitle = when {
+        netKey.startsWith("wifi") -> "Wi-Fi"
+        netKey == "mobile" -> "мобильная сеть"
+        netKey == "ethernet" -> "кабель"
+        else -> null
+    }
     fun ping(n: Node): Int? = pings[n.tag]
     fun key(n: Node) = ping(n)?.takeIf { it >= 0 } ?: Int.MAX_VALUE
     fun groupKey(g: ServerGroup) = g.nodes.minOf { key(it) }
@@ -143,7 +155,7 @@ fun ServerSheet(viewModel: MainViewModel, onDismiss: () -> Unit) {
                     subtitle = when {
                         !autopilot -> "Выключен: сервер выбран вручную"
                         whitelist && settings.autoWhitelist -> "Белые списки: выбирает только LTE-обход" + (nowNode?.let { " · сейчас ${ServerInfo.title(it.name)}" } ?: "")
-                        nowNode != null -> "Включён · сейчас ${ServerInfo.title(nowNode.name)}"
+                        nowNode != null -> "Сейчас ${ServerInfo.title(nowNode.name)}" + (netTitle?.let { " · $it" } ?: "")
                         else -> "Включён: сам выбирает самый быстрый"
                     },
                     leading = {
@@ -194,6 +206,11 @@ fun ServerSheet(viewModel: MainViewModel, onDismiss: () -> Unit) {
                     pings = pings,
                     selectedTag = if (autopilot) null else sub.selectedTag,
                     fastest = isFastest,
+                    autopilotHere = autopilot && nowNode != null && g.nodes.any { it.tag == nowNode.tag },
+                    pinging = g.nodes.any { it.tag in pingingTags },
+                    flash = g.nodes.sumOf { pingFlash[it.tag] ?: 0 },
+                    mobileOnly = onWifi && g.nodes.all { ServerInfo.isLte(it.name) },
+                    onPing = { viewModel.pingGroup(g.nodes.map { it.tag }) },
                     favorite = g.title in settings.favorites || g.nodes.any { it.name in settings.favorites },
                     onPick = pick,
                     onFavorite = { viewModel.toggleFavorite(g.title) },
@@ -274,7 +291,7 @@ fun ServerSheet(viewModel: MainViewModel, onDismiss: () -> Unit) {
             if (special.isNotEmpty() && tab != ServerTab.Lte) {
                 Caption("Россия нужна для российских сайтов из-за границы. Обход и LTE — только для мобильного интернета с белыми списками: на Wi-Fi выбирайте обычные страны.")
             }
-            Caption("★ — добавить в избранное. Долгое нажатие на сервер — ярлык на рабочий стол. Метки протоколов выбирают конкретное подключение. Пинг — время соединения с сервером; при включённом VPN — задержка через сервер.")
+            Caption("Нажмите на пинг — сервер проверится заново. ★ — добавить в избранное. Долгое нажатие на сервер — ярлык на рабочий стол. Метки протоколов выбирают конкретное подключение. Пинг — время соединения с сервером; при включённом VPN — задержка через сервер.")
             Spacer(Modifier.height(24.dp))
         }
       }
@@ -296,6 +313,11 @@ private fun GroupRow(
     pings: Map<String, Int>,
     selectedTag: String?,
     fastest: Boolean,
+    autopilotHere: Boolean = false,
+    pinging: Boolean = false,
+    flash: Int = 0,
+    mobileOnly: Boolean = false,
+    onPing: () -> Unit = {},
     favorite: Boolean,
     onPick: (Node) -> Unit,
     onFavorite: () -> Unit,
@@ -338,6 +360,10 @@ private fun GroupRow(
                 }
                 val info = listOf(shownNode.category, shownNode.detail).filter { it.isNotBlank() }.joinToString(" · ")
                 Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (autopilotHere) {
+                        Tag("Автопилот")
+                        Spacer(Modifier.width(6.dp))
+                    }
                     if (fastest) {
                         Tag("Быстрый")
                         Spacer(Modifier.width(6.dp))
@@ -350,13 +376,38 @@ private fun GroupRow(
                 }
             }
             Spacer(Modifier.width(8.dp))
-            val text = when (ping) {
-                null -> "…"
-                Pinger.UNREACHABLE -> "нет ответа"
-                Pinger.UNKNOWN -> "—"
+            val text = when {
+                ping == null -> "…"
+                // На Wi-Fi LTE-обход не отвечает — это не поломка, он для мобильной сети
+                mobileOnly && (ping == Pinger.UNREACHABLE || ping == Pinger.UNKNOWN) -> "только мобильный"
+                ping == Pinger.UNREACHABLE -> "нет ответа"
+                ping == Pinger.UNKNOWN -> "—"
                 else -> "$ping мс"
             }
-            Text(text, color = pingColor(ping ?: -1), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 10.dp))
+            // Нажатие на пинг — перепроверить только этот сервер; новый результат «вспыхивает»
+            val glow = remember { androidx.compose.animation.core.Animatable(0f) }
+            androidx.compose.runtime.LaunchedEffect(flash) {
+                if (flash > 0) {
+                    glow.snapTo(1f)
+                    glow.animateTo(0f, androidx.compose.animation.core.tween(1600))
+                }
+            }
+            val pc = if (mobileOnly && text == "только мобильный") Apex.TextDim else pingColor(ping ?: -1)
+            Box(
+                Modifier
+                    .padding(top = 4.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(pc.copy(alpha = 0.22f * glow.value))
+                    .clickable(enabled = !pinging, onClick = onPing)
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (pinging) {
+                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Apex.AccentText)
+                } else {
+                    Text(text, color = pc, fontSize = if (text.length > 12) 12.sp else 15.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
             Box(
                 Modifier.size(40.dp).clip(CircleShape).clickable(onClick = onFavorite),
                 contentAlignment = Alignment.Center,

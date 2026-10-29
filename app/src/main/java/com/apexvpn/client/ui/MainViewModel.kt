@@ -168,6 +168,34 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         applyToVpn()
     }
 
+    /** Серверы, которые сейчас перепроверяются по нажатию на пинг. */
+    private val _pingingTags = MutableStateFlow<Set<String>>(emptySet())
+    val pingingTags = _pingingTags.asStateFlow()
+    /** Сколько раз перепроверяли сервер — по смене числа строка «вспыхивает» новым пингом. */
+    private val _pingFlash = MutableStateFlow<Map<String, Int>>(emptyMap())
+    val pingFlash = _pingFlash.asStateFlow()
+
+    /** Нажатие на пинг: перепроверить только этот сервер (все его протоколы). */
+    fun pingGroup(tags: List<String>) {
+        if (tags.isEmpty() || tags.any { it in _pingingTags.value }) return
+        viewModelScope.launch {
+            _pingingTags.value = _pingingTags.value + tags
+            try {
+                val nodes = Subscription.state.value.nodes.filter { it.tag in tags }
+                val r = Pinger.pingAll(nodes, save = false).filterKeys { it in tags }
+                val merged = _pings.value.ifEmpty { com.apexvpn.client.data.Prefs.lastPings() } + r
+                _pings.value = merged
+                com.apexvpn.client.data.Prefs.saveLastPings(merged)
+                _pingFlash.value = _pingFlash.value + tags.associateWith { (_pingFlash.value[it] ?: 0) + 1 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) {
+            } finally {
+                _pingingTags.value = _pingingTags.value - tags.toSet()
+            }
+        }
+    }
+
     fun pingAll() {
         if (_pinging.value) return
         viewModelScope.launch {
