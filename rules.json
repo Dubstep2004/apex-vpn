@@ -1,0 +1,30 @@
+{
+ "updated": 1793430230,
+ "files": {
+  "geoip-ru.srs": {
+   "sha256": "bdca5cdb44cdcf0940001e5952386822a6f4ffa8b2c8eea00340aa6f585c7f9d",
+   "size": 50096,
+   "count": 10894
+  },
+  "geosite-category-ads-all.srs": {
+   "sha256": "54ef3a555666779d0083a3921f4b6534898088b2d63846f3ec57c43a5412a86c",
+   "size": 8131,
+   "count": 905
+  },
+  "geosite-category-betting-ru.srs": {
+   "sha256": "761a8b09a17094b8fb9e25899a057bf87fe6e0ca49513b5a72746c762f2e4f63",
+   "size": 222,
+   "count": 13
+  },
+  "geosite-category-porn.srs": {
+   "sha256": "2ccbf43ab8db8d5641e1462dcccd17407dd40bb77c658f8e96bb57b6334a9a42",
+   "size": 48915,
+   "count": 6661
+  },
+  "geosite-category-ru.srs": {
+   "sha256": "66d16eaba254233527e9a581a54a19f21385cb6bb9fdbda2dc3d3947facde4f0",
+   "size": 9024,
+   "count": 1145
+  }
+ }
+}
